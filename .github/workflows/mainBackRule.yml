@@ -1,0 +1,25 @@
+name: Deploy to Preproduction
+
+on: 
+  pull_request: 
+    branches:
+      - main-Back
+    types: [closed]
+    
+jobs:
+  deploy:
+    if: |
+      github.event.pull_request.merged == true && 
+      github.event.pull_request.head.ref == 'dev-Back'
+    
+    runs-on: ubuntu-latest
+        
+    steps:
+      - name: Checkout Codigo
+        uses: actions/checkout@v4
+    
+      - name: Executar Logs e Deploy
+        run: |
+          echo "Branch de origem: ${{ github.event.pull_request.head.ref }}"
+          echo "Branch de destino: ${{ github.event.pull_request.base.ref }}"
+          echo "Fazendo deploy..."
