@@ -1,4 +1,4 @@
-name: Deploy to Preproduction
+name: Deploy to Preproduction Backend
 
 on: 
   pull_request: 
