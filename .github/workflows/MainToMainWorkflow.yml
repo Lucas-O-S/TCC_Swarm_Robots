@@ -9,16 +9,17 @@ on:
 jobs:
   deploy:
     if: |
-          github.event.pull_request.merged == true && 
-          startsWith(github.event.pull_request.head.ref, 'main')
+      github.event.pull_request.merged == true && 
+      startsWith(github.event.pull_request.head.ref, 'main')
     
     runs-on: ubuntu-latest
         
     steps:
       - name: Checkout Codigo
-      uses: actions/checkout@v4
-      
-      run: |
+        uses: actions/checkout@v4
+    
+      - name: Executar Logs e Deploy
+        run: |
           echo "Branch de origem: ${{ github.event.pull_request.head.ref }}"
           echo "Branch de destino: ${{ github.event.pull_request.base.ref }}"
           echo "Fazendo deploy..."
