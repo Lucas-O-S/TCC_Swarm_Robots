@@ -4,13 +4,10 @@ on:
   pull_request: 
     branches:
       - main-Back
-    types: [closed]
     
 jobs:
   deploy:
-    if: |
-      github.event.pull_request.merged == true && 
-      github.event.pull_request.head.ref == 'dev-Back'
+    if: github.event.pull_request.head.ref == 'dev-Back'
     
     runs-on: ubuntu-latest
         
