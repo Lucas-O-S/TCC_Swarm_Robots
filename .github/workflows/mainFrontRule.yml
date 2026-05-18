@@ -18,9 +18,7 @@ jobs:
       - name: Validar Branchs
         run: |
           if [ "${{ github.event.pull_request.head.ref }}" != "dev-Front" ]; then
-            echo "Branch de origem: ${{ github.event.pull_request.head.ref }}"
-            echo "Branch de destino: ${{ github.event.pull_request.base.ref }}"
-            echo "Branch de origem não é dev-Front"
+            echo "❌ ERRO: A branch de origem não é 'dev-Front'. Merge bloqueado!"
             exit 1
           fi
           echo "Branch de origem é dev-Front"
