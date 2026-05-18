@@ -15,6 +15,16 @@ jobs:
       - name: Checkout Codigo
         uses: actions/checkout@v4
     
+      - name: Validar Branchs
+        run: |
+          if [ "${{ github.event.pull_request.head.ref }}" != "main" ]; then
+            echo "Branch de origem: ${{ github.event.pull_request.head.ref }}"
+            echo "Branch de destino: ${{ github.event.pull_request.base.ref }}"
+            echo "Branch de origem não é main"
+            exit 1
+          fi
+          echo "Branch de origem é main"
+          
       - name: Executar Logs e Deploy
         run: |
           echo "Branch de origem: ${{ github.event.pull_request.head.ref }}"

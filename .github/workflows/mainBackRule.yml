@@ -7,7 +7,6 @@ on:
     
 jobs:
   deploy:
-    if: github.event.pull_request.head.ref == 'dev-Back'
     
     runs-on: ubuntu-latest
         
@@ -15,8 +14,16 @@ jobs:
       - name: Checkout Codigo
         uses: actions/checkout@v4
     
-      - name: Executar Logs e Deploy
+      - name: Validar Branchs
         run: |
-          echo "Branch de origem: ${{ github.event.pull_request.head.ref }}"
-          echo "Branch de destino: ${{ github.event.pull_request.base.ref }}"
+          if [ "${{ github.event.pull_request.head.ref }}" != "dev-Back" ]; then
+            echo "Branch de origem: ${{ github.event.pull_request.head.ref }}"
+            echo "Branch de destino: ${{ github.event.pull_request.base.ref }}"
+            echo "Branch de origem não é dev-Back"
+            exit 1
+          fi
+          echo "Branch de origem é dev-Back"
+
+      - name: Executar Deploy
+        run: |
           echo "Fazendo deploy..."
