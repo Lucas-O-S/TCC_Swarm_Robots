@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard MARI - Enxame</title>
+    <link rel="stylesheet" href="styles/style.css">
+</head>
+
+<body>
+
+    <!-- HEXÁGONOS DECORATIVOS -->
+    <div class="hex-background">
+
+    <!-- ESQUERDA -->
+    <div class="hex-group left-top">
+        <div class="hex"></div>
+        <div class="hex light"></div>
+        <div class="hex"></div>
+        <div class="hex empty"></div>
+        <div class="hex light"></div>
+    </div>
+
+    <!-- DIREITA -->
+    <div class="hex-group right-top">
+        <div class="hex"></div>
+        <div class="hex"></div>
+        <div class="hex light"></div>
+        <div class="hex"></div>
+        <div class="hex empty"></div>
+        <div class="hex light"></div>
+    </div>
+
+    <!-- CENTRO SUAVE -->
+    <div class="hex-group center-soft">
+        <div class="hex small light"></div>
+        <div class="hex small empty"></div>
+    </div>
+
+</div>
+
+    <div class="dashboard-container">
+
+        <!-- MAPA -->
+        <main class="mapa-robos card">
+
+            <h2>Mapa do Enxame</h2>
+
+            <div class="canvas-container">
+                <canvas id="grid-mapa" width="580" height="480"></canvas>
+                <div id="mapa-tooltip"></div>
+            </div>
+
+        </main>
+
+        <!-- PAINEL LATERAL -->
+        <aside class="painel-lateral">
+
+            <!-- LISTA ROBÔS — data-id liga cada item ao robô no mapa -->
+            <section class="card lista-robos">
+
+                <div class="lista-robos-header">
+                    <span>Robô</span>
+                    <span>Conexão</span>
+                </div>
+
+                <div class="robo-item" data-id="0">
+                    <span>R01</span>
+                    <svg class="status-hex" viewBox="0 0 24 24"><polygon points="12,2 21,7 21,17 12,22 3,17 3,7" fill="#1a9e45"/></svg>
+                </div>
+
+                <div class="robo-item" data-id="1">
+                    <span>R02</span>
+                    <svg class="status-hex" viewBox="0 0 24 24"><polygon points="12,2 21,7 21,17 12,22 3,17 3,7" fill="#1a9e45"/></svg>
+                </div>
+
+                <div class="robo-item" data-id="2">
+                    <span>R03</span>
+                    <svg class="status-hex" viewBox="0 0 24 24"><polygon points="12,2 21,7 21,17 12,22 3,17 3,7" fill="#1a9e45"/></svg>
+                </div>
+
+                <div class="robo-item" data-id="3">
+                    <span>R04</span>
+                    <svg class="status-hex" viewBox="0 0 24 24"><polygon points="12,2 21,7 21,17 12,22 3,17 3,7" fill="#1a9e45"/></svg>
+                </div>
+
+                <div class="robo-item" data-id="4">
+                    <span>R05</span>
+                    <svg class="status-hex" viewBox="0 0 24 24"><polygon points="12,2 21,7 21,17 12,22 3,17 3,7" fill="#c0392b"/></svg>
+                </div>
+
+                <div class="robo-item" data-id="5">
+                    <span>R06</span>
+                    <svg class="status-hex" viewBox="0 0 24 24"><polygon points="12,2 21,7 21,17 12,22 3,17 3,7" fill="#c0392b"/></svg>
+                </div>
+
+            </section>
+
+            <!-- ALERTAS -->
+            <section class="card alertas-sistema">
+                <div class="lista-robos-header">
+                    <span>Alertas</span>
+                </div>
+                    <ul>
+                        <li class="alerta critico">R05 foi desconectado</li>
+                        <li class="alerta critico">R06 foi desconectado</li>
+                    </ul>
+            </section>
+
+        </aside>
+
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+
+            const canvas  = document.getElementById('grid-mapa');
+            const tooltip = document.getElementById('mapa-tooltip');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            const W = canvas.width;
+            const H = canvas.height;
+
+            const padding  = 40;
+            const cellSize = 40;
+            const HEX_R   = 13;   // raio do hexágono
+
+            const cols = Math.floor((W - padding * 2) / cellSize);
+            const rows = Math.floor((H - padding * 2) / cellSize);
+
+            // ---- dados dos robôs (índice == data-id na lista) ----
+            const ROBOS = [
+                { id: 0, label: 'R01', col: 2,  row: 1,  color: '#f28c28', online: true  },
+                { id: 1, label: 'R02', col: 3,  row: 2,  color: '#f28c28', online: true  },
+                { id: 2, label: 'R03', col: 5,  row: 4,  color: '#f28c28', online: true  },
+                { id: 3, label: 'R04', col: 10, row: 9,  color: '#f28c28', online: true  },
+                { id: 4, label: 'R05', col: 7,  row: 6,  color: '#f28c28', online: false },
+                { id: 5, label: 'R06', col: 9,  row: 3,  color: '#f28c28', online: false },
+            ];
+
+            // calcula coordenadas de tela para cada robô
+            ROBOS.forEach(r => {
+                r.x = padding + r.col * cellSize;
+                r.y = padding + r.row * cellSize;
+            });
+
+            // ---- estado de hover ----
+            let hoveredId = null;
+
+            // ---- funções de desenho ----
+
+            function drawBackground() {
+                ctx.fillStyle = "#ede5d0";
+                ctx.fillRect(0, 0, W, H);
+            }
+
+            function drawGrid() {
+                ctx.strokeStyle = "rgba(0,0,0,0.28)";
+                ctx.lineWidth = 1;
+
+                for (let c = 0; c <= cols; c++) {
+                    const x = padding + c * cellSize;
+                    ctx.beginPath();
+                    ctx.moveTo(x, padding);
+                    ctx.lineTo(x, padding + rows * cellSize);
+                    ctx.stroke();
+                }
+
+                for (let r = 0; r <= rows; r++) {
+                    const y = padding + r * cellSize;
+                    ctx.beginPath();
+                    ctx.moveTo(padding, y);
+                    ctx.lineTo(padding + cols * cellSize, y);
+                    ctx.stroke();
+                }
+            }
+
+            function hexPath(x, y, r) {
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const a  = (Math.PI / 3) * i - Math.PI / 6;
+                    const px = x + r * Math.cos(a);
+                    const py = y + r * Math.sin(a);
+                    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+            }
+
+            function drawRobos() {
+                ROBOS.forEach(robo => {
+                    const isHovered  = robo.id === hoveredId;
+                    const isOffline  = !robo.online;
+
+                    // anel de destaque quando hovered
+                    if (isHovered) {
+                        ctx.save();
+                        hexPath(robo.x, robo.y, HEX_R + 6);
+                        ctx.strokeStyle = '#c06800';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+
+                    // corpo do hexágono
+                    hexPath(robo.x, robo.y, HEX_R);
+                    ctx.fillStyle = isOffline
+                        ? (isHovered ? 'rgba(242,140,40,0.75)' : 'rgba(242,140,40,0.40)')
+                        : (isHovered ? '#e07818' : '#f28c28');
+                    ctx.fill();
+                });
+            }
+
+            function redraw() {
+                drawBackground();
+                drawGrid();
+                drawRobos();
+            }
+
+            redraw();
+
+            // ---- hit-test: está dentro do hexágono? ----
+            function hexHitTest(mx, my, robo) {
+                const dx = mx - robo.x;
+                const dy = my - robo.y;
+                return Math.sqrt(dx * dx + dy * dy) <= HEX_R + 6;
+            }
+
+            // ---- converte coordenada do mouse para coordenada do canvas ----
+            function canvasPos(e) {
+                const rect  = canvas.getBoundingClientRect();
+                const scaleX = canvas.width  / rect.width;
+                const scaleY = canvas.height / rect.height;
+                return {
+                    x: (e.clientX - rect.left) * scaleX,
+                    y: (e.clientY - rect.top)  * scaleY,
+                };
+            }
+
+            // ---- highlight da lista ----
+            function highlightLista(id) {
+                document.querySelectorAll('.robo-item').forEach(el => {
+                    el.classList.toggle('highlight', el.dataset.id == id);
+                });
+            }
+
+            function clearLista() {
+                document.querySelectorAll('.robo-item').forEach(el => {
+                    el.classList.remove('highlight');
+                });
+            }
+
+            // ---- posição do tooltip (em px relativos ao container) ----
+            function posTooltip(robo) {
+                const rect     = canvas.getBoundingClientRect();
+                const scaleX   = rect.width  / canvas.width;
+                const scaleY   = rect.height / canvas.height;
+
+                // robo.x / robo.y são coords do canvas; converte para px do container
+                tooltip.style.left = (robo.x * scaleX) + 'px';
+                tooltip.style.top  = (robo.y * scaleY) + 'px';
+                tooltip.textContent = robo.label;
+                tooltip.classList.add('visivel');
+            }
+
+            function hideTooltip() {
+                tooltip.classList.remove('visivel');
+            }
+
+            // ---- eventos do canvas ----
+
+            canvas.addEventListener('mousemove', e => {
+                const { x, y } = canvasPos(e);
+                const found = ROBOS.find(r => hexHitTest(x, y, r));
+
+                if (found) {
+                    if (hoveredId !== found.id) {
+                        hoveredId = found.id;
+                        redraw();
+                        highlightLista(found.id);
+                        posTooltip(found);
+                    }
+                    canvas.style.cursor = 'pointer';
+                } else {
+                    if (hoveredId !== null) {
+                        hoveredId = null;
+                        redraw();
+                        clearLista();
+                        hideTooltip();
+                    }
+                    canvas.style.cursor = 'default';
+                }
+            });
+
+            canvas.addEventListener('mouseleave', () => {
+                hoveredId = null;
+                redraw();
+                clearLista();
+                hideTooltip();
+            });
+
+            // ---- eventos da lista ----
+
+            document.querySelectorAll('.robo-item').forEach(el => {
+                el.addEventListener('mouseenter', () => {
+                    const id   = parseInt(el.dataset.id);
+                    const robo = ROBOS.find(r => r.id === id);
+                    if (!robo) return;
+
+                    hoveredId = id;
+                    redraw();
+                    highlightLista(id);
+                    posTooltip(robo);
+                });
+
+                el.addEventListener('mouseleave', () => {
+                    hoveredId = null;
+                    redraw();
+                    clearLista();
+                    hideTooltip();
+                });
+            });
+
+        });
+    </script>
+
+</body>
+
+</html>
