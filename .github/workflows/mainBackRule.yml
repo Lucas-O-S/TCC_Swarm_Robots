@@ -4,13 +4,9 @@ on:
   pull_request: 
     branches:
       - main-Back
-    types: [closed]
     
 jobs:
   deploy:
-    if: |
-      github.event.pull_request.merged == true && 
-      github.event.pull_request.head.ref == 'dev-Back'
     
     runs-on: ubuntu-latest
         
@@ -18,8 +14,14 @@ jobs:
       - name: Checkout Codigo
         uses: actions/checkout@v4
     
-      - name: Executar Logs e Deploy
+      - name: Validar Branchs
         run: |
-          echo "Branch de origem: ${{ github.event.pull_request.head.ref }}"
-          echo "Branch de destino: ${{ github.event.pull_request.base.ref }}"
+          if [ ${{ github.event.pull_request.head.ref }}.startsWith('main') != true ]; then
+            echo "❌ ERRO: A branch de origem não é 'main'. Merge bloqueado!"
+            exit 1
+          fi
+          echo "Branch de origem é dev-Back"
+
+      - name: Executar Deploy
+        run: |
           echo "Fazendo deploy..."
