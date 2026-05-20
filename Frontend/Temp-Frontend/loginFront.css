@@ -22,9 +22,10 @@ body{
 .logo-text{
     color: #f57c20;
     letter-spacing: 12px;
-    font-size: 75px;
+    font-size: 85px;
     margin-bottom: 20px;
     font-weight: 300;
+    font-family: monospace;
 }
     
 /* Área do e abelha */
