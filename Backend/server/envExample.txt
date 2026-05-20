@@ -1,0 +1,9 @@
+
+
+DB_HOST=             # Nome do serviço, pode ser o ip ou localhost
+DB_PORT=            # Porta padrão do Microsoft SQL
+DB_USERNAME=          # O usuário configurado no SQL_USER
+DB_PASSWORD=      # A senha configurada no SQL_PASSWORD
+DB_NAME= SwarmRobotsDb    # O banco de dados configurado no SQL_DATABASE
+
+secret = # Segredo da api para o auth

@@ -1,7 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import 'dotenv/config';
 import { AppModule } from './app.module';
-import { DocumentBuilder } from '@nestjs/swagger';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { transform } from 'typescript';
+import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
   
@@ -14,7 +16,17 @@ async function bootstrap() {
   .addBearerAuth()
   .build();
 
-  await app.listen(process.env.PORT ?? 3000);
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, document);
 
+  app.useGlobalPipes(new ValidationPipe({
+    transform: true,
+    whitelist: true,
+    forbidNonWhitelisted: true,
+  }));
+
+  await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
+  console.log(`Server is running on port ${process.env.PORT ?? 3000}`);
+  
 }
 bootstrap();
