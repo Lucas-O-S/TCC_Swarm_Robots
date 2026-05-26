@@ -1,0 +1,61 @@
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+}
+
+body{
+  background:#e7dcc0;
+  font-family: monospace;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
+}
+
+/* CARD */
+
+.container{
+  width:80%;
+  max-width:900px;
+
+  background:#f5efdf;
+
+  border-radius:20px;
+
+  padding:50px;
+}
+
+/* TABELA */
+
+.table{
+  width:100%;
+}
+
+/* HEADER */
+
+.table-header{
+  display:grid;
+
+  /* colunas alinhadas */
+  grid-template-columns: 150px 300px 120px;
+
+  margin-bottom:25px;
+
+  font-size:38px;
+  color:#333;
+}
+
+/* LINHAS */
+
+.table-row{
+  display:grid;
+
+  /* MESMAS colunas */
+  grid-template-columns: 150px 300px 120px;
+
+  padding:10px 0;
+
+  font-size:30px;
+  color:#333;
+}
