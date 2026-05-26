@@ -1,0 +1,305 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono&display=swap');
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: #e8dfc9;
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 36px;
+}
+
+/* ========================================
+   HEXÁGONOS DECORATIVOS
+======================================== */
+
+.hex-background {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* ========================================
+   GRUPOS
+======================================== */
+
+.hex-group {
+    position: absolute;
+    display: grid;
+    grid-template-columns: repeat(3, 90px);
+    gap: 4px;
+}
+
+/* deslocamento tipo colmeia */
+.hex-group .hex:nth-child(even) {
+    transform: translateY(48px);
+}
+
+/* ========================================
+   HEXÁGONOS
+======================================== */
+
+.hex {
+    width: 90px;
+    height: 100px;
+
+    clip-path: polygon(
+        25% 6%,
+        75% 6%,
+        100% 50%,
+        75% 94%,
+        25% 94%,
+        0% 50%
+    );
+
+    border: 1.5px solid rgba(90, 60, 20, 0.22);
+
+    background: rgba(242, 140, 40, 0.14);
+
+    box-shadow:
+        0 0 10px rgba(242,140,40,0.05),
+        inset 0 0 8px rgba(255,255,255,0.06);
+}
+
+/* claros */
+.hex.light {
+    opacity: 0.32;
+    filter: blur(0.4px);
+}
+
+/* vazios */
+.hex.empty {
+    background: transparent;
+}
+
+/* menores */
+.hex.small {
+    width: 55px;
+    height: 62px;
+}
+
+/* ========================================
+   POSIÇÕES
+======================================== */
+
+.left-top {
+    top: -20px;
+    left: -40px;
+}
+
+.right-top {
+    top: 30px;
+    right: -50px;
+}
+
+.center-soft {
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+/* ========================================
+   LAYOUT
+======================================== */
+
+.dashboard-container {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 18px;
+    max-width: 960px;
+    width: 100%;
+    position: relative;
+    z-index: 1;
+}
+
+/* ========================================
+   CARDS
+======================================== */
+
+.card {
+    background: #f2eada;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.07);
+}
+
+/* ========================================
+   MAPA
+======================================== */
+
+.mapa-robos h2 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #888;
+    margin-bottom: 14px;
+    letter-spacing: 0.04em;
+}
+
+.canvas-container {
+    position: relative;
+    display: flex;
+    justify-content: center;
+}
+
+#grid-mapa {
+    width: 100%;
+    border-radius: 8px;
+    display: block;
+    cursor: default;
+}
+
+/* tooltip sobre o canvas */
+#mapa-tooltip {
+    position: absolute;
+    background: rgba(58, 48, 32, 0.95); /* Um pouco de opacidade fica elegante */
+    color: #f5e9cc;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;                     /* Reduzi levemente para caber melhor */
+    line-height: 1.5;                    /* Melhora o espaçamento entre as linhas */
+    padding: 8px 12px;                   /* Mais espaço interno para as informações */
+    border-radius: 8px;
+    pointer-events: none;
+    text-align: left;                    /* Garante alinhamento à esquerda */
+    opacity: 0;
+    transition: opacity 0.15s;
+    transform: translate(-50%, -115%);   /* Ajustado para não cobrir o hexágono */
+    z-index: 10;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3); /* Sombra para destacar do mapa */
+}
+
+#mapa-tooltip.visivel {
+    opacity: 1;
+}
+
+/* ========================================
+   PAINEL LATERAL
+======================================== */
+
+.painel-lateral {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* ========================================
+   LISTA ROBÔS
+======================================== */
+
+.lista-robos { flex: 1; }
+
+.lista-robos-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+
+.lista-robos-header span {
+    font-size: 13px;
+    font-weight: 600;
+    color: #aaa;
+    letter-spacing: 0.03em;
+}
+
+.robo-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    padding: 5px 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.robo-item:hover {
+    background: rgba(0,0,0,0.05);
+}
+
+/* highlight ativado via JS (hover no canvas ou na lista) */
+.robo-item.highlight {
+    background: rgba(242, 140, 40, 0.18);
+}
+
+.robo-item span {
+    font-size: 15px;
+    font-weight: 500;
+    color: #555;
+    font-family: 'DM Mono', monospace;
+    transition: color 0.15s;
+}
+
+.robo-item.highlight span {
+    color: #c06800;
+}
+
+.status-hex {
+    width: 20px;
+    height: 20px;
+}
+
+.online-blink {
+    animation: sutil-brilho 2.5s infinite ease-in-out;
+}
+
+@keyframes sutil-brilho {
+    0%, 100% {
+        filter: drop-shadow(0 0 0px rgba(26, 158, 69, 0));
+        opacity: 0.85;
+    }
+    50% {
+        /* Cria um leve glow verde ao redor do hexágono */
+        filter: drop-shadow(0 0 3px rgba(26, 158, 69, 0.8));
+        opacity: 1;
+    }
+}
+
+/* ========================================
+   ALERTAS
+======================================== */
+
+/* ========================================
+   ALERTAS
+======================================== */
+
+.alertas-sistema ul { 
+    list-style: none; 
+}
+
+.alerta {
+    font-size: 13px;
+    font-family: 'DM Mono', monospace;
+    display: flex;             /* Alinha o horário e a mensagem lado a lado */
+    gap: 8px;                  /* Espaçamento entre o horário e o texto */
+    margin-bottom: 8px;        /* Espaço entre um alerta e outro */
+    line-height: 1.4;
+}
+
+/* Estilo do carimbo de data e hora */
+.alerta-timestamp {
+    color: #8a7a60;            /* Tom mais suave para não brigar com o vermelho do erro */
+    flex-shrink: 0;            /* Impede que o horário esmague se o texto for longo */
+}
+
+/* Cores dinâmicas para as mensagens dependendo do tipo */
+.alerta.critico .alerta-msg { color: #c0392b; }
+.alerta.info .alerta-msg    { color: #2980b9; }
+
+/* ========================================
+   RESPONSIVO
+======================================== */
+
+@media (max-width: 680px) {
+    .dashboard-container { grid-template-columns: 1fr; }
+    .hex-background { position: absolute; }
+}
