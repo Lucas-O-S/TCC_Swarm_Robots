@@ -160,18 +160,20 @@ body {
 /* tooltip sobre o canvas */
 #mapa-tooltip {
     position: absolute;
-    background: #3a3020;
+    background: rgba(58, 48, 32, 0.95); /* Um pouco de opacidade fica elegante */
     color: #f5e9cc;
     font-family: 'DM Mono', monospace;
-    font-size: 12px;
-    padding: 4px 10px;
-    border-radius: 6px;
+    font-size: 11px;                     /* Reduzi levemente para caber melhor */
+    line-height: 1.5;                    /* Melhora o espaçamento entre as linhas */
+    padding: 8px 12px;                   /* Mais espaço interno para as informações */
+    border-radius: 8px;
     pointer-events: none;
-    white-space: nowrap;
+    text-align: left;                    /* Garante alinhamento à esquerda */
     opacity: 0;
     transition: opacity 0.15s;
-    transform: translate(-50%, -130%);
+    transform: translate(-50%, -115%);   /* Ajustado para não cobrir o hexágono */
     z-index: 10;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3); /* Sombra para destacar do mapa */
 }
 
 #mapa-tooltip.visivel {
@@ -246,19 +248,52 @@ body {
     height: 20px;
 }
 
+.online-blink {
+    animation: sutil-brilho 2.5s infinite ease-in-out;
+}
+
+@keyframes sutil-brilho {
+    0%, 100% {
+        filter: drop-shadow(0 0 0px rgba(26, 158, 69, 0));
+        opacity: 0.85;
+    }
+    50% {
+        /* Cria um leve glow verde ao redor do hexágono */
+        filter: drop-shadow(0 0 3px rgba(26, 158, 69, 0.8));
+        opacity: 1;
+    }
+}
+
 /* ========================================
    ALERTAS
 ======================================== */
 
-.alertas-sistema ul { list-style: none; }
+/* ========================================
+   ALERTAS
+======================================== */
+
+.alertas-sistema ul { 
+    list-style: none; 
+}
 
 .alerta {
     font-size: 13px;
     font-family: 'DM Mono', monospace;
+    display: flex;             /* Alinha o horário e a mensagem lado a lado */
+    gap: 8px;                  /* Espaçamento entre o horário e o texto */
+    margin-bottom: 8px;        /* Espaço entre um alerta e outro */
+    line-height: 1.4;
 }
 
-.critico { color: #c0392b; }
-.info    { color: #2980b9; }
+/* Estilo do carimbo de data e hora */
+.alerta-timestamp {
+    color: #8a7a60;            /* Tom mais suave para não brigar com o vermelho do erro */
+    flex-shrink: 0;            /* Impede que o horário esmague se o texto for longo */
+}
+
+/* Cores dinâmicas para as mensagens dependendo do tipo */
+.alerta.critico .alerta-msg { color: #c0392b; }
+.alerta.info .alerta-msg    { color: #2980b9; }
 
 /* ========================================
    RESPONSIVO
