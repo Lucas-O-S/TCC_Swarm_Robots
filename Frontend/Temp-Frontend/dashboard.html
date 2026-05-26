@@ -67,22 +67,22 @@
 
                 <div class="robo-item" data-id="0">
                     <span>R01</span>
-                    <svg class="status-hex" viewBox="0 0 24 24"><polygon points="12,2 21,7 21,17 12,22 3,17 3,7" fill="#1a9e45"/></svg>
+                    <svg class="status-hex online-blink" viewBox="0 0 24 24"><polygon points="12,2 21,7 21,17 12,22 3,17 3,7" fill="#1a9e45"/></svg>
                 </div>
 
                 <div class="robo-item" data-id="1">
                     <span>R02</span>
-                    <svg class="status-hex" viewBox="0 0 24 24"><polygon points="12,2 21,7 21,17 12,22 3,17 3,7" fill="#1a9e45"/></svg>
+                    <svg class="status-hex online-blink" viewBox="0 0 24 24"><polygon points="12,2 21,7 21,17 12,22 3,17 3,7" fill="#1a9e45"/></svg>
                 </div>
 
                 <div class="robo-item" data-id="2">
                     <span>R03</span>
-                    <svg class="status-hex" viewBox="0 0 24 24"><polygon points="12,2 21,7 21,17 12,22 3,17 3,7" fill="#1a9e45"/></svg>
+                    <svg class="status-hex online-blink" viewBox="0 0 24 24"><polygon points="12,2 21,7 21,17 12,22 3,17 3,7" fill="#1a9e45"/></svg>
                 </div>
 
                 <div class="robo-item" data-id="3">
                     <span>R04</span>
-                    <svg class="status-hex" viewBox="0 0 24 24"><polygon points="12,2 21,7 21,17 12,22 3,17 3,7" fill="#1a9e45"/></svg>
+                    <svg class="status-hex online-blink" viewBox="0 0 24 24"><polygon points="12,2 21,7 21,17 12,22 3,17 3,7" fill="#1a9e45"/></svg>
                 </div>
 
                 <div class="robo-item" data-id="4">
@@ -103,8 +103,14 @@
                     <span>Alertas</span>
                 </div>
                     <ul>
-                        <li class="alerta critico">R05 foi desconectado</li>
-                        <li class="alerta critico">R06 foi desconectado</li>
+                        <li class="alerta critico">
+            			<span class="alerta-timestamp">[25/05 20:42]</span>
+            			<span class="alerta-msg">R05 foi desconectado</span>
+        		</li>
+        		<li class="alerta critico">
+            			<span class="alerta-timestamp">[25/05 20:43]</span>
+            			<span class="alerta-msg">R06 foi desconectado</span>
+        		</li>
                     </ul>
             </section>
 
@@ -132,13 +138,13 @@
 
             // ---- dados dos robôs (índice == data-id na lista) ----
             const ROBOS = [
-                { id: 0, label: 'R01', col: 2,  row: 1,  color: '#f28c28', online: true  },
-                { id: 1, label: 'R02', col: 3,  row: 2,  color: '#f28c28', online: true  },
-                { id: 2, label: 'R03', col: 5,  row: 4,  color: '#f28c28', online: true  },
-                { id: 3, label: 'R04', col: 10, row: 9,  color: '#f28c28', online: true  },
-                { id: 4, label: 'R05', col: 7,  row: 6,  color: '#f28c28', online: false },
-                { id: 5, label: 'R06', col: 9,  row: 3,  color: '#f28c28', online: false },
-            ];
+                { id: 0, label: 'R01', col: 2,  row: 1,  color: '#f28c28', online: true,  status: 'Operacional', tarefa: 'Coletando ferramentas' },
+    		{ id: 1, label: 'R02', col: 3,  row: 2,  color: '#f28c28', online: true,  status: 'Operacional', tarefa: 'Mapeando área B' },
+    		{ id: 2, label: 'R03', col: 5,  row: 4,  color: '#f28c28', online: true,  status: 'Retornando',  tarefa: 'Recarga de bateria' },
+    		{ id: 3, label: 'R04', col: 10, row: 9,  color: '#f28c28', online: true,  status: 'Aguardando',  tarefa: 'Nenhuma' },
+    		{ id: 4, label: 'R05', col: 7,  row: 6,  color: '#f28c28', online: false, status: 'Desconectado', tarefa: 'Desconhecida' },
+    		{ id: 5, label: 'R06', col: 9,  row: 3,  color: '#f28c28', online: false, status: 'Desconectado', tarefa: 'Desconhecida' },
+	    ];
 
             // calcula coordenadas de tela para cada robô
             ROBOS.forEach(r => {
@@ -253,16 +259,23 @@
 
             // ---- posição do tooltip (em px relativos ao container) ----
             function posTooltip(robo) {
-                const rect     = canvas.getBoundingClientRect();
-                const scaleX   = rect.width  / canvas.width;
-                const scaleY   = rect.height / canvas.height;
+    		const rect   = canvas.getBoundingClientRect();
+    		const scaleX = rect.width  / canvas.width;
+    		const scaleY = rect.height / canvas.height;
 
-                // robo.x / robo.y são coords do canvas; converte para px do container
-                tooltip.style.left = (robo.x * scaleX) + 'px';
-                tooltip.style.top  = (robo.y * scaleY) + 'px';
-                tooltip.textContent = robo.label;
-                tooltip.classList.add('visivel');
-            }
+   	 // robo.x / robo.y são coords do canvas; converte para px do container
+    		tooltip.style.left = (robo.x * scaleX) + 'px';
+ 	   tooltip.style.top  = (robo.y * scaleY) + 'px';
+    
+    	// Monta o HTML interno com os novos dados
+    		tooltip.innerHTML = `
+       		 <strong>Robô:</strong> ${robo.label}<br>
+     		   <strong>Status:</strong> ${robo.status}<br>
+      		  <strong>Tarefa:</strong> ${robo.tarefa}
+  	  `;
+    
+ 	   tooltip.classList.add('visivel');
+	    }
 
             function hideTooltip() {
                 tooltip.classList.remove('visivel');
