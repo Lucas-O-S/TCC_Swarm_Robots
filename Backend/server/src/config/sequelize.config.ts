@@ -10,7 +10,7 @@ export const sequelizeConfig: SequelizeModuleOptions = {
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
     autoLoadModels: true,
-    synchronize: true,
+    synchronize: false,
     timezone: "-03:00",
     dialectOptions: {
         encrypt: false,
