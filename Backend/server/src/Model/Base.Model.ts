@@ -1,25 +1,31 @@
 import { Model } from "sequelize";
-import { Column, PrimaryKey } from "sequelize-typescript";
+import { Column, PrimaryKey, Default, DataType, CreatedAt, UpdatedAt, DeletedAt } from "sequelize-typescript";
 
-
-
+/**
+ * Colunas de auditoria realmente universais (pk + timestamps).
+ *
+ * "Name" foi removido daqui de propósito: nem toda tabela tem nome
+ * (ex.: `position` não tem), então cada model concreto declara os
+ * campos que fazem sentido pra ele.
+ *
+ * Os models concretos devem usar `@Table({ underscored: true, paranoid: true })`
+ * para que os nomes de coluna batam com o snake_case usado no init.sql
+ * (createdAt -> created_at, etc). Sem isso, o Sequelize monta queries com
+ * o nome exato do atributo (camelCase) e o Postgres não encontra a coluna.
+ */
 export abstract class BaseModel<T extends Model = any> extends Model<T> {
 
-    @Column
     @PrimaryKey
-    UUID: string;
+    @Default(DataType.UUIDV4)
+    @Column(DataType.UUID)
+    uuid: string;
 
-    @Column
-    Name: string;
+    @CreatedAt
+    createdAt: Date;
 
-    @Column
-    CreatedAt: Date;
+    @UpdatedAt
+    updatedAt: Date;
 
-    @Column
-    UpdatedAt: Date;
-
-    @Column
-    DeletedAt: Date;
-
-
+    @DeletedAt
+    deletedAt: Date;
 }
