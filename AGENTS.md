@@ -7,11 +7,32 @@ Repositório: [github.com/Lucas-O-S/TCC_Swarm_Robots](https://github.com/Lucas-O
 TCC (trabalho de conclusão de curso) que replica a arquitetura do projeto
 [DotBots](https://github.com/DotBots) ("Dazzling Swarm Robots" - Inria/Paris),
 mas mantendo backend em **NestJS + PostgreSQL/Sequelize** em vez do backend
-Python (FastAPI) que o DotBots usa. A referência principal é o
-[PyDotBot](https://github.com/DotBots/PyDotBot) - o "control plane" deles,
-que expõe REST + WebSocket para controlar e rastrear uma frota de robôs via
-um gateway de rádio. Não estamos usando o código deles, só a arquitetura e o
-formato de protocolo como especificação a seguir.
+Python (FastAPI) que o DotBots usa.
+
+A inspiração é a **organização DotBots como um todo** (github.com/DotBots),
+não um repo só - cada repo do org cobre uma camada diferente do problema.
+Os dois que mais importam pra este projeto, cada um com um papel diferente:
+
+- **[PyDotBot](https://github.com/DotBots/PyDotBot)** é a referência pra
+  parte que conecta com o front: o "control plane" que expõe REST +
+  WebSocket pra controlar/rastrear a frota via um gateway de rádio - formato
+  dos payloads (waypoints, rgb-led, move-raw), modelo de status
+  (`DotBotStatus`) e o enum de modo (`ControlModeType` Manual/Auto). É daqui
+  que vem a estrutura de rotas do `RobotController` e o `RobotsGateway`
+  (WebSocket) planejado.
+- **[swarmit](https://github.com/DotBots/swarmit)** é a inspiração pro lado
+  de automação/orquestração do enxame. Diferente do PyDotBot (que só manda
+  uma lista de waypoints avulsa, sem persistir nada), o swarmit trata o
+  robô como algo que roda um "programa"/experimento gerenciado
+  remotamente (`flash`/`start`/`stop`/`monitor`/`status`), com um servidor
+  compartilhado que já usa **JWT** (`swarmit serve`) - o mesmo caminho que a
+  gente já adotou aqui. É o paradigma mais próximo do que queremos pro lado
+  automatizado: `Task` ganhar conteúdo real e o sistema conseguir
+  atribuir/executar trabalho no enxame sem um operador clicando em cada
+  robô.
+
+Não estamos usando o código de nenhum desses repos, só a arquitetura e os
+formatos de protocolo/decisões de design como especificação a seguir.
 
 Este arquivo existe para que qualquer sessão do Claude (ou qualquer pessoa)
 que continue este projeto - inclusive de outro computador - tenha o
@@ -19,6 +40,37 @@ contexto das decisões já tomadas, sem precisar re-derivar tudo de novo.
 As "folder instructions" configuradas no Cowork têm só a instrução original
 de uma linha; este arquivo é a fonte de verdade detalhada, versionada com o
 resto do código.
+
+## Objetivo: controle manual + automatizado
+
+O dono do projeto quer que o sistema permita **os dois modos de controle
+convivendo**, não um só:
+
+- **Manual**: operador manda comando direto pra um robô específico (tipo
+  joystick/waypoint avulso) - já mapeado no protocolo via
+  `RobotControlMode.Manual`.
+- **Automatizado**: o sistema atribui/executa `Task`s sozinho, sem um
+  humano clicando em cada robô - `RobotControlMode.Auto`. Cada robô tem seu
+  próprio modo (coluna `mode` em `robots`), então dá pra ter parte da frota
+  em manual e parte em automático ao mesmo tempo.
+
+Sobre funcionar **"de forma adaptativa"** (pergunta feita no chat) - a
+resposta é "depende do nível", ainda nenhum foi implementado:
+
+1. **Atribuição automática simples** (viável com o que já existe hoje,
+   uma vez que `Task` ganhe conteúdo de missão - ver "Pendente"): o sistema
+   escolhe automaticamente qual robô pega qual task pendente, com base em
+   prioridade/status/bateria. É lógica de consulta ao Postgres, não precisa
+   de nada em tempo real.
+2. **Reativo/adaptativo de verdade** (precisa do `SwarmService` + WebSocket,
+   itens 5/6 do "Pendente", ainda não construídos): o sistema reage a
+   mudanças de estado *enquanto elas acontecem* - reatribui a task se o
+   robô ficar `LOST` no meio, manda voltar pra carregar se a bateria cair
+   demais, rebalanceia quando um robô novo entra na rede. Sem o estado
+   quente em memória + os eventos de WebSocket, isso só dá pra fazer via
+   polling do banco (funciona, mas não é "tempo real").
+3. **Aprendizado/otimização** (ex.: machine learning pra decidir alocação) -
+   fora de escopo por enquanto, não faz parte do plano atual.
 
 ## Stack
 
@@ -217,45 +269,83 @@ legibilidade em SQL cru pra relatórios do TCC, a ideia (ainda não aplicada)
 
 ## Pendente (próximos passos)
 
-1. ~~`Position.Model.ts` (Sequelize) + registrar em `Robot.module.ts`.~~ **Feito**,
-   junto com `Task.Model.ts` e as associações (`@BelongsTo`/`@HasMany`).
-2. Tabelas de referência opcionais (`robot_applications`, `robot_control_modes`).
-3. Módulo `Protocol`: encode/decode dos payloads binários (mirror de
-   `dotbot/protocol.py` - `PayloadType`, `PayloadCommandRgbLed`,
-   `PayloadDotBotAdvertisement`, etc.), usando `Buffer` no lugar dos
-   dataclasses do Python.
-4. Módulo de transporte (`GatewayAdapter`): interface comum + implementação
-   `SerialGatewayAdapter` (lib `serialport`) e `SimulatorGatewayAdapter`
-   (pra desenvolver sem hardware).
-5. `SwarmService`: estado em memória (`Map<address, RobotState>`),
-   processamento de frames recebidos (mirror de
-   `Controller.handle_received_frame`), throttling de escrita no Postgres.
-6. `RobotsGateway` (WebSocket, `@nestjs/websockets`) emitindo os eventos
-   `NEW_DOTBOT` / `UPDATE` / `RELOAD` (mirror de `DotBotNotificationCommand`).
-7. ~~Preencher `Robot.Controller.ts`/`Robot.Service.ts`/`robot.create.dto.ts`~~
-   **Feito** o CRUD genérico (via `BaseController`/`BaseService`) + DTOs.
-   Ainda faltam as rotas específicas do protocolo: `GET /robots/:address`,
-   `PUT /robots/:address/move-raw`, `/rgb-led`, `/waypoints` (mapeando
-   `dotbot/server.py` do PyDotBot - `address`, não `uuid`, porque são
-   endereçadas fisicamente).
-8. ~~`TaskModule`/`PositionModule` dedicados~~ **Feito**: cada um com
-   `Repository`/`Service`/`Controller`/`module`/DTOs/`Schema`, mesmo padrão
-   do Robot (`Base*` + `JwtAuthGuard` + DTO concreto no create/update).
-   `Robot.module.ts` voltou a registrar só `RobotModel`. `init.sql` ganhou
-   um seed de task padrão (`uuid` fixo `00000000-0000-0000-0000-000000000001`,
-   "Tarefa padrão") - só roda em volume novo, mesma ressalva do `users`
-   (se o volume já existe, precisa `docker-compose down -v` de novo).
-   `TaskModel`/`PositionModel` ainda só têm os campos básicos (`name`/
-   `priority` na task; `x`/`y`/`source`/`direction` na position) - Task
-   ainda não carrega dado de missão de verdade (ver observação no chat sobre
-   isso), e Position normalmente seria escrita pelo `SwarmService`
-   (throttled) em vez de por um usuário direto, mas o CRUD genérico fica
-   disponível igual às outras entidades.
-9. ~~Decidir se o projeto vai ter autenticação de operador~~ **Feito**: auth
-   básica usuário/senha implementada (ver seção "Autenticação"), com toggle
-   `AUTH_ACTIVATED` pra ligar/desligar. Ainda em aberto: roles/permissões
-   (admin vs operador comum) - hoje todo usuário autenticado tem acesso
-   igual.
+Itens já concluídos, resumidos (histórico completo nas seções acima):
+`Position.Model.ts`/`Task.Model.ts` + associações; CRUD genérico
+(`Base*`) de Robot/Task/Position/User com DTOs/Schema/Guard; auth básica
+usuário/senha com toggle `AUTH_ACTIVATED`; `IndexModule`;
+`ApiResponseInterface` via interceptor/filter globais.
+
+Tabela de referência opcional (`robot_applications`, `robot_control_modes`,
+só pra legibilidade de SQL/relatório) segue de baixa prioridade, sem data.
+
+**Objetivo combinado: nível 2 de automação** (ver "Objetivo: controle
+manual + automatizado" acima) - o plano abaixo está ordenado por
+dependência real, cada bloco precisa do anterior:
+
+**A. Schema/model** (rápido, sem dependência de nada)
+1. `TaskModel` ganha `status` (pendente/em_andamento/concluída/cancelada) -
+   sem isso não dá pra saber quais tasks estão livres pra atribuir.
+2. `TaskModel` ganha conteúdo de missão real: tabela `task_waypoints`
+   (`task_id`, `order`, `x`, `y`) - sem isso não tem o que mandar pro robô.
+
+**B. Dependências novas no `package.json`**
+3. `serialport` - USB com o gateway de rádio (bloco D).
+4. `@nestjs/websockets` + `socket.io` (ou `ws`) - bloco G.
+5. `@nestjs/event-emitter` - desacopla `SwarmService` do `Orchestrator`
+   (opcional, mas evita acoplamento direto entre as duas classes).
+
+**C. Módulo `Protocol`** (mirror de `dotbot/protocol.py`)
+6. Encode/decode dos payloads binários (`PayloadCommandMoveRaw`,
+   `PayloadCommandRgbLed`, `PayloadDotBotAdvertisement`,
+   `PayloadLH2Waypoints`, etc.) usando `Buffer`.
+7. Frame wrapper (header + payload, endereçado por `address`).
+
+**D. Módulo de transporte (`GatewayAdapter`)**
+8. Interface comum (`send(address, payload)`, `onFrameReceived(callback)`).
+9. `SerialGatewayAdapter` (hardware real via USB).
+10. `SimulatorGatewayAdapter` (fake, pra testar sem hardware).
+
+> **Controle manual já funciona só com C + D prontos** - não depende de
+> `Task`/`SwarmService`/`Orchestrator` (blocos E/F) de jeito nenhum. Ou
+> seja: dá pra testar `move-raw`/`rgb-led`/`waypoints` direto num robô
+> específico (endereçado por `address`) assim que o Protocolo e o
+> Transporte existirem, sem esperar a automação de tasks ficar pronta.
+>
+> **Ordem de teste recomendada**: construir C+D, testar o controle manual
+> de ponta a ponta usando o `SimulatorGatewayAdapter` (sem precisar do
+> robô físico o tempo todo) e só depois subir pra E/F/G (automação).
+
+**E. `SwarmService`** (estado quente, mirror de `Controller.dotbots`)
+11. `Map<address, RobotLiveState>` em memória.
+12. Processa frame recebido: atualiza posição/bateria/`waypoint_idx`.
+13. Job periódico (1s) recalculando status Active/Inactive/Lost a partir
+    de `lastSync` (igual `_dotbots_status_refresh` do PyDotBot).
+14. Throttling de escrita no Postgres (não grava a cada pacote bruto).
+15. Emite eventos quando algo relevante muda (status mudou, bateria cruzou
+    limite, `waypoint_idx` chegou no fim).
+
+**F. `Orchestrator`** (peça nova, não existe no PyDotBot - é o "cérebro"
+adaptativo pro nível 2, inspirado na ideia de orquestração do `swarmit`)
+16. Escuta os eventos do `SwarmService`.
+17. Atribuição automática por prioridade (nível 1), disparada por evento
+    (task criada / robô ficou livre / robô novo entrou na rede).
+18. Regras de nível 2: robô `Lost` com task → libera a task; bateria baixa
+    → interrompe/retorna e libera a task; `waypoint_idx` no fim → marca
+    task concluída e libera o robô.
+
+**G. `RobotsGateway`** (WebSocket, mirror de `DotBotNotificationCommand`)
+19. Emite pro front `NEW_DOTBOT`/`UPDATE`/`RELOAD` + eventos próprios
+    (`TASK_REASSIGNED`/`TASK_COMPLETED`).
+20. Recebe comando do front em tempo real (joystick manual via socket, não
+    só REST).
+
+**H. Rotas REST específicas do protocolo** (precisam de C+D pra funcionar
+de verdade, não só retornar erro)
+21. `GET /robots/:address`, `PUT /robots/:address/move-raw`, `/rgb-led`,
+    `/waypoints`, `/control-mode` (mapeando `dotbot/server.py` - `address`,
+    não `uuid`, porque são endereçadas fisicamente).
+22. `PUT /robots/:address/task/:taskId` - atribuição manual de task, que
+    também aciona o `Orchestrator` (bloco F).
 
 ## Don't
 
