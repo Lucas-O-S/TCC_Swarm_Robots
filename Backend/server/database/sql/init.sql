@@ -20,6 +20,13 @@ CREATE TABLE tasks (
     deleted_at TIMESTAMP NULL
 );
 
+-- Task padrão/genérica: uuid fixo pra poder ser referenciada (ex.: robô que
+-- ainda não tem uma tarefa "de verdade" atribuída, mas você quer um valor
+-- não-nulo pra testar). Não é atribuída a `robots.task_id` automaticamente -
+-- isso continua nullable, cada robô só ganha essa task se alguém atribuir.
+INSERT INTO tasks (uuid, name, priority)
+VALUES ('00000000-0000-0000-0000-000000000001', 'Tarefa padrão', 0);
+
 
 CREATE TABLE robots (
     uuid UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

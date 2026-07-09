@@ -238,9 +238,19 @@ legibilidade em SQL cru pra relatórios do TCC, a ideia (ainda não aplicada)
    `PUT /robots/:address/move-raw`, `/rgb-led`, `/waypoints` (mapeando
    `dotbot/server.py` do PyDotBot - `address`, não `uuid`, porque são
    endereçadas fisicamente).
-8. `TaskModule`/`PositionModule` dedicados, se/quando ganharem endpoints
-   próprios (hoje os models estão registrados dentro de `Robot.module.ts`
-   por conveniência).
+8. ~~`TaskModule`/`PositionModule` dedicados~~ **Feito**: cada um com
+   `Repository`/`Service`/`Controller`/`module`/DTOs/`Schema`, mesmo padrão
+   do Robot (`Base*` + `JwtAuthGuard` + DTO concreto no create/update).
+   `Robot.module.ts` voltou a registrar só `RobotModel`. `init.sql` ganhou
+   um seed de task padrão (`uuid` fixo `00000000-0000-0000-0000-000000000001`,
+   "Tarefa padrão") - só roda em volume novo, mesma ressalva do `users`
+   (se o volume já existe, precisa `docker-compose down -v` de novo).
+   `TaskModel`/`PositionModel` ainda só têm os campos básicos (`name`/
+   `priority` na task; `x`/`y`/`source`/`direction` na position) - Task
+   ainda não carrega dado de missão de verdade (ver observação no chat sobre
+   isso), e Position normalmente seria escrita pelo `SwarmService`
+   (throttled) em vez de por um usuário direto, mas o CRUD genérico fica
+   disponível igual às outras entidades.
 9. ~~Decidir se o projeto vai ter autenticação de operador~~ **Feito**: auth
    básica usuário/senha implementada (ver seção "Autenticação"), com toggle
    `AUTH_ACTIVATED` pra ligar/desligar. Ainda em aberto: roles/permissões
