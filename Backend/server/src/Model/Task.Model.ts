@@ -1,4 +1,4 @@
-import { Column, DataType, HasMany, Table } from "sequelize-typescript";
+import { Column, DataType, Default, HasMany, Table } from "sequelize-typescript";
 import { BaseModel } from "./Base.Model";
 import { RobotModel } from "./Robot.Model";
 
@@ -13,6 +13,8 @@ export class TaskModel extends BaseModel<TaskModel> {
     @Column({ type: DataType.STRING, allowNull: false })
     name: string;
 
+    /** Quanto menor, mais prioritária. Default 0 - não é obrigatório informar. */
+    @Default(0)
     @Column({ type: DataType.INTEGER, allowNull: false })
     priority: number;
 

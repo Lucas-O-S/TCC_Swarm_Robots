@@ -1,31 +1,9 @@
-import { Column, DataType, Default, Table } from "sequelize-typescript";
+import { BelongsTo, Column, DataType, Default, ForeignKey, Table } from "sequelize-typescript";
 import { BaseModel } from "./Base.Model";
-
-/** ApplicationType do protocolo DotBot */
-export enum RobotApplication {
-    DotBot = 0,
-    SailBot = 1,
-    Freebot = 2,
-    XGO = 3,
-    LH2MiniMote = 4,
-}
-
-/**
- * DotBotStatus. Valor cacheado: a fonte da verdade é recalculada
- * periodicamente a partir de `lastSync` (ACTIVE < 5s, INACTIVE < 60s,
- * LOST caso contrário), igual ao `_dotbots_status_refresh` do PyDotBot.
- */
-export enum RobotStatus {
-    Active = 0,
-    Inactive = 1,
-    Lost = 2,
-}
-
-/** ControlModeType do protocolo. */
-export enum RobotControlMode {
-    Manual = 0,
-    Auto = 1,
-}
+import { TaskModel } from "./Task.Model";
+import { RobotStatus } from "./Enums/RobotStatus.enum";
+import { RobotApplication } from "../Protocol/Enums/RobotApplication.enum";
+import { RobotControlMode } from "../Protocol/Enums/RobotControlMode.enum";
 
 @Table({ tableName: "robots", underscored: true, paranoid: true })
 export class RobotModel extends BaseModel<RobotModel> {
@@ -57,9 +35,6 @@ export class RobotModel extends BaseModel<RobotModel> {
     @Column({ type: DataType.SMALLINT, allowNull: false })
     mode: RobotControlMode;
 
-    @Column({ type: DataType.INTEGER, allowNull: true })
-    direction: number;
-
     /** Bitmask de calibração LH2: bit0 = lighthouse 1, bit1 = lighthouse 2. */
     @Default(0)
     @Column({ type: DataType.SMALLINT, allowNull: false })
@@ -84,6 +59,10 @@ export class RobotModel extends BaseModel<RobotModel> {
      * Nullable: um robô pode existir (acabou de anunciar na rede) sem
      * ainda ter uma tarefa atribuída.
      */
+    @ForeignKey(() => TaskModel)
     @Column({ type: DataType.UUID, allowNull: true })
     taskId: string;
+
+    @BelongsTo(() => TaskModel)
+    task: TaskModel;
 }

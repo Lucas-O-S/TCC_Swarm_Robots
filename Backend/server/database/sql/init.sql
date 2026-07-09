@@ -1,14 +1,31 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Tasks: conceito da sua aplicação (não faz parte do protocolo DotBot).
-CREATE TABLE tasks (
+-- Usuários (operadores) do sistema - auth básica usuário/senha.
+CREATE TABLE users (
     uuid UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) NOT NULL,
-    priority INT NOT NULL,
+    username VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL
 );
+
+-- Tasks: conceito da sua aplicação (não faz parte do protocolo DotBot).
+CREATE TABLE tasks (
+    uuid UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    priority INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL
+);
+
+-- Task padrão/genérica: uuid fixo pra poder ser referenciada (ex.: robô que
+-- ainda não tem uma tarefa "de verdade" atribuída, mas você quer um valor
+-- não-nulo pra testar). Não é atribuída a `robots.task_id` automaticamente -
+-- isso continua nullable, cada robô só ganha essa task se alguém atribuir.
+INSERT INTO tasks (uuid, name, priority)
+VALUES ('00000000-0000-0000-0000-000000000001', 'Tarefa padrão', 0);
 
 
 CREATE TABLE robots (
