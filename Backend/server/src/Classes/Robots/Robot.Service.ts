@@ -1,6 +1,4 @@
+import { Injectable } from '@nestjs/common';
 
-
-
-export class RobotService {
-    
-}
+@Injectable()
+export class RobotService {}

@@ -1,6 +1,4 @@
+import { Controller } from '@nestjs/common';
 
-
-
-export class RobotController{
-    
-}
+@Controller('robots')
+export class RobotController {}

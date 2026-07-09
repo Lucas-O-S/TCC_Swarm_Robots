@@ -1,3 +1,4 @@
+import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
 import { RobotModel } from "src/Model/Robot.Model";
 
@@ -6,6 +7,7 @@ import { RobotModel } from "src/Model/Robot.Model";
  * (validação, "existe?", etc.) fica no Service, nunca aqui - segue o mesmo
  * padrão usado no ApiGameHit (Controller -> Service -> Repository -> Model).
  */
+@Injectable()
 export class RobotRepository {
 
     constructor(
