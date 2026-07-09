@@ -3,12 +3,12 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { sequelizeConfig } from './config/sequelize.config';
 import { SequelizeModule } from '@nestjs/sequelize';
-import { RobotModule } from './Classes/Robots/Robot.module';
+import { AllModules } from './index/IndexModule';
 
 @Module({
   imports: [
     SequelizeModule.forRoot(sequelizeConfig),
-    RobotModule,
+    ...AllModules,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -66,6 +66,70 @@ Quando for construir Controller/Service/DTO de verdade (item 7 da lista de
 `ApiResponseInterface`, `class-validator`, `@ApiProperty`) a menos que o
 dono do projeto peça o contrário.
 
+**Atualização (decisões já tomadas sobre o que adotar do `ApiGameHit`):**
+
+- **Base genérica (`BaseController`/`BaseService`/`BaseRepository` em
+  `src/Classes/Base/`)**: o `ApiGameHit` NÃO tem isso - cada entidade repete
+  `insert/update/get/getAll/delete/exists` na mão. Aqui decidimos generalizar
+  isso numa base comum; `Robot.Repository.ts`/`Robot.Service.ts`/
+  `Robot.Controller.ts` estendem essas classes e só sobrescrevem o que é
+  específico (ver comentário no `BaseController` sobre por que `create`/
+  `update` precisam ser redeclarados com o DTO concreto - genéricos somem em
+  runtime e o `ValidationPipe` pula a validação se o metatype vira `Object`).
+- **`ApiResponseInterface`**: **adotado**, mas não do jeito literal do
+  `ApiGameHit` (try/catch copiado em cada método do Controller). Em vez
+  disso, um `NestInterceptor` global (`ApiResponseInterceptor`) envelopa toda
+  resposta de sucesso e um `ExceptionFilter` global
+  (`ApiResponseExceptionFilter`) envelopa qualquer exception lançada -
+  ambos em `src/Classes/Base/`, plugados em `main.ts`
+  (`app.useGlobalInterceptors`/`useGlobalFilters`). Vantagem: nenhum
+  Controller precisa de try/catch manual, e o `message` é genérico por
+  status HTTP (`src/Classes/Base/ApiResponse.Messages.ts`), não uma frase
+  por ação - o detalhe específico do erro (ex.: "Nome de usuário já está em
+  uso") vai no campo `error`, extraído da exception real (`HttpException`
+  real como 404/409/401, ou um `Error` genérico vira 500).
+- **DTOs com `class-validator` (mensagens em pt-br) + `@ApiProperty`**:
+  **adotado** (`RobotCreateDto`, `RobotUpdateDto` via `PartialType`,
+  `UserCreateDto`, `LoginDto`).
+- **Schemas manuais pro `@ApiBody`**: **adotado**
+  (`Robot.Schema.ts`, `User.Schema.ts`, `Login.Schema.ts`).
+- **Guards (`JwtAuthGuard`)**: **adotado**, com uma diferença importante do
+  `ApiGameHit` - ver seção "Autenticação" abaixo.
+- **`IndexModule`**: **adotado** (`src/index/IndexModule.ts`, `AllModules`
+  importado com spread em `app.module.ts`).
+
+## Autenticação
+
+Sistema básico de usuário/senha (não é o `ApiGameHit` completo - sem roles/
+admin por enquanto, só login):
+
+- `src/Model/User.Model.ts` - `username` (único) + `passwordHash` (bcrypt).
+  UUID/paranoid/timestamps como todo model daqui (ver "Divergência
+  intencional" mais abaixo). Tem `defaultScope` excluindo `passwordHash` de
+  toda query (evita vazar o hash no `GET /users` genérico do
+  `BaseController`) - só `UserRepository.getByUsername` pede de volta via
+  `.unscoped()`, porque é o único lugar que precisa (login).
+- `src/Classes/Users/` - `UserRepository`/`UserService`/`UserModule`/
+  `UserController` (`GET`/`PUT`/`DELETE` via `BaseController`). `create` é
+  bloqueado de propósito (lança `ForbiddenException`) - criar usuário só via
+  `POST /auth/register`, garante hash de senha + checagem de username
+  duplicado. `update` usa `UserUpdateDto` (só `username` - sem
+  `passwordHash`, trocar senha é um fluxo à parte, não implementado).
+- `src/Auth/` - `AuthModule`, `AuthController` (`POST /auth/register`,
+  `POST /auth/login`, `GET /auth/me` de teste), `AuthService` (bcrypt
+  compare + assina JWT via `@nestjs/jwt`), `JwtStrategy`
+  (`passport-jwt`), `JwtAuthGuard`.
+- **`AUTH_ACTIVATED` (`.env`, lido em `src/config/auth.config.ts`)**: liga/
+  desliga a autenticação **globalmente**, num ponto único. `JwtAuthGuard`
+  checa `authConfig.activated` antes de checar o token - se `false`, libera
+  geral sem validar nada (`request.user` fica `undefined`). Pedido explícito
+  do dono do projeto pra poder desenvolver sem precisar logar o tempo todo;
+  default hoje é `false` no `.env` local. Mudar pra `true` quando o front
+  tiver login implementado.
+- Hoje só `RobotController` usa `@UseGuards(JwtAuthGuard)` (nível de classe -
+  cobre também as rotas herdadas do `BaseController`). Novos controllers
+  devem aplicar o mesmo guard a menos que a rota precise ser pública.
+
 ## Correspondência com o DotBot (o que já foi decidido)
 
 O PyDotBot separa claramente três camadas: **protocolo** (formato binário dos
@@ -93,6 +157,8 @@ separação em módulos NestJS:
     pelo robô - é calculado pelo backend a partir de `lastSync`.
   - `Task.Model.ts` - tabela `tasks` (conceito nosso, não existe no DotBot).
   - `Position.Model.ts` - tabela `position`, `@BelongsTo(() => RobotModel)`.
+  - `User.Model.ts` - tabela `users` (conceito nosso, auth - não existe no
+    DotBot/protocolo).
 - `src/Classes/Robots/` - camada de API do robô, seguindo o padrão
   Controller → Service → Repository (ver seção "Padrão de código de
   referência" acima). `Robot.Repository.ts` já existe; `Robot.Controller.ts`
@@ -166,17 +232,20 @@ legibilidade em SQL cru pra relatórios do TCC, a ideia (ainda não aplicada)
    `Controller.handle_received_frame`), throttling de escrita no Postgres.
 6. `RobotsGateway` (WebSocket, `@nestjs/websockets`) emitindo os eventos
    `NEW_DOTBOT` / `UPDATE` / `RELOAD` (mirror de `DotBotNotificationCommand`).
-7. Preencher `Robot.Controller.ts` / `Robot.Service.ts` / `robot.create.dto.ts`
-   (hoje são stubs vazios, só `Robot.Repository.ts` existe) com os endpoints
-   REST: `GET /robots` (com filtros de status/bateria/posição), `GET
-   /robots/:address`, `POST /robots/:address/rgb-led`, `/move`, `/waypoints`,
-   `/control-mode`. Seguir o estilo `ApiGameHit` (`ApiResponseInterface`,
-   `class-validator`, `@ApiProperty`) - ver seção acima.
+7. ~~Preencher `Robot.Controller.ts`/`Robot.Service.ts`/`robot.create.dto.ts`~~
+   **Feito** o CRUD genérico (via `BaseController`/`BaseService`) + DTOs.
+   Ainda faltam as rotas específicas do protocolo: `GET /robots/:address`,
+   `PUT /robots/:address/move-raw`, `/rgb-led`, `/waypoints` (mapeando
+   `dotbot/server.py` do PyDotBot - `address`, não `uuid`, porque são
+   endereçadas fisicamente).
 8. `TaskModule`/`PositionModule` dedicados, se/quando ganharem endpoints
    próprios (hoje os models estão registrados dentro de `Robot.module.ts`
    por conveniência).
-9. Decidir se o projeto vai ter autenticação de operador (JWT + guards, como
-   no `ApiGameHit`) ou não - ainda em aberto.
+9. ~~Decidir se o projeto vai ter autenticação de operador~~ **Feito**: auth
+   básica usuário/senha implementada (ver seção "Autenticação"), com toggle
+   `AUTH_ACTIVATED` pra ligar/desligar. Ainda em aberto: roles/permissões
+   (admin vs operador comum) - hoje todo usuário autenticado tem acesso
+   igual.
 
 ## Don't
 

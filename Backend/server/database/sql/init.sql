@@ -1,5 +1,15 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Usuários (operadores) do sistema - auth básica usuário/senha.
+CREATE TABLE users (
+    uuid UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    username VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL
+);
+
 -- Tasks: conceito da sua aplicação (não faz parte do protocolo DotBot).
 CREATE TABLE tasks (
     uuid UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
