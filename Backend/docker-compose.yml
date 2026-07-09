@@ -3,13 +3,17 @@ version: '3.8'
 services:
   db:
     image: postgres
-    environment:   
+    environment:
       POSTGRES_USER: adm
-      POSTGRES_PASSWORD: "123456"   
+      POSTGRES_PASSWORD: "123456"
       POSTGRES_DB: mari_database
-    
+
     ports:
       - "5432:5432"
-    
-volumes: 
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./server/database/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+volumes:
   postgres_data:
