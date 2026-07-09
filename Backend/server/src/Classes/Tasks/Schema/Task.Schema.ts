@@ -6,6 +6,6 @@ export const TaskSchema = {
             name: { type: 'string', example: 'Patrulhar área A' },
             priority: { type: 'number', example: 0 },
         },
-        required: ['name', 'priority'],
+        required: ['name'],
     },
 };

@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsInt, IsNotEmpty, IsString, Min } from "class-validator";
+import { IsInt, IsNotEmpty, IsOptional, IsString, Min } from "class-validator";
 
 export class TaskCreateDto {
 
@@ -12,10 +12,12 @@ export class TaskCreateDto {
     name: string;
 
     @ApiProperty({
-        description: "Prioridade da tarefa (quanto menor, mais prioritária)",
+        description: "Prioridade da tarefa (quanto menor, mais prioritária). Default 0 se não informado.",
         example: 0,
+        required: false,
     })
+    @IsOptional()
     @IsInt({ message: "A prioridade deve ser um número inteiro" })
     @Min(0, { message: "A prioridade não pode ser negativa" })
-    priority: number;
+    priority?: number;
 }

@@ -243,6 +243,11 @@ guarda um `Map<address, RobotState>` com tudo que muda rápido, serve o
 WebSocket direto dali, e só grava no Postgres de forma amostrada/no evento
 certo (mudança de status, chegada de robô novo, comando do operador).
 
+**Bug corrigido (auditoria de código):** `Robot.Model.ts` tinha uma coluna
+`direction` que violava essa regra e além disso nem existia na tabela
+`robots` do `init.sql` (só `position.direction` existe) - toda query
+quebraria assim que o banco estivesse de pé. Removida do model.
+
 ### Enums vs. tabelas de referência
 
 `RobotApplication`/`RobotControlMode`/`RobotStatus` são `smallint` com
@@ -274,6 +279,9 @@ Itens já concluídos, resumidos (histórico completo nas seções acima):
 (`Base*`) de Robot/Task/Position/User com DTOs/Schema/Guard; auth básica
 usuário/senha com toggle `AUTH_ACTIVATED`; `IndexModule`;
 `ApiResponseInterface` via interceptor/filter globais.
+
+`TaskModel.priority` tem `@Default(0)` (model + `init.sql`) e é opcional no
+`TaskCreateDto`/`TaskSchema` - só `name` é obrigatório pra criar uma task.
 
 Tabela de referência opcional (`robot_applications`, `robot_control_modes`,
 só pra legibilidade de SQL/relatório) segue de baixa prioridade, sem data.

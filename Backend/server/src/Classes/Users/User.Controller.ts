@@ -6,6 +6,7 @@ import { JwtAuthGuard } from "src/Auth/Guards/JwtAuth.Guard";
 import { UserService } from "./User.Service";
 import { UserUpdateDto } from "./DTO/user.update.dto";
 import { UserSchema } from "./Schema/User.Schema";
+import { UserUpdateSchema } from "./Schema/UserUpdate.Schema";
 
 /**
  * GET /, GET /:uuid, DELETE /:uuid vêm do BaseController como estão.
@@ -32,7 +33,7 @@ export class UserController extends BaseController<UserModel> {
     }
 
     @Put(":uuid")
-    @ApiBody(UserSchema)
+    @ApiBody(UserUpdateSchema)
     async update(@Param("uuid") uuid: string, @Body() dto: UserUpdateDto): Promise<UserModel> {
         return super.update(uuid, dto);
     }

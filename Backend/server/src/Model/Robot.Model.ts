@@ -35,9 +35,6 @@ export class RobotModel extends BaseModel<RobotModel> {
     @Column({ type: DataType.SMALLINT, allowNull: false })
     mode: RobotControlMode;
 
-    @Column({ type: DataType.INTEGER, allowNull: true })
-    direction: number;
-
     /** Bitmask de calibração LH2: bit0 = lighthouse 1, bit1 = lighthouse 2. */
     @Default(0)
     @Column({ type: DataType.SMALLINT, allowNull: false })
