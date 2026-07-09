@@ -1,4 +1,4 @@
-import { FindOptions, Model, ModelStatic, WhereOptions } from "sequelize";
+import { FindOptions, Model, ModelStatic } from "sequelize";
 
 /**
  * CRUD genérico sobre um model Sequelize com `uuid` como PK (todo model
@@ -17,7 +17,7 @@ export abstract class BaseRepository<T extends Model> {
 
     async update(dto: Partial<T>, uuid: string): Promise<boolean> {
         const [affectedRows] = await this.model.update(dto as any, {
-            where: { uuid } as WhereOptions<T>,
+            where: { uuid } as any,
         });
 
         return affectedRows > 0;
@@ -32,7 +32,7 @@ export abstract class BaseRepository<T extends Model> {
     }
 
     async delete(uuid: string): Promise<boolean> {
-        return (await this.model.destroy({ where: { uuid } as WhereOptions<T> })) > 0;
+        return (await this.model.destroy({ where: { uuid } as any })) > 0;
     }
 
     async exists(uuid: string): Promise<boolean> {
