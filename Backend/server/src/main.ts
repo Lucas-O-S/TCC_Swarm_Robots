@@ -3,8 +3,8 @@ import 'dotenv/config';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
-import { ApiResponseInterceptor } from './Classes/Base/Interceptors/ApiResponse.Interceptor';
-import { ApiResponseExceptionFilter } from './Classes/Base/Filters/ApiResponse.Filter';
+import { ApiResponseInterceptor } from './Classes/Interceptors/ApiResponse.Interceptor';
+import { ApiResponseExceptionFilter } from './Classes/Filters/ApiResponse.Filter';
 
 async function bootstrap() {
 
@@ -27,7 +27,7 @@ async function bootstrap() {
   }));
 
   // Envelope padrão de resposta ({status, message, data?, dataUnit?, error?})
-  // aplicado globalmente - ver src/Classes/Base/Interceptors e .../Filters.
+  // aplicado globalmente - ver src/Classes/Interceptors e src/Classes/Filters.
   app.useGlobalInterceptors(new ApiResponseInterceptor());
   app.useGlobalFilters(new ApiResponseExceptionFilter());
 
