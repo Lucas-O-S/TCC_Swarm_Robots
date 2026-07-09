@@ -1,5 +1,4 @@
-import { Model } from "sequelize";
-import { Column, PrimaryKey, Default, DataType, CreatedAt, UpdatedAt, DeletedAt } from "sequelize-typescript";
+import { Column, PrimaryKey, Default, DataType, CreatedAt, UpdatedAt, DeletedAt, Model } from "sequelize-typescript";
 
 /**
  * Colunas de auditoria realmente universais (pk + timestamps).
@@ -21,11 +20,11 @@ export abstract class BaseModel<T extends Model = any> extends Model<T> {
     uuid: string;
 
     @CreatedAt
-    createdAt: Date;
+    declare createdAt: Date;
 
     @UpdatedAt
-    updatedAt: Date;
+    declare updatedAt: Date;
 
     @DeletedAt
-    deletedAt: Date;
+    declare deletedAt: Date;
 }

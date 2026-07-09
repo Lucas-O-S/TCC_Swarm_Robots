@@ -22,11 +22,11 @@ export class RobotRepository {
         return affectedRows > 0;
     }
 
-    async get(uuid: string): Promise<RobotModel> {
+    async get(uuid: string): Promise<RobotModel | null> {
         return await this.model.findByPk(uuid);
     }
 
-    async getByAddress(address: string): Promise<RobotModel> {
+    async getByAddress(address: string): Promise<RobotModel | null> {
         return await this.model.findOne({ where: { address } });
     }
 
