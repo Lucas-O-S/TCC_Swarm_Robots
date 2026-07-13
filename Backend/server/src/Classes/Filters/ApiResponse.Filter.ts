@@ -1,7 +1,7 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from "@nestjs/common";
 import { Response } from "express";
-import { ApiResponseInterface } from "src/Classes/ApiResponse/ApiResponse.Interface";
-import { getApiResponseMessage } from "src/Classes/ApiResponse/ApiResponse.Messages";
+import { ApiResponseInterface } from "src/Protocol/ApiResponse/ApiResponse.Interface";
+import { getApiResponseMessage } from "src/Protocol/ApiResponse/ApiResponse.Messages";
 
 /**
  * Captura qualquer exception lançada (HttpException do Nest - 404, 409,
