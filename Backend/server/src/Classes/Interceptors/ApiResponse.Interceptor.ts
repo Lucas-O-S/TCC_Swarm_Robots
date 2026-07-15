@@ -1,8 +1,8 @@
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from "@nestjs/common";
 import { Observable } from "rxjs";
 import { map } from "rxjs/operators";
-import { ApiResponseInterface } from "src/Protocol/ApiResponse/ApiResponse.Interface";
-import { getApiResponseMessage } from "src/Protocol/ApiResponse/ApiResponse.Messages";
+import { ApiResponseInterface } from "src/Classes/ApiResponse/ApiResponse.Interface";
+import { getApiResponseMessage } from "src/Classes/ApiResponse/ApiResponse.Messages";
 
 /**
  * Envelopa toda resposta de sucesso em ApiResponseInterface, aplicado

@@ -15,10 +15,10 @@ export class MovePayload implements PayloadCodec<MovePayload> {
 
         const buffer = Buffer.alloc(4)
 
-        buffer.writeUInt8(payload.left_x, 0);
-        buffer.writeUInt8(payload.left_y, 1);
-        buffer.writeUInt8(payload.right_x, 2);
-        buffer.writeUInt8(payload.right_y, 3);
+        buffer.writeInt8(payload.left_x, 0);
+        buffer.writeInt8(payload.left_y, 1);
+        buffer.writeInt8(payload.right_x, 2);
+        buffer.writeInt8(payload.right_y, 3);
 
         return buffer;
     }
