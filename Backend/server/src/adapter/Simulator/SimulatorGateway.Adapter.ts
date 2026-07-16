@@ -1,8 +1,10 @@
+import { Injectable } from "@nestjs/common";
 import { Protocol } from "src/Protocols/Protocol";
 import { GatewayAdapter } from "../GatewayAdapter.interface";
 import { PayloadType } from "src/Enums/PayloadType.enum";
 
 
+@Injectable()
 export class SimulatorGatewayAdapter implements GatewayAdapter{
 
 
