@@ -3,7 +3,7 @@ import { PayloadType } from "src/Enums/PayloadType.enum";
 
 export class Protocol{
 
-    buildHeader(
+    static buildHeader(
         destination : string,
         version : number = 1,
         type : number = 16
@@ -24,7 +24,7 @@ export class Protocol{
 
     }
     
-    buildFrame(
+    static buildFrame(
         header : Buffer,
         payloadType : PayloadType,
         body: Buffer
