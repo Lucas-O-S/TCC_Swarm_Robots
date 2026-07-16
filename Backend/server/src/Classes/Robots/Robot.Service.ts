@@ -2,9 +2,10 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { BaseService } from 'src/Classes/Base/Base.Service';
 import { RobotModel } from 'src/Model/Robot.Model';
 import { RobotRepository } from './Robot.Repository';
-import { GATEWAY_ADAPTER, GatewayAdapter } from 'src/adapter/GatewayAdapter.interface';
+import { GATEWAY_ADAPTER } from 'src/adapter/GatewayAdapter.interface';
+import type { GatewayAdapter } from 'src/adapter/GatewayAdapter.interface';
 import { PayloadType } from 'src/Enums/PayloadType.enum';
-import { MovePayload } from 'src/Protocols/Payloads/MovePayload.COdec';
+import { MovePayloadProtocol } from 'src/Protocols/Payloads/MovePayload.COdec';
 import { RgbLedPayloadProtocol } from 'src/Protocols/Payloads/RgbPayload.Codec';
 import { MoveRawDto } from './DTO/move.raw.dto';
 import { RgbLedDto } from './DTO/rgb.led.dto';
@@ -40,7 +41,7 @@ export class RobotService extends BaseService<RobotModel> {
 
     async moveRaw(address: string, dto: MoveRawDto) {
         await this.requireByAddress(address);
-        const body = new MovePayload().encodePayload(dto);
+        const body = new MovePayloadProtocol().encodePayload(dto);
         this.gateway.send(address, PayloadType.CMD_MOVE_RAW, body);
         return { address, command: 'move-raw', payload: dto };
     }

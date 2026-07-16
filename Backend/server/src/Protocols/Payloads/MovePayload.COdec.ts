@@ -9,7 +9,7 @@ export interface MovePayload {
 }
 
 
-export class MovePayload implements PayloadCodec<MovePayload> {
+export class MovePayloadProtocol implements PayloadCodec<MovePayload> {
 
     encodePayload (payload: MovePayload): Buffer {
 
