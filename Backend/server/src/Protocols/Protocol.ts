@@ -1,13 +1,13 @@
-import { PayloadType } from "src/Enums/PayloadType.enum";
+import { PayloadType, isValidPayloadType } from "src/Enums/PayloadType.enum";
 
 
 
 export class Frame  {
     header : Buffer;
-    payloadType : PayloadType;
+    payloadType : PayloadType | null;
     body: Buffer;
 
-    constructor(header : Buffer, payloadType : PayloadType, body: Buffer){
+    constructor(header : Buffer, payloadType : PayloadType | null, body: Buffer){
         this.header = header;
         this.payloadType = payloadType;
         this.body = body;
@@ -45,7 +45,7 @@ export class Protocol{
         // 18(header) + 1(payloadType) + body
         const buffer : Buffer = Buffer.concat([
             frame.header,
-            Buffer.from([frame.payloadType]),
+            Buffer.from([frame.payloadType ?? 0]),
             frame.body
         ])
 
@@ -56,6 +56,24 @@ export class Protocol{
 
     static parseFrame(frame : Buffer) : Frame {
 
+        const header : Buffer = frame.subarray(0,18);
+
+        const payloadType : PayloadType | null = this.validatePayloadType(frame.readUInt8(18));
         
+        const body : Buffer = frame.subarray(19);
+
+        return new Frame(header, payloadType, body);
+
+        
+    }
+
+    private static validatePayloadType(payloadTypeByte: number): PayloadType | null {
+
+        if (!isValidPayloadType(payloadTypeByte)) {
+            console.error(`Invalid payload type: ${payloadTypeByte}`);
+            return null;
+        }
+
+        return payloadTypeByte as PayloadType;
     }
 }

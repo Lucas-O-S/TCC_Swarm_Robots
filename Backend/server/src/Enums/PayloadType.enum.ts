@@ -16,3 +16,8 @@ export enum PayloadType {
     DOTBOT_SIMULATOR_DATA = 0xFA
 
 }
+
+export const isValidPayloadType = (payloadType: number) => {
+    return Object.values(PayloadType).includes(payloadType);
+}
+
