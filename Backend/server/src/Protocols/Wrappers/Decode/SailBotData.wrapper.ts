@@ -1,5 +1,5 @@
-import { PayloadCodec, PayloadField } from "../Protocol.Codec";
-import { PayloadDecoder } from "./PayloadProtocol";
+import { PayloadCodec, PayloadField } from "../../Protocol.Codec";
+import { PayloadDecoder } from "../PayloadProtocol";
 
 /** Dados do SailBot (0x0A): rumo, posição GPS, vento e ângulos de leme/vela. */
 export interface SailBotData {

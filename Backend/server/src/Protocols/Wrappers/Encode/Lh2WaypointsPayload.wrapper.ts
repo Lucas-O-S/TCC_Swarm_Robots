@@ -1,5 +1,5 @@
-import { PayloadCodec } from "../Protocol.Codec";
-import { genericPayload, PayloadCoder } from "./PayloadProtocol";
+import { PayloadCodec } from "../../Protocol.Codec";
+import { genericPayload, PayloadCoder } from "../PayloadProtocol";
 
 /** Um ponto de destino em coordenadas LH2 (mm), 4 bytes por eixo. */
 export interface Waypoint {

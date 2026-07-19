@@ -1,5 +1,5 @@
-import { PayloadCodec } from "../Protocol.Codec";
-import { genericPayload, PayloadCoder } from "./PayloadProtocol";
+import { PayloadCodec } from "../../Protocol.Codec";
+import { genericPayload, PayloadCoder } from "../PayloadProtocol";
 
 /** Dados esperados do comando rgb-led (cada canal 0..255). */
 export interface RgbLedPayload extends genericPayload {

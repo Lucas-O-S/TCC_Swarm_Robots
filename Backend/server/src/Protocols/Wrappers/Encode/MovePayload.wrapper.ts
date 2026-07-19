@@ -1,5 +1,5 @@
-import { PayloadCodec } from "../Protocol.Codec";
-import { genericPayload, PayloadCoder } from "./PayloadProtocol";
+import { PayloadCodec } from "../../Protocol.Codec";
+import { genericPayload, PayloadCoder } from "../PayloadProtocol";
 
 /** Dados esperados do comando move-raw (joystick, cada eixo -128..127). */
 export interface MovePayload extends genericPayload {

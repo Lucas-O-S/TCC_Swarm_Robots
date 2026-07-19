@@ -1,5 +1,5 @@
-import { PayloadCodec, PayloadField } from "../Protocol.Codec";
-import { PayloadDecoder } from "./PayloadProtocol";
+import { PayloadCodec, PayloadField } from "../../Protocol.Codec";
+import { PayloadDecoder } from "../PayloadProtocol";
 
 /** Localização LH2 já processada (0x0C): índices do polinômio/LFSR + timestamp. */
 export interface Lh2ProcessedLocation {

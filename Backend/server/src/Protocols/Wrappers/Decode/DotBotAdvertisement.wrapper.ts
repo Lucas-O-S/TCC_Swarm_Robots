@@ -1,5 +1,5 @@
-import { PayloadCodec, PayloadField } from "../Protocol.Codec";
-import { PayloadDecoder } from "./PayloadProtocol";
+import { PayloadCodec, PayloadField } from "../../Protocol.Codec";
+import { PayloadDecoder } from "../PayloadProtocol";
 
 /**
  * Advertisement completo do DotBot (0x06) - o pacote de status principal que o

@@ -1,5 +1,5 @@
-import { PayloadCodec, PayloadField } from "../Protocol.Codec";
-import { PayloadDecoder } from "./PayloadProtocol";
+import { PayloadCodec, PayloadField } from "../../Protocol.Codec";
+import { PayloadDecoder } from "../PayloadProtocol";
 
 /** Dados do simulador do DotBot (0xFA): ângulo theta + posição. */
 export interface DotBotSimulatorData {

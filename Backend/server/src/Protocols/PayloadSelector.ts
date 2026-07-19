@@ -1,10 +1,10 @@
 import { PayloadType } from "src/Enums/PayloadType.enum";
 import { PayloadCoder } from "./Wrappers/PayloadProtocol";
-import { MovePayloadProtocol } from "./Wrappers/MovePayload.wrapper";
-import { RgbLedPayloadProtocol } from "./Wrappers/RgbLedPayload.wrapper";
-import { ControlModePayloadProtocol } from "./Wrappers/ControlModePayload.wrapper";
-import { Lh2WaypointsPayloadProtocol } from "./Wrappers/Lh2WaypointsPayload.wrapper";
-import { XgoActionPayloadProtocol } from "./Wrappers/XgoActionPayload.wrapper";
+import { MovePayloadProtocol } from "./Wrappers/Encode/MovePayload.wrapper";
+import { RgbLedPayloadProtocol } from "./Wrappers/Encode/RgbLedPayload.wrapper";
+import { ControlModePayloadProtocol } from "./Wrappers/Encode/ControlModePayload.wrapper";
+import { Lh2WaypointsPayloadProtocol } from "./Wrappers/Encode/Lh2WaypointsPayload.wrapper";
+import { XgoActionPayloadProtocol } from "./Wrappers/Encode/XgoActionPayload.wrapper";
 
 /**
  * Factory: escolhe o wrapper certo a partir do tipo de payload. Útil quando o

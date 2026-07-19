@@ -1,5 +1,5 @@
-import { PayloadCodec, PayloadField } from "../Protocol.Codec";
-import { PayloadDecoder } from "./PayloadProtocol";
+import { PayloadCodec, PayloadField } from "../../Protocol.Codec";
+import { PayloadDecoder } from "../PayloadProtocol";
 
 /** Advertisement simples (0x04): só o tipo de aplicação do robô. */
 export interface Advertisement {

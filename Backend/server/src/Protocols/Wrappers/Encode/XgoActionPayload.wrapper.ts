@@ -1,5 +1,5 @@
-import { PayloadCodec } from "../Protocol.Codec";
-import { genericPayload, PayloadCoder } from "./PayloadProtocol";
+import { PayloadCodec } from "../../Protocol.Codec";
+import { genericPayload, PayloadCoder } from "../PayloadProtocol";
 
 /** Dados do comando xgo-action (código da ação, 1 byte). Só robôs XGO. */
 export interface XgoActionPayload extends genericPayload {
