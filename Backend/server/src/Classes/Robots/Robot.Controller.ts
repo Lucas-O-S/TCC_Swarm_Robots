@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiBody, ApiTags } from '@nestjs/swagger';
 import { BaseController } from 'src/Classes/Base/Base.Controller';
 import { RobotModel } from 'src/Model/Robot.Model';
 import { JwtAuthGuard } from 'src/Auth/Guards/JwtAuth.Guard';
+import { PayloadType } from 'src/Enums/PayloadType.enum';
 import { RobotService } from './Robot.Service';
 import { RobotCreateDto } from './DTO/robot.create.dto';
 import { RobotUpdateDto } from './DTO/robot.update.dto';
@@ -28,7 +29,7 @@ import { XgoActionSchema } from './Schema/XgoAction.Schema';
  * geral - ver src/config/auth.config.ts.
  * Rotas de comando do protocolo (move-raw, rgb-led, control-mode, waypoints,
  * xgo-action) são endereçadas por `address` (chave física do rádio), não pelo
- * uuid - ver AGENTS.md.
+ * uuid, e delegam pro RobotService.sendCommand - ver AGENTS.md.
  */
 @Controller('robots')
 @ApiTags('Robots')
@@ -56,34 +57,34 @@ export class RobotController extends BaseController<RobotModel> {
     @Put(':address/move-raw')
     @ApiBody(MoveRawSchema)
     async moveRaw(@Param('address') address: string, @Body() dto: MoveRawDto) {
-        return this.robotService.moveRaw(address, dto);
+        return this.robotService.sendCommand(address, PayloadType.CMD_MOVE_RAW, 'move-raw', dto);
     }
 
     /** Comando de cor do LED RGB para um robô específico. */
     @Put(':address/rgb-led')
     @ApiBody(RgbLedSchema)
     async rgbLed(@Param('address') address: string, @Body() dto: RgbLedDto) {
-        return this.robotService.setRgbLed(address, dto);
+        return this.robotService.sendCommand(address, PayloadType.CMD_RGB_LED, 'rgb-led', dto);
     }
 
     /** Alterna o modo de controle do robô (Manual/Auto). */
     @Put(':address/control-mode')
     @ApiBody(ControlModeSchema)
     async controlMode(@Param('address') address: string, @Body() dto: ControlModeDto) {
-        return this.robotService.setControlMode(address, dto);
+        return this.robotService.sendCommand(address, PayloadType.CONTROL_MODE, 'control-mode', dto);
     }
 
     /** Envia uma lista de waypoints (LH2) para o robô seguir. */
     @Put(':address/waypoints')
     @ApiBody(WaypointsSchema)
     async waypoints(@Param('address') address: string, @Body() dto: WaypointsDto) {
-        return this.robotService.setWaypoints(address, dto);
+        return this.robotService.sendCommand(address, PayloadType.LH2_WAYPOINTS, 'waypoints', dto);
     }
 
     /** Envia uma ação para um robô XGO. */
     @Put(':address/xgo-action')
     @ApiBody(XgoActionSchema)
     async xgoAction(@Param('address') address: string, @Body() dto: XgoActionDto) {
-        return this.robotService.setXgoAction(address, dto);
+        return this.robotService.sendCommand(address, PayloadType.CMD_XGO_ACTION, 'xgo-action', dto);
     }
 }
