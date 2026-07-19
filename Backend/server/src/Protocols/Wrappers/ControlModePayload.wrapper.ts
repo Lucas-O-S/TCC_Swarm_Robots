@@ -1,8 +1,8 @@
 import { PayloadCodec } from "../Protocol.Codec";
-import { PayloadProtocol } from "./PayloadProtocol";
+import { genericPayload, PayloadProtocol } from "./PayloadProtocol";
 
 /** Dados do comando control-mode (0=Manual, 1=Auto). */
-export interface ControlModePayload {
+export interface ControlModePayload extends genericPayload {
     mode: number;
 }
 
