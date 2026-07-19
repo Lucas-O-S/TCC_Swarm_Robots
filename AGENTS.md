@@ -213,8 +213,10 @@ separação em módulos NestJS:
     DotBot/protocolo).
 - `src/Classes/Robots/` - camada de API do robô, seguindo o padrão
   Controller → Service → Repository (ver seção "Padrão de código de
-  referência" acima). `Robot.Repository.ts` já existe; `Robot.Controller.ts`
-  e `Robot.Service.ts` ainda são stubs (item 7 de "Pendente").
+  referência" acima). `Robot.Repository.ts`, `Robot.Service.ts` e
+  `Robot.Controller.ts` **já construídos**, com as 5 rotas de comando do
+  protocolo - ver seção "Camada de protocolo, transporte e comandos
+  (CONSTRUÍDO)" abaixo.
 
 ### Regra geral: nem tudo vira coluna
 
@@ -272,6 +274,97 @@ legibilidade em SQL cru pra relatórios do TCC, a ideia (ainda não aplicada)
   unidades diferentes (LH2 pra DotBot/Freebot/XGO, GPS pra SailBot) e não dá
   pra misturar sem indicar a origem.
 
+## Camada de protocolo, transporte e comandos (CONSTRUÍDO)
+
+Esta seção descreve o que já existe de verdade no código (supera as descrições
+antigas em "Correspondência com o DotBot", que eram planejamento). **Nota de
+pasta**: a implementação ficou em `src/Protocols/` (plural) e os enums de
+protocolo em `src/Enums/` (não `src/Protocol/Enums/` como o texto antigo dizia).
+
+Tudo foi conferido **byte a byte contra o PyDotBot original** (move, rgb,
+control-mode, waypoints, xgo-action e dotbot-advertisement), e o round-trip do
+frame (`buildFrame` → `parseFrame`) bate.
+
+### `src/Protocols/Protocol.ts` - frame (monta e desmonta)
+
+- Classe `Frame` = saco de dados: `header: Buffer`, `payloadType: PayloadType | null`, `body: Buffer`.
+- `Protocol.buildHeader(destination, version=1, type=16)`: header de **18 bytes**
+  little-endian - version(1B)=1, type(1B)=16 (`PacketType.DATA`), destination(8B)
+  = o `address` via `BigInt("0x"+address)` com `writeBigUInt64LE`, source(8B)=0.
+- `Protocol.buildFrame(frame: Frame)`: `header + [payloadType] + body` (concat).
+- `Protocol.parseFrame(buffer)`: o inverso - fatia header (0-17), lê o
+  payloadType (byte 18, validado via `validPayloadType` do enum → `null` se
+  desconhecido) e o body (`subarray(19)`).
+
+### `src/Protocols/Protocol.Codec.ts` - motor metadata (encode + decode)
+
+- `PayloadField` = descrição de um campo (`field`, `length?`, `signed?`, sem valor).
+- `PayloadItem extends PayloadField` = descrição **+ `value`** (usado no encode).
+- `PayloadCodec`: encode no construtor (`new PayloadCodec(items).Payload`) e
+  `static decode(buffer, fields)`. Ambos percorrem os campos andando o offset
+  pelo `length`; o `switch` trata 1/2/4 bytes, com/sem sinal, little-endian.
+  **É o mesmo motor pros dois sentidos** (co-dec), não dois separados.
+
+### `src/Protocols/Wrappers/` - um arquivo por payload
+
+- Contratos (`PayloadProtocol.ts`), **separados por direção** porque payload é
+  de mão única: `PayloadProtocol<T>` (encode, quem **sai**) e `PayloadDecoder<T>`
+  (decode, quem **entra**). `genericPayload` é um marcador vazio (inerte; pode
+  sair sem perda).
+- **Encoders (saída)**: `MovePayloadProtocol`, `RgbLedPayloadProtocol`,
+  `ControlModePayloadProtocol`, `Lh2WaypointsPayloadProtocol`, `XgoActionPayloadProtocol`.
+- **Decoders (entrada)**: `AdvertisementProtocol`, `GpsPositionProtocol`,
+  `DotBotAdvertisementProtocol` (o principal), `SailBotDataProtocol`,
+  `Lh2ProcessedLocationProtocol`, `DotBotSimulatorDataProtocol`.
+- Cada wrapper tem: interface tipada (o formato) + lista de campos (`*Fields`,
+  a "planta" dos bytes) + a classe. A **mesma lista** alimenta encode e decode.
+- **Waypoints é de tamanho variável**: o wrapper **compõe** (motor pras partes
+  fixas `threshold`+`count`, e `Buffer.concat` pra lista de pontos) em vez de
+  inchar o motor com suporte a lista. Decisão consciente: compor é mais simples
+  pra 1 payload; se aparecerem mais listas, generalizar o motor. Os payloads de
+  **entrada** que o robô manda são todos de tamanho **fixo**, então o decode não
+  precisa de lista.
+- Deixados **de fora** de propósito (não são campos fixos simples):
+  `LH2_CALIBRATION_HOMOGRAPHY` (bloco cru de 36 bytes), `RAW_DATA` (bytes
+  variáveis), e os `*_WAYPOINTS` (saída, lista).
+
+### `src/Protocols/PayloadSelector.ts` - factory
+
+- `getPayloadCodec(payloadType)` escolhe o **encoder** pelo tipo (`switch` +
+  `default: null`). **Falta o lado de decode** (escolher o decoder por tipo) -
+  é o próximo passo do recebimento.
+
+### `src/adapter/` - transporte
+
+- `GatewayAdapter.interface.ts`: contrato `send(destination, payloadType, body,
+  version?, type?)` + `onFrameReceived(cb)`, e o **token de injeção**
+  `GATEWAY_ADAPTER` (interface some em runtime, então injeta por token).
+- `Simulator/SimulatorGateway.Adapter.ts`: `SimulatorGatewayAdapter`
+  (`@Injectable`). `send` monta o `Frame` e **imprime o hex no console** (não vai
+  pra USB). `onFrameReceived` ainda emite um frame **falso** (não ligado a nada).
+  Registrado no `RobotModule` via `{ provide: GATEWAY_ADAPTER, useClass:
+  SimulatorGatewayAdapter }` - trocar pelo Serial é uma linha só.
+
+### `src/Classes/Robots/` - rotas de comando (não são mais stubs)
+
+- 5 rotas endereçadas por `address`: `PUT /robots/:address/{move-raw, rgb-led,
+  control-mode, waypoints, xgo-action}`. Cada uma com DTO (class-validator pt-br
+  + `@ApiProperty`) e Schema manual pro `@ApiBody`. Waypoints usa validação
+  aninhada (`@ValidateNested` + `@Type`, funciona porque `main.ts` tem
+  `ValidationPipe({ transform: true })`).
+- Todas delegam pro `RobotService.sendCommand(address, payloadType, command,
+  payload)`: confere o robô existe (404 senão), e o `dispatch` escolhe o codec
+  no `PayloadSelector`, codifica e chama `gateway.send`. Um método só pros 5
+  comandos.
+
+### O que falta pra fechar o RECEBIMENTO (início do bloco E)
+
+1. Lado de decode no `PayloadSelector` (escolher decoder por `payloadType`).
+2. Handler no `onFrameReceived`: frame chega → `parseFrame` → selector escolhe
+   decoder → `decodePayload` → guardar o estado.
+3. Onde guardar: `Map<address, status>` em memória (versão mínima do
+   `SwarmService`). Só então faz sentido um `GET /robots/:address/status`.
+
 ## Pendente (próximos passos)
 
 Itens já concluídos, resumidos (histórico completo nas seções acima):
@@ -289,6 +382,18 @@ só pra legibilidade de SQL/relatório) segue de baixa prioridade, sem data.
 **Objetivo combinado: nível 2 de automação** (ver "Objetivo: controle
 manual + automatizado" acima) - o plano abaixo está ordenado por
 dependência real, cada bloco precisa do anterior:
+
+**Status dos blocos abaixo (ver "Camada de protocolo... (CONSTRUÍDO)" acima):**
+- **Bloco C (Protocolo): FEITO** - frame build/parse + motor metadata
+  (encode/decode) + todos os payloads (encoders + decoders).
+- **Bloco D (Transporte): parcial** - interface (item 8) e
+  `SimulatorGatewayAdapter` (item 10) FEITOS; falta o `SerialGatewayAdapter`
+  (item 9) e ligar o `onFrameReceived` num handler real.
+- **Bloco H (Rotas): parcial** - as 5 rotas de comando (item 21) FEITAS; falta
+  o `GET /robots/:address/status` (depende do estado em memória, bloco E) e a
+  atribuição de task (item 22).
+- **Próximo pedaço lógico**: fechar o recebimento (decode no selector +
+  `onFrameReceived` + `Map` de estado) - é o começo do bloco E.
 
 **A. Schema/model** (rápido, sem dependência de nada)
 1. `TaskModel` ganha `status` (pendente/em_andamento/concluída/cancelada) -
