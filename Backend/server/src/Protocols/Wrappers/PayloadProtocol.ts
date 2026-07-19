@@ -2,7 +2,7 @@
  * Contrato de quem SAI (comando que você manda pro robô): recebe os dados e
  * devolve os bytes. O tipo `T` é o formato daquele comando.
  */
-export interface PayloadProtocol<T> {
+export interface PayloadCoder<T> {
     encodePayload(payload: T): Buffer;
 }
 

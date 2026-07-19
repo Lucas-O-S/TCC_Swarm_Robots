@@ -6,7 +6,7 @@ import { GATEWAY_ADAPTER } from 'src/adapter/GatewayAdapter.interface';
 import type { GatewayAdapter } from 'src/adapter/GatewayAdapter.interface';
 import { PayloadType } from 'src/Enums/PayloadType.enum';
 import { PayloadSelector } from 'src/Protocols/PayloadSelector';
-import { PayloadProtocol } from 'src/Protocols/Wrappers/PayloadProtocol';
+import { PayloadCoder } from 'src/Protocols/Wrappers/PayloadProtocol';
 
 /**
  * CRUD básico (create/getOne/getAll/update/remove) vem do BaseService; aqui
@@ -42,7 +42,7 @@ export class RobotService extends BaseService<RobotModel> {
      * envia pro robô. Um ponto único cuida do "não achei codec" e do envio.
      */
     private dispatch(address: string, payloadType: PayloadType, payload: any): void {
-        const codec: PayloadProtocol<any> | null = PayloadSelector.getPayloadCodec(payloadType);
+        const codec: PayloadCoder<any> | null = PayloadSelector.getPayloadCodec(payloadType);
         if (!codec) {
             throw new Error(`Nenhum codec registrado para o payload type ${payloadType}`);
         }

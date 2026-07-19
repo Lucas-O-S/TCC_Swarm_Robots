@@ -1,5 +1,5 @@
 import { PayloadCodec } from "../Protocol.Codec";
-import { genericPayload, PayloadProtocol } from "./PayloadProtocol";
+import { genericPayload, PayloadCoder } from "./PayloadProtocol";
 
 /** Um ponto de destino em coordenadas LH2 (mm), 4 bytes por eixo. */
 export interface Waypoint {
@@ -18,7 +18,7 @@ export interface Lh2WaypointsPayload extends genericPayload {
  * motor, e a lista de pontos concatenada em seguida. O `count` é derivado do
  * tamanho da lista, então nunca fica dessincronizado com os pontos.
  */
-export class Lh2WaypointsPayloadProtocol implements PayloadProtocol<Lh2WaypointsPayload> {
+export class Lh2WaypointsPayloadProtocol implements PayloadCoder<Lh2WaypointsPayload> {
 
     encodePayload(payload: Lh2WaypointsPayload): Buffer {
         // Parte fixa: threshold (2 bytes) + count (1 byte, = nº de pontos).

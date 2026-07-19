@@ -1,5 +1,5 @@
 import { PayloadType } from "src/Enums/PayloadType.enum";
-import { PayloadProtocol } from "./Wrappers/PayloadProtocol";
+import { PayloadCoder } from "./Wrappers/PayloadProtocol";
 import { MovePayloadProtocol } from "./Wrappers/MovePayload.wrapper";
 import { RgbLedPayloadProtocol } from "./Wrappers/RgbLedPayload.wrapper";
 import { ControlModePayloadProtocol } from "./Wrappers/ControlModePayload.wrapper";
@@ -13,7 +13,7 @@ import { XgoActionPayloadProtocol } from "./Wrappers/XgoActionPayload.wrapper";
  */
 export class PayloadSelector {
 
-    static getPayloadCodec(payloadType: number): PayloadProtocol<any> | null {
+    static getPayloadCodec(payloadType: number): PayloadCoder<any> | null {
         switch (payloadType) {
             case PayloadType.CMD_MOVE_RAW:
                 return new MovePayloadProtocol();
