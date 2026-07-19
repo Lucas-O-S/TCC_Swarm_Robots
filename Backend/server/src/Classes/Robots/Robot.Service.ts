@@ -5,11 +5,7 @@ import { RobotRepository } from './Robot.Repository';
 import { GATEWAY_ADAPTER } from 'src/adapter/GatewayAdapter.interface';
 import type { GatewayAdapter } from 'src/adapter/GatewayAdapter.interface';
 import { PayloadType } from 'src/Enums/PayloadType.enum';
-import { MovePayloadProtocol } from 'src/Protocols/Wrappers/MovePayload.wrapper';
-import { RgbLedPayloadProtocol } from 'src/Protocols/Wrappers/RgbLedPayload.wrapper';
-import { ControlModePayloadProtocol } from 'src/Protocols/Wrappers/ControlModePayload.wrapper';
-import { Lh2WaypointsPayloadProtocol } from 'src/Protocols/Wrappers/Lh2WaypointsPayload.wrapper';
-import { XgoActionPayloadProtocol } from 'src/Protocols/Wrappers/XgoActionPayload.wrapper';
+import { PayloadSelector } from 'src/Protocols/PayloadSelector';
 import { MoveRawDto } from './DTO/move.raw.dto';
 import { RgbLedDto } from './DTO/rgb.led.dto';
 import { ControlModeDto } from './DTO/control.mode.dto';
@@ -45,38 +41,47 @@ export class RobotService extends BaseService<RobotModel> {
         return robot;
     }
 
+    /**
+     * Escolhe o codec pelo tipo (via PayloadSelector), codifica o payload e
+     * envia pro robô. Um ponto único cuida do "não achei codec" e do envio.
+     */
+    private dispatch(address: string, payloadType: PayloadType, payload: any): void {
+        const codec = PayloadSelector.getPayloadCodec(payloadType);
+        
+        if (!codec) 
+            throw new Error(`Nenhum codec registrado para o payload type ${payloadType}`);
+        
+        const body = codec.encodePayload(payload);
+        this.gateway.send(address, payloadType, body);
+    }
+
     async moveRaw(address: string, dto: MoveRawDto) {
         await this.requireByAddress(address);
-        const body = new MovePayloadProtocol().encodePayload(dto);
-        this.gateway.send(address, PayloadType.CMD_MOVE_RAW, body);
+        this.dispatch(address, PayloadType.CMD_MOVE_RAW, dto);
         return { address, command: 'move-raw', payload: dto };
     }
 
     async setRgbLed(address: string, dto: RgbLedDto) {
         await this.requireByAddress(address);
-        const body = new RgbLedPayloadProtocol().encodePayload(dto);
-        this.gateway.send(address, PayloadType.CMD_RGB_LED, body);
+        this.dispatch(address, PayloadType.CMD_RGB_LED, dto);
         return { address, command: 'rgb-led', payload: dto };
     }
 
     async setControlMode(address: string, dto: ControlModeDto) {
         await this.requireByAddress(address);
-        const body = new ControlModePayloadProtocol().encodePayload(dto);
-        this.gateway.send(address, PayloadType.CONTROL_MODE, body);
+        this.dispatch(address, PayloadType.CONTROL_MODE, dto);
         return { address, command: 'control-mode', payload: dto };
     }
 
     async setWaypoints(address: string, dto: WaypointsDto) {
         await this.requireByAddress(address);
-        const body = new Lh2WaypointsPayloadProtocol().encodePayload(dto);
-        this.gateway.send(address, PayloadType.LH2_WAYPOINTS, body);
+        this.dispatch(address, PayloadType.LH2_WAYPOINTS, dto);
         return { address, command: 'waypoints', payload: dto };
     }
 
     async setXgoAction(address: string, dto: XgoActionDto) {
         await this.requireByAddress(address);
-        const body = new XgoActionPayloadProtocol().encodePayload(dto);
-        this.gateway.send(address, PayloadType.CMD_XGO_ACTION, body);
+        this.dispatch(address, PayloadType.CMD_XGO_ACTION, dto);
         return { address, command: 'xgo-action', payload: dto };
     }
 }
