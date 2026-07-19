@@ -1,6 +1,19 @@
 import { PayloadType } from "src/Enums/PayloadType.enum";
 
 
+
+export class Frame  {
+    header : Buffer;
+    payloadType : PayloadType;
+    body: Buffer;
+
+    constructor(header : Buffer, payloadType : PayloadType, body: Buffer){
+        this.header = header;
+        this.payloadType = payloadType;
+        this.body = body;
+    }
+}
+
 export class Protocol{
 
     static buildHeader(
@@ -25,21 +38,24 @@ export class Protocol{
     }
     
     static buildFrame(
-        header : Buffer,
-        payloadType : PayloadType,
-        body: Buffer
+        frame : Frame
     ) : Buffer
     {
 
         // 18(header) + 1(payloadType) + body
         const buffer : Buffer = Buffer.concat([
-            header,
-            Buffer.from([payloadType]),
-            body
+            frame.header,
+            Buffer.from([frame.payloadType]),
+            frame.body
         ])
 
         return buffer;
 
     }
 
+
+    static parseFrame(frame : Buffer) : Frame {
+
+        
+    }
 }

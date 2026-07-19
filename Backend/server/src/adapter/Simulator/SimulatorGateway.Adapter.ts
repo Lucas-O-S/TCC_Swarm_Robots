@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Protocol } from "src/Protocols/Protocol";
+import { Protocol, Frame } from "src/Protocols/Protocol";
 import { GatewayAdapter } from "../GatewayAdapter.interface";
 import { PayloadType } from "src/Enums/PayloadType.enum";
 
@@ -22,13 +22,11 @@ export class SimulatorGatewayAdapter implements GatewayAdapter{
             type
         );
 
-        const frame : Buffer = Protocol.buildFrame(
-            header,
-            payloadType,
-            body
+        const bytes : Buffer = Protocol.buildFrame(
+            new Frame(header, payloadType, body)
         );
 
-        console.log("[SIMULADOR] enviando frame:", frame.toString("hex"));
+        console.log("[SIMULADOR] enviando frame:", bytes.toString("hex"));
 
     }
 
