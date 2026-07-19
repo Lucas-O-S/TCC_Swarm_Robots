@@ -5,10 +5,16 @@ import { RobotRepository } from './Robot.Repository';
 import { GATEWAY_ADAPTER } from 'src/adapter/GatewayAdapter.interface';
 import type { GatewayAdapter } from 'src/adapter/GatewayAdapter.interface';
 import { PayloadType } from 'src/Enums/PayloadType.enum';
-import { MovePayloadProtocol } from 'src/Protocols/Payloads/MovePayload.COdec';
-import { RgbLedPayloadProtocol } from 'src/Protocols/Payloads/RgbPayload.Codec';
+import { MovePayloadProtocol } from 'src/Protocols/Wrappers/MovePayload.wrapper';
+import { RgbLedPayloadProtocol } from 'src/Protocols/Wrappers/RgbLedPayload.wrapper';
+import { ControlModePayloadProtocol } from 'src/Protocols/Wrappers/ControlModePayload.wrapper';
+import { Lh2WaypointsPayloadProtocol } from 'src/Protocols/Wrappers/Lh2WaypointsPayload.wrapper';
+import { XgoActionPayloadProtocol } from 'src/Protocols/Wrappers/XgoActionPayload.wrapper';
 import { MoveRawDto } from './DTO/move.raw.dto';
 import { RgbLedDto } from './DTO/rgb.led.dto';
+import { ControlModeDto } from './DTO/control.mode.dto';
+import { WaypointsDto } from './DTO/waypoints.dto';
+import { XgoActionDto } from './DTO/xgo.action.dto';
 
 /**
  * CRUD básico (create/getOne/getAll/update/remove) vem do BaseService; aqui
@@ -51,5 +57,26 @@ export class RobotService extends BaseService<RobotModel> {
         const body = new RgbLedPayloadProtocol().encodePayload(dto);
         this.gateway.send(address, PayloadType.CMD_RGB_LED, body);
         return { address, command: 'rgb-led', payload: dto };
+    }
+
+    async setControlMode(address: string, dto: ControlModeDto) {
+        await this.requireByAddress(address);
+        const body = new ControlModePayloadProtocol().encodePayload(dto);
+        this.gateway.send(address, PayloadType.CONTROL_MODE, body);
+        return { address, command: 'control-mode', payload: dto };
+    }
+
+    async setWaypoints(address: string, dto: WaypointsDto) {
+        await this.requireByAddress(address);
+        const body = new Lh2WaypointsPayloadProtocol().encodePayload(dto);
+        this.gateway.send(address, PayloadType.LH2_WAYPOINTS, body);
+        return { address, command: 'waypoints', payload: dto };
+    }
+
+    async setXgoAction(address: string, dto: XgoActionDto) {
+        await this.requireByAddress(address);
+        const body = new XgoActionPayloadProtocol().encodePayload(dto);
+        this.gateway.send(address, PayloadType.CMD_XGO_ACTION, body);
+        return { address, command: 'xgo-action', payload: dto };
     }
 }

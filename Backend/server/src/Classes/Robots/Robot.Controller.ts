@@ -9,8 +9,14 @@ import { RobotUpdateDto } from './DTO/robot.update.dto';
 import { RobotSchema } from './Schema/Robot.Schema';
 import { MoveRawDto } from './DTO/move.raw.dto';
 import { RgbLedDto } from './DTO/rgb.led.dto';
+import { ControlModeDto } from './DTO/control.mode.dto';
+import { WaypointsDto } from './DTO/waypoints.dto';
+import { XgoActionDto } from './DTO/xgo.action.dto';
 import { MoveRawSchema } from './Schema/MoveRaw.Schema';
 import { RgbLedSchema } from './Schema/RgbLed.Schema';
+import { ControlModeSchema } from './Schema/ControlMode.Schema';
+import { WaypointsSchema } from './Schema/Waypoints.Schema';
+import { XgoActionSchema } from './Schema/XgoAction.Schema';
 
 /**
  * GET /, GET /:uuid, DELETE /:uuid vêm do BaseController como estão.
@@ -20,8 +26,9 @@ import { RgbLedSchema } from './Schema/RgbLed.Schema';
  * @UseGuards(JwtAuthGuard) no nível da classe protege as rotas herdadas do
  * BaseController também. Com AUTH_ACTIVATED=false (.env) o guard libera
  * geral - ver src/config/auth.config.ts.
- * Rotas de comando do protocolo (move-raw, rgb-led) são endereçadas por
- * `address` (chave física do rádio), não pelo uuid - ver AGENTS.md.
+ * Rotas de comando do protocolo (move-raw, rgb-led, control-mode, waypoints,
+ * xgo-action) são endereçadas por `address` (chave física do rádio), não pelo
+ * uuid - ver AGENTS.md.
  */
 @Controller('robots')
 @ApiTags('Robots')
@@ -57,5 +64,26 @@ export class RobotController extends BaseController<RobotModel> {
     @ApiBody(RgbLedSchema)
     async rgbLed(@Param('address') address: string, @Body() dto: RgbLedDto) {
         return this.robotService.setRgbLed(address, dto);
+    }
+
+    /** Alterna o modo de controle do robô (Manual/Auto). */
+    @Put(':address/control-mode')
+    @ApiBody(ControlModeSchema)
+    async controlMode(@Param('address') address: string, @Body() dto: ControlModeDto) {
+        return this.robotService.setControlMode(address, dto);
+    }
+
+    /** Envia uma lista de waypoints (LH2) para o robô seguir. */
+    @Put(':address/waypoints')
+    @ApiBody(WaypointsSchema)
+    async waypoints(@Param('address') address: string, @Body() dto: WaypointsDto) {
+        return this.robotService.setWaypoints(address, dto);
+    }
+
+    /** Envia uma ação para um robô XGO. */
+    @Put(':address/xgo-action')
+    @ApiBody(XgoActionSchema)
+    async xgoAction(@Param('address') address: string, @Body() dto: XgoActionDto) {
+        return this.robotService.setXgoAction(address, dto);
     }
 }

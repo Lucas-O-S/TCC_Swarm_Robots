@@ -19,7 +19,10 @@ import { SimulatorGatewayAdapter } from "src/adapter/Simulator/SimulatorGateway.
     providers: [
         RobotService,
         RobotRepository,
-        { provide: GATEWAY_ADAPTER, useClass: SimulatorGatewayAdapter },
+        { 
+            provide: GATEWAY_ADAPTER,
+            useClass: SimulatorGatewayAdapter
+        },
     ],
     exports: [RobotService],
 })
