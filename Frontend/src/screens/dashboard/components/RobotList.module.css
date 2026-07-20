@@ -1,0 +1,49 @@
+.listaRobos {
+  flex: 1;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.header span {
+  font-size: 13px;
+  font-weight: 600;
+  color: #aaa;
+  letter-spacing: 0.03em;
+}
+
+.item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.item:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.item.highlight {
+  background: rgba(242, 140, 40, 0.18);
+}
+
+.item span {
+  font-size: 15px;
+  font-weight: 500;
+  color: #555;
+  font-family: var(--font-mono);
+  transition: color 0.15s;
+}
+
+.item.highlight span {
+  color: #c06800;
+}

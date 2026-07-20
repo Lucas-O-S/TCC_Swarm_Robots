@@ -1,0 +1,8 @@
+.header {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  align-items: center;
+  margin-bottom: 40px;
+  font-size: 36px;
+  color: var(--color-text);
+}

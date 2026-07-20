@@ -1,0 +1,16 @@
+.screen {
+  background: var(--color-bg);
+  font-family: var(--font-mono);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+.container {
+  width: 80%;
+  max-width: 900px;
+  background: var(--color-surface);
+  border-radius: 20px;
+  padding: 50px;
+}
