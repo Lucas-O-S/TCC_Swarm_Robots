@@ -1,0 +1,21 @@
+/* Variáveis de tema (cores, raios, fontes) usadas por todo o app. */
+:root {
+  --color-bg: #e7dcc0;
+  --color-bg-login: #f3e8c8;
+  --color-surface: #f5efdf;
+  --color-surface-alt: #f2eada;
+
+  --color-orange: #ff8c00;
+  --color-orange-logo: #f57c20;
+  --color-orange-hex: #f28c28;
+
+  --color-dark: #2d2d2d;
+  --color-text: #333;
+  --color-green: #1a9e45;
+  --color-red: #c0392b;
+
+  --radius: 16px;
+
+  --font-sans: 'DM Sans', Arial, Helvetica, sans-serif;
+  --font-mono: 'DM Mono', monospace;
+}
