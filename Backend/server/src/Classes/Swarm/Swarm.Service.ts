@@ -2,11 +2,13 @@ import { Inject, Injectable, OnModuleInit } from "@nestjs/common";
 import * as GatewayAdapterInterface from "src/adapter/GatewayAdapter.interface";
 import { Protocol } from "src/Protocols/Protocol";
 import { PayloadSelector } from "src/Protocols/PayloadSelector";
+import { SwarmGateway } from "./Swarm.Gateway";
 
 /**
  * Estado "quente" da frota (mirror do Controller.dotbots do PyDotBot): guarda
  * em memória o último dado decodificado de cada robô, por `address`, alimentado
- * pelos frames que chegam do adapter via onFrameReceived.
+ * pelos frames que chegam do adapter via onFrameReceived. A cada atualização,
+ * também empurra o novo estado pro front via WebSocket (SwarmGateway).
  */
 @Injectable()
 export class SwarmService implements OnModuleInit {
@@ -15,6 +17,7 @@ export class SwarmService implements OnModuleInit {
 
     constructor(
         @Inject(GatewayAdapterInterface.GATEWAY_ADAPTER) private readonly gateway: GatewayAdapterInterface.GatewayAdapter,
+        private readonly ws: SwarmGateway,
     ) {}
 
     // Registra o handler quando o módulo sobe (não no construtor - é uma ação
@@ -31,7 +34,7 @@ export class SwarmService implements OnModuleInit {
         }
 
         const frame = Protocol.parseFrame(bytes);
-        
+
         if (frame.payloadType === null) {
             return; // tipo desconhecido
         }
@@ -46,11 +49,14 @@ export class SwarmService implements OnModuleInit {
         // Quem mandou = campo `source` do header (offset 10, 8 bytes) -> hex.
         const address = frame.header.readBigUInt64LE(10).toString(16).padStart(16, "0");
 
-        this.states.set(address, {
+        const state = {
             payloadType: frame.payloadType,
             data,
             updatedAt: new Date(),
-        });
+        };
+
+        this.states.set(address, state);   // guarda no quadro (memória)
+        this.ws.emitUpdate(address, state); // empurra pro front ao vivo
 
         console.log(`[SWARM] estado de ${address} atualizado:`, data);
     }
