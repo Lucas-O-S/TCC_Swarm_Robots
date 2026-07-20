@@ -1,10 +1,16 @@
 import { PayloadType } from "src/Enums/PayloadType.enum";
-import { PayloadCoder } from "./Wrappers/PayloadProtocol";
+import { PayloadCoder, PayloadDecoder } from "./Wrappers/PayloadProtocol";
 import { MovePayloadProtocol } from "./Wrappers/Encode/MovePayload.wrapper";
 import { RgbLedPayloadProtocol } from "./Wrappers/Encode/RgbLedPayload.wrapper";
 import { ControlModePayloadProtocol } from "./Wrappers/Encode/ControlModePayload.wrapper";
 import { Lh2WaypointsPayloadProtocol } from "./Wrappers/Encode/Lh2WaypointsPayload.wrapper";
 import { XgoActionPayloadProtocol } from "./Wrappers/Encode/XgoActionPayload.wrapper";
+import { AdvertisementProtocol } from "./Wrappers/Decode/Advertisement.wrapper";
+import { GpsPositionProtocol } from "./Wrappers/Decode/GpsPosition.wrapper";
+import { DotBotAdvertisementProtocol } from "./Wrappers/Decode/DotBotAdvertisement.wrapper";
+import { SailBotDataProtocol } from "./Wrappers/Decode/SailBotData.wrapper";
+import { Lh2ProcessedLocationProtocol } from "./Wrappers/Decode/Lh2ProcessedLocation.wrapper";
+import { DotBotSimulatorDataProtocol } from "./Wrappers/Decode/DotBotSimulatorData.wrapper";
 
 /**
  * Factory: escolhe o wrapper certo a partir do tipo de payload. Útil quando o
@@ -13,7 +19,7 @@ import { XgoActionPayloadProtocol } from "./Wrappers/Encode/XgoActionPayload.wra
  */
 export class PayloadSelector {
 
-    static getPayloadCodec(payloadType: number): PayloadCoder<any> | null {
+    static getPayloadCoder(payloadType: number): PayloadCoder<any> | null {
         switch (payloadType) {
             case PayloadType.CMD_MOVE_RAW:
                 return new MovePayloadProtocol();
@@ -29,4 +35,24 @@ export class PayloadSelector {
                 return null;
         }
     }
+
+    static getPayloadDecoder(payloadType: number): PayloadDecoder<any> | null {
+        switch (payloadType) {
+            case PayloadType.ADVERTISEMENT:
+                return new AdvertisementProtocol();
+            case PayloadType.GPS_POSITION:
+                return new GpsPositionProtocol();
+            case PayloadType.DOTBOT_ADVERTISEMENT:
+                return new DotBotAdvertisementProtocol();
+            case PayloadType.SAILBOT_DATA:
+                return new SailBotDataProtocol();
+            case PayloadType.LH2_PROCESSED_DATA:
+                return new Lh2ProcessedLocationProtocol();
+            case PayloadType.DOTBOT_SIMULATOR_DATA:
+                return new DotBotSimulatorDataProtocol();
+            default:
+                return null;
+        }
+    }
+
 }

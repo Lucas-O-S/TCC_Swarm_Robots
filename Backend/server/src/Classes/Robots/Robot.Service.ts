@@ -42,7 +42,7 @@ export class RobotService extends BaseService<RobotModel> {
      * envia pro robô. Um ponto único cuida do "não achei codec" e do envio.
      */
     private dispatch(address: string, payloadType: PayloadType, payload: any): void {
-        const codec: PayloadCoder<any> | null = PayloadSelector.getPayloadCodec(payloadType);
+        const codec: PayloadCoder<any> | null = PayloadSelector.getPayloadCoder(payloadType);
         if (!codec) {
             throw new Error(`Nenhum codec registrado para o payload type ${payloadType}`);
         }
