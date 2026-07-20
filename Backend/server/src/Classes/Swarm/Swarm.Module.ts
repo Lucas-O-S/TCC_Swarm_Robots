@@ -2,12 +2,12 @@ import { Module } from "@nestjs/common";
 import { GatewayModule } from "../Gateway/Gateway.Module";
 import { SwarmController } from "./Swarm.Controller";
 import { SwarmService } from "./Swarm.Service";
-import { SwarmGateway } from "./Swarm.Gateway";
+import { RobotWebsockets } from "src/Websockets/Robot.Websockets";
 
 @Module({
     imports: [GatewayModule],
     controllers: [SwarmController],
-    providers: [SwarmService, SwarmGateway],
+    providers: [SwarmService, RobotWebsockets],
     exports: [SwarmService],
 })
 export class SwarmModule {}

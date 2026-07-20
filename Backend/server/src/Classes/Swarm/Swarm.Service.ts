@@ -2,13 +2,13 @@ import { Inject, Injectable, OnModuleInit } from "@nestjs/common";
 import * as GatewayAdapterInterface from "src/adapter/GatewayAdapter.interface";
 import { Protocol } from "src/Protocols/Protocol";
 import { PayloadSelector } from "src/Protocols/PayloadSelector";
-import { SwarmGateway } from "./Swarm.Gateway";
+import { RobotWebsockets } from "src/Websockets/Robot.Websockets";
 
 /**
  * Estado "quente" da frota (mirror do Controller.dotbots do PyDotBot): guarda
  * em memória o último dado decodificado de cada robô, por `address`, alimentado
  * pelos frames que chegam do adapter via onFrameReceived. A cada atualização,
- * também empurra o novo estado pro front via WebSocket (SwarmGateway).
+ * também empurra o novo estado pro front via WebSocket (RobotWebsockets).
  */
 @Injectable()
 export class SwarmService implements OnModuleInit {
@@ -17,7 +17,7 @@ export class SwarmService implements OnModuleInit {
 
     constructor(
         @Inject(GatewayAdapterInterface.GATEWAY_ADAPTER) private readonly gateway: GatewayAdapterInterface.GatewayAdapter,
-        private readonly ws: SwarmGateway,
+        private readonly ws: RobotWebsockets,
     ) {}
 
     // Registra o handler quando o módulo sobe (não no construtor - é uma ação
