@@ -6,6 +6,7 @@ import { SequelizeModule } from '@nestjs/sequelize';
 import { Module } from "@nestjs/common";
 import { GATEWAY_ADAPTER } from "src/adapter/GatewayAdapter.interface";
 import { SimulatorGatewayAdapter } from "src/adapter/Simulator/SimulatorGateway.Adapter";
+import { GatewayModule } from "../Gateway/Gateway.Module";
 
 // TaskModel/PositionModel agora têm module próprio (Task.module.ts /
 // Position.module.ts) - ver AGENTS.md, item 8 da lista de "Pendente".
@@ -14,15 +15,12 @@ import { SimulatorGatewayAdapter } from "src/adapter/Simulator/SimulatorGateway.
 @Module({
     imports: [
         SequelizeModule.forFeature([RobotModel]),
+        GatewayModule
     ],
     controllers: [RobotController],
     providers: [
         RobotService,
         RobotRepository,
-        { 
-            provide: GATEWAY_ADAPTER,
-            useClass: SimulatorGatewayAdapter
-        },
     ],
     exports: [RobotService],
 })

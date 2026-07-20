@@ -3,6 +3,7 @@ import { UserModule } from "src/Classes/Users/User.module";
 import { AuthModule } from "src/Auth/Auth.module";
 import { TaskModule } from "src/Classes/Tasks/Task.module";
 import { PositionModule } from "src/Classes/Positions/Position.module";
+import { SwarmModule } from "src/Classes/Swarm/Swarm.Module";
 
 /**
  * Lista central de módulos de negócio (estilo ApiGameHit) - importada com
@@ -15,4 +16,5 @@ export const AllModules = [
     RobotModule,
     TaskModule,
     PositionModule,
+    SwarmModule,
 ];
