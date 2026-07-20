@@ -330,9 +330,11 @@ frame (`buildFrame` → `parseFrame`) bate.
 
 ### `src/Protocols/PayloadSelector.ts` - factory
 
-- `getPayloadCodec(payloadType)` escolhe o **encoder** pelo tipo (`switch` +
-  `default: null`). **Falta o lado de decode** (escolher o decoder por tipo) -
-  é o próximo passo do recebimento.
+- `getPayloadCoder(payloadType)` escolhe o **encoder** pelo tipo (comando que
+  sai); `getPayloadDecoder(payloadType)` escolhe o **decoder** (dado que entra).
+  Os dois são `switch` + `default: null`. (Nota: o contrato do encoder foi
+  renomeado de `PayloadProtocol<T>` para `PayloadCoder<T>`; o do decoder é
+  `PayloadDecoder<T>`.)
 
 ### `src/adapter/` - transporte
 
@@ -341,9 +343,14 @@ frame (`buildFrame` → `parseFrame`) bate.
   `GATEWAY_ADAPTER` (interface some em runtime, então injeta por token).
 - `Simulator/SimulatorGateway.Adapter.ts`: `SimulatorGatewayAdapter`
   (`@Injectable`). `send` monta o `Frame` e **imprime o hex no console** (não vai
-  pra USB). `onFrameReceived` ainda emite um frame **falso** (não ligado a nada).
-  Registrado no `RobotModule` via `{ provide: GATEWAY_ADAPTER, useClass:
-  SimulatorGatewayAdapter }` - trocar pelo Serial é uma linha só.
+  pra USB). `onFrameReceived` simula um robô fake `0000000000000001`
+  **emitindo um advertisement real a cada 3s** (header com `source`=robô +
+  payloadType 0x06 + body), pra exercitar o recebimento sem hardware.
+- O adapter é provido pelo **`GatewayModule`** (`src/Classes/Gateway/Gateway.Module.ts`):
+  `{ provide: GATEWAY_ADAPTER, useClass: SimulatorGatewayAdapter }` + `exports`
+  do token. `RobotModule` e `SwarmModule` **importam** esse módulo, então
+  compartilham **a mesma instância** do adapter (envio e recebimento na mesma
+  "linha"). Trocar Simulador→Serial/Mari é uma linha só, no GatewayModule.
 
 ### `src/Classes/Robots/` - rotas de comando (não são mais stubs)
 
@@ -357,13 +364,28 @@ frame (`buildFrame` → `parseFrame`) bate.
   no `PayloadSelector`, codifica e chama `gateway.send`. Um método só pros 5
   comandos.
 
-### O que falta pra fechar o RECEBIMENTO (início do bloco E)
+### `src/Classes/Swarm/` - recebimento (FEITO, início do bloco E)
 
-1. Lado de decode no `PayloadSelector` (escolher decoder por `payloadType`).
-2. Handler no `onFrameReceived`: frame chega → `parseFrame` → selector escolhe
-   decoder → `decodePayload` → guardar o estado.
-3. Onde guardar: `Map<address, status>` em memória (versão mínima do
-   `SwarmService`). Só então faz sentido um `GET /robots/:address/status`.
+O ciclo agora **vai e volta** (comando sai, status entra). Peças:
+
+- `SwarmService` (`@Injectable`, `implements OnModuleInit`): guarda
+  `Map<address, {payloadType, data, updatedAt}>` em memória. No `onModuleInit`
+  registra o handler via `gateway.onFrameReceived`. O `handleFrame`: guarda
+  contra frame < 19 bytes → `Protocol.parseFrame` → `PayloadSelector.getPayloadDecoder`
+  → `decodePayload` → grava por `address` (lido do `source` do header, offset 10)
+  e loga. Expõe `getState(address)` e `getAll()`.
+- `SwarmController`: `GET /robots/:address/status` devolve o último estado
+  decodificado do robô (do Map). Mesmo prefixo `robots`, rota distinta das do
+  RobotController - não colide.
+- `SwarmModule`: `imports: [GatewayModule]`, `providers: [SwarmService]`,
+  `controllers: [SwarmController]`, `exports: [SwarmService]`. Registrado no
+  `IndexModule` (`AllModules`).
+- Testado ponta a ponta: o simulador emite o advertisement, o SwarmService
+  decodifica e o `GET /status` mostra `{direction, pos_x, battery, mode, ...}`.
+
+**Ainda de memória-só**: o SwarmService não persiste no Postgres nem recalcula
+status Active/Inactive/Lost por `lastSync` (itens 13/14 do bloco E), e não emite
+eventos/WebSocket (bloco G).
 
 ## Pendente (próximos passos)
 
@@ -383,17 +405,20 @@ só pra legibilidade de SQL/relatório) segue de baixa prioridade, sem data.
 manual + automatizado" acima) - o plano abaixo está ordenado por
 dependência real, cada bloco precisa do anterior:
 
-**Status dos blocos abaixo (ver "Camada de protocolo... (CONSTRUÍDO)" acima):**
+**Status dos blocos abaixo (ver seções "CONSTRUÍDO" e "recebimento" acima):**
 - **Bloco C (Protocolo): FEITO** - frame build/parse + motor metadata
-  (encode/decode) + todos os payloads (encoders + decoders).
-- **Bloco D (Transporte): parcial** - interface (item 8) e
-  `SimulatorGatewayAdapter` (item 10) FEITOS; falta o `SerialGatewayAdapter`
-  (item 9) e ligar o `onFrameReceived` num handler real.
-- **Bloco H (Rotas): parcial** - as 5 rotas de comando (item 21) FEITAS; falta
-  o `GET /robots/:address/status` (depende do estado em memória, bloco E) e a
-  atribuição de task (item 22).
-- **Próximo pedaço lógico**: fechar o recebimento (decode no selector +
-  `onFrameReceived` + `Map` de estado) - é o começo do bloco E.
+  (encode/decode) + todos os payloads (encoders + decoders) + os dois selectors.
+- **Bloco D (Transporte): parcial** - interface (8) e `SimulatorGatewayAdapter`
+  (10) FEITOS, com `onFrameReceived` já ligado no SwarmService. Falta o
+  transporte real via **Mari** (9) - ver seção "Rede Mari" abaixo.
+- **Bloco E (SwarmService): começado** - `Map` de estado + `handleFrame`
+  (recebe/decodifica/guarda) FEITOS (11/12). Falta job de status por `lastSync`
+  (13), throttling de escrita no Postgres (14) e emitir eventos (15).
+- **Bloco H (Rotas): parcial** - as 5 rotas de comando (21) + o
+  `GET /robots/:address/status` FEITOS; falta a atribuição de task (22).
+- **Próximos pedaços lógicos**: (a) WebSocket (bloco G) pra empurrar o estado ao
+  front em tempo real - custo baixo, o estado já existe; (b) automação (bloco F,
+  Orchestrator); (c) transporte real via Mari (bloco D) - ver abaixo.
 
 **A. Schema/model** (rápido, sem dependência de nada)
 1. `TaskModel` ganha `status` (pendente/em_andamento/concluída/cancelada) -
@@ -459,6 +484,40 @@ de verdade, não só retornar erro)
     não `uuid`, porque são endereçadas fisicamente).
 22. `PUT /robots/:address/task/:taskId` - atribuição manual de task, que
     também aciona o `Orchestrator` (bloco F).
+
+## Rede Mari (transporte real - EM ESCOPO)
+
+Decidido pelo dono do projeto: o sistema **tem** que funcionar com o robô e o
+gateway **reais** - a Mari está no escopo, não é "trabalho futuro". Pesquisa
+feita na fonte (pacotes `marilib` e repo `DotBots/mari`):
+
+- **A parte de rádio (TSCH sobre BLE 2Mbps, channel-hopping) mora no FIRMWARE do
+  gateway (nRF5340), NÃO no backend.** O host (nosso NestJS) só troca pacotes
+  **enquadrados** com o gateway via **USB serial** (`/dev/ttyACM0`, 1000000 baud).
+  Do nosso lado é enquadramento de bytes + serial, não rede de rádio - cabe em TS.
+- **Pilha no fio (de dentro pra fora):** (1) nosso DotBot Packet (payloadType +
+  body) = `next_proto DOTBOT_APP 0x11`; (2) **Mari Frame** - header próprio
+  (`version=3`, `type`, `network_id(2)`, `destination(8)`, `source(8)`,
+  `next_proto(1)`) + payload; (3) prefixo **EdgeEvent** (1 byte:
+  `NODE_DATA`/`NODE_JOINED`/`NODE_LEFT`); (4) **HDLC** enquadrando tudo pro UART.
+- **Pra falar com o gateway real**, um `MariGatewayAdapter` (implementando a
+  interface `GatewayAdapter` - nada acima muda) precisa de: `serialport` (npm),
+  codec **HDLC** (portar `serial_hdlc.py`), build/parse do **Mari Frame header**,
+  e tratar os **EdgeEvent**. Nosso DotBot Packet entra como payload do Mari Frame.
+  Dá pra **validar byte a byte contra o `marilib`** (gera no Python, compara),
+  como já fizemos com o protocolo do DotBot.
+
+Dois caminhos (decisão A vs B ainda em aberto):
+- **A - reimplementar o host-side da Mari em TS** (`MariGatewayAdapter`):
+  self-contained, sem Python; ~1 semana; risco = bater o formato exato (mitigado
+  pela validação contra o `marilib`).
+- **B - ponte com o `marilib` (Python)**: rodar o `mari-edge` como sidecar que
+  cuida de serial+Mari, e o NestJS troca só os bytes do DotBot Packet com ele
+  (MQTT - o marilib já tem - ou socket); ~2 dias; reusa lib testada; custo = um
+  processo Python a mais na stack.
+
+Os dois plugam no `GatewayModule` como uma implementação nova do `GATEWAY_ADAPTER`;
+o `SimulatorGatewayAdapter` vira o modo "sem hardware".
 
 ## Don't
 
