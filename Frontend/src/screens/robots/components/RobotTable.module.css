@@ -1,0 +1,11 @@
+.table {
+  width: 100%;
+}
+
+.tableHeader {
+  display: grid;
+  grid-template-columns: 150px 300px 120px;
+  margin-bottom: 25px;
+  font-size: 38px;
+  color: var(--color-text);
+}

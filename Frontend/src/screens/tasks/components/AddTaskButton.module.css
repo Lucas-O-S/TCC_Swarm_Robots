@@ -1,0 +1,19 @@
+.addBtn {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  transform: translateX(-50%);
+  width: 55px;
+  height: 55px;
+  border-radius: 15px;
+  background: var(--color-orange);
+  color: white;
+  font-size: 40px;
+  border: none;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.addBtn:hover {
+  opacity: 0.8;
+}
