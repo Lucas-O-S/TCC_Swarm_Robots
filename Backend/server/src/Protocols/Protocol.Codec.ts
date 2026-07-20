@@ -66,9 +66,9 @@ export class PayloadCodec {
         const result: Record<string, number> = {};
         let offset = 0;
 
-        for (const field of fields) {
-            const len = field.length ?? 1;
-            result[field.field] = PayloadCodec.bufferRead(field, len, buffer, offset);
+        for (const fieldIterator of fields) {
+            const len = fieldIterator.length ?? 1;
+            result[fieldIterator.field] = PayloadCodec.bufferRead(fieldIterator, len, buffer, offset);
             offset += len;
         }
 
