@@ -1,0 +1,7 @@
+.row {
+  display: grid;
+  grid-template-columns: 150px 300px 120px;
+  padding: 10px 0;
+  font-size: 30px;
+  color: var(--color-text);
+}
