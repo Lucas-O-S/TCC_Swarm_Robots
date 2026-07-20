@@ -1,4 +1,4 @@
-import type { Alert } from '../../../model';
+import type { Alert } from '../types';
 import { Card } from '../../../components/Card/Card';
 import styles from './AlertList.module.css';
 

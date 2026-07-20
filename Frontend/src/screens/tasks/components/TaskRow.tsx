@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Task } from '../../../model';
+import type { Task } from '../types';
 import { Button } from '../../../components/Button/Button';
 import styles from './TaskRow.module.css';
 

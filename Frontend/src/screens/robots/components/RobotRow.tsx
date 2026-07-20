@@ -1,4 +1,4 @@
-import type { Robot } from '../../../model';
+import type { Robot } from '../types';
 import styles from './RobotRow.module.css';
 
 interface RobotRowProps {

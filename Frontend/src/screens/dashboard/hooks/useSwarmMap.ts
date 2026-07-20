@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { MouseEvent } from 'react';
-import type { Robot } from '../../../model';
+import type { Robot } from '../types';
 
 // Constantes do desenho do mapa.
 const PADDING = 40;

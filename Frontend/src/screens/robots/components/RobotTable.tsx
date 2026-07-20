@@ -1,4 +1,4 @@
-import type { Robot } from '../../../model';
+import type { Robot } from '../types';
 import { RobotRow } from './RobotRow';
 import styles from './RobotTable.module.css';
 

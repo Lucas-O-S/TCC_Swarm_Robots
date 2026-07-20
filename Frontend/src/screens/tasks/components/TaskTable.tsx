@@ -1,4 +1,4 @@
-import type { Task } from '../../../model';
+import type { Task } from '../types';
 import { TaskRow } from './TaskRow';
 import styles from './TaskTable.module.css';
 

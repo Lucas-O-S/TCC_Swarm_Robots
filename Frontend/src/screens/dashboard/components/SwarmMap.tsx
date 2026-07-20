@@ -1,4 +1,4 @@
-import type { Robot } from '../../../model';
+import type { Robot } from '../types';
 import { useSwarmMap } from '../hooks/useSwarmMap';
 import styles from './SwarmMap.module.css';
 

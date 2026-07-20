@@ -1,4 +1,4 @@
-import type { Robot } from '../../../model';
+import type { Robot } from '../types';
 import { Card } from '../../../components/Card/Card';
 import { StatusHex } from '../../../components/StatusHex/StatusHex';
 import styles from './RobotList.module.css';

@@ -1,3 +1,6 @@
+# Env local (o .env.example fica versionado)
+.env
+
 # Logs
 logs
 *.log
