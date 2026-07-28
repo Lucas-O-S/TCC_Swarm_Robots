@@ -15,6 +15,8 @@ CREATE TABLE tasks (
     uuid UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
     priority INT NOT NULL DEFAULT 0,
+    -- 0=Pendente, 1=EmAndamento, 2=Concluida, 3=Cancelada
+    status SMALLINT NOT NULL DEFAULT 0 CHECK (status BETWEEN 0 AND 3),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL
@@ -26,6 +28,20 @@ CREATE TABLE tasks (
 -- isso continua nullable, cada robô só ganha essa task se alguém atribuir.
 INSERT INTO tasks (uuid, name, priority)
 VALUES ('00000000-0000-0000-0000-000000000001', 'Tarefa padrão', 0);
+
+-- Pontos do trajeto de uma task (conteúdo de missão). Uma task tem vários,
+-- na ordem de `order_index`. É o que o Orchestrator manda pro robô como waypoints.
+CREATE TABLE task_waypoints (
+    uuid UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    task_id UUID NOT NULL,
+    order_index INT NOT NULL,
+    x INT NOT NULL,
+    y INT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
+    FOREIGN KEY (task_id) REFERENCES tasks(uuid)
+);
 
 
 CREATE TABLE robots (

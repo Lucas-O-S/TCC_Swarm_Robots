@@ -1,6 +1,8 @@
 import { Column, DataType, Default, HasMany, Table } from "sequelize-typescript";
 import { BaseModel } from "./Base.Model";
 import { RobotModel } from "./Robot.Model";
+import { TaskStatus } from "./Enums/TaskStatus.enum";
+import { TaskWaypointModel } from "./TaskWaypoint.Model";
 
 /**
  * Tasks: conceito da nossa aplicação, não existe no protocolo DotBot
@@ -18,6 +20,18 @@ export class TaskModel extends BaseModel<TaskModel> {
     @Column({ type: DataType.INTEGER, allowNull: false })
     priority: number;
 
+    /**
+     * Ciclo de vida da task. Nasce Pendente; a automação (Orchestrator) marca
+     * EmAndamento ao atribuir e Concluida quando o robô termina.
+     */
+    @Default(TaskStatus.Pendente)
+    @Column({ type: DataType.SMALLINT, allowNull: false })
+    status: TaskStatus;
+
     @HasMany(() => RobotModel)
     robots: RobotModel[];
+
+    /** Pontos do trajeto, em ordem - é o que vira waypoints pro robô. */
+    @HasMany(() => TaskWaypointModel)
+    waypoints: TaskWaypointModel[];
 }
