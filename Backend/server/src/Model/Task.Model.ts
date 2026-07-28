@@ -21,10 +21,10 @@ export class TaskModel extends BaseModel<TaskModel> {
     priority: number;
 
     /**
-     * Ciclo de vida da task. Nasce Pendente; a automação (Orchestrator) marca
-     * EmAndamento ao atribuir e Concluida quando o robô termina.
+     * Task lifecycle. Starts Pending; automation (Orchestrator) marks it
+     * InProgress on assignment and Completed when the robot finishes.
      */
-    @Default(TaskStatus.Pendente)
+    @Default(TaskStatus.Pending)
     @Column({ type: DataType.SMALLINT, allowNull: false })
     status: TaskStatus;
 

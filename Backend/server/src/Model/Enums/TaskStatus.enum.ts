@@ -1,11 +1,11 @@
 /**
- * Estado de uma Task (conceito nosso, não do protocolo DotBot). Controla o
- * ciclo de vida da tarefa pra automação saber quais estão livres pra atribuir.
- * Fica no domínio/model (como o RobotStatus), não no módulo de Protocolo.
+ * Task lifecycle state (our own concept, not part of the DotBot protocol).
+ * Controls the task's lifecycle so automation knows which ones are free to assign.
+ * Lives in the domain/model (like RobotStatus), not in the Protocol module.
  */
 export enum TaskStatus {
-    Pendente = 0,
-    EmAndamento = 1,
-    Concluida = 2,
-    Cancelada = 3,
+    Pending = 0,
+    InProgress = 1,
+    Completed = 2,
+    Cancelled = 3,
 }

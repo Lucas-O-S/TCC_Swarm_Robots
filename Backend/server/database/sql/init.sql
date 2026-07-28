@@ -15,7 +15,7 @@ CREATE TABLE tasks (
     uuid UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
     priority INT NOT NULL DEFAULT 0,
-    -- 0=Pendente, 1=EmAndamento, 2=Concluida, 3=Cancelada
+    -- 0=Pending, 1=InProgress, 2=Completed, 3=Cancelled
     status SMALLINT NOT NULL DEFAULT 0 CHECK (status BETWEEN 0 AND 3),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -42,6 +42,17 @@ CREATE TABLE task_waypoints (
     deleted_at TIMESTAMP NULL,
     FOREIGN KEY (task_id) REFERENCES tasks(uuid)
 );
+
+-- Task de teste (pendente) com 3 waypoints, pra servir de cobaia pro
+-- Orchestrator: assim que houver um robô livre em modo Auto, ela deve ser
+-- atribuída e os pontos mandados pro robô.
+INSERT INTO tasks (uuid, name, priority, status)
+VALUES ('00000000-0000-0000-0000-000000000002', 'Patrulha de teste', 0, 0);
+
+INSERT INTO task_waypoints (task_id, order_index, x, y) VALUES
+    ('00000000-0000-0000-0000-000000000002', 0, 1000, 2000),
+    ('00000000-0000-0000-0000-000000000002', 1, 1500, 800),
+    ('00000000-0000-0000-0000-000000000002', 2, 300,  300);
 
 
 CREATE TABLE robots (

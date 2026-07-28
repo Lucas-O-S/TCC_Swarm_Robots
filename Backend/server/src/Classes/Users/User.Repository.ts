@@ -23,4 +23,6 @@ export class UserRepository extends BaseRepository<UserModel> {
     async getByUsername(username: string): Promise<UserModel | null> {
         return await this.model.unscoped().findOne({ where: { username } });
     }
+
+    
 }
