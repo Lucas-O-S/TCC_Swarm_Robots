@@ -10,11 +10,11 @@ export class OrchestratorListener {
 
     @OnEvent(EventsCommands.lost)
     handleLost(payload: { address: string }) {
-        return this.orchestrator.releaseRobotTask(payload.address);
+        return this.orchestrator.handleRobotLost(payload);
     }
 
     @OnEvent(EventsCommands.advertisement)
     handleAdvertisement(payload: { address: string; data: any }) {
-        return this.orchestrator.onAdvertisement(payload.address, payload.data);
+        return this.orchestrator.onAdvertisement(payload);
     }
 }

@@ -1,4 +1,5 @@
-import { Injectable, OnModuleInit } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleInit } from "@nestjs/common";
+import { RobotControlMode } from "src/Enums/RobotControlMode.enum";
 import { TaskModel } from "src/Model/Task.Model";
 import { RobotService } from "../Robots/Robot.Service";
 import { TaskService } from "../Tasks/Task.Service";
@@ -89,6 +90,49 @@ export class OrchestratorService implements OnModuleInit {
 
     }
 
+    /**
+     * Atribuição MANUAL (uso típico: robô SemiAuto). Faz o mesmo que o loop
+     * automático de `assignPending`, mas disparado por um humano via rota, não
+     * pela fila. Reusa o `sendCommandToRobot` pra montar/enviar os waypoints.
+     */
+    async assignTaskManually(address: string, taskId: string): Promise<void> {
+
+        const robot = await this.robotService.getByAddress(address);
+
+        if (!robot) {
+            throw new NotFoundException(`Nenhum robô com o endereço '${address}'`);
+        }
+
+        // Manual é dirigido no joystick; não recebe task. (Auto e SemiAuto podem.)
+        if (robot.mode === RobotControlMode.Manual) {
+            throw new BadRequestException(`Robô ${address} está em modo Manual`);
+        }
+
+        if (robot.taskId) {
+            throw new ConflictException(`Robô ${address} já está executando uma task`);
+        }
+
+        const task = await this.taskService.getOneTaskWithWaypoints(taskId);
+
+        if (!task) {
+            throw new NotFoundException(`Nenhuma task com uuid '${taskId}'`);
+        }
+
+        if (!task.waypoints?.length) {
+            throw new BadRequestException(`Task ${taskId} não tem waypoints`);
+        }
+
+        const sent = await this.sendCommandToRobot(robot, task);
+
+        if (!sent) {
+            throw new Error(`Falha ao enviar waypoints para o robô ${address}`);
+        }
+
+        await this.taskService.update(task.uuid, { status: TaskStatus.InProgress });
+
+        await this.robotService.update(robot.uuid, { taskId: task.uuid });
+    }
+
     private async sendCommandToRobot(robot: RobotModel, task: TaskModel): Promise<boolean> {
         try {
             await this.robotService.sendCommand(
@@ -117,7 +161,7 @@ export class OrchestratorService implements OnModuleInit {
             return
         }
 
-        await this.handleRobotLost(robot)
+        await this.handleLostRobot(robot)
 
         console.log(`[ORQ] robô ${payload.address} sumiu → task ${robot.taskId} voltou pra fila`);
 
@@ -130,7 +174,7 @@ export class OrchestratorService implements OnModuleInit {
 
         if (!robot || !robot.taskId){
             return
-        } 
+        }
 
         //Verifica bateria baixa (data.battery vem em mV; comparamos em Volts)
         const batteryVolts = payload.data.battery / 1000;

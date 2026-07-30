@@ -32,7 +32,7 @@ export class RobotRepository extends BaseRepository<RobotModel> {
                 [Op.and] : [
                     { taskId: { [Op.is]: null } },
                     { mode: RobotControlMode.Auto },
-                    { status: { [Op.ne]: RobotStatus.Lost} }       
+                    { status: { [Op.ne]: RobotStatus.Lost} }
                 ]
             }
         });
