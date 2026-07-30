@@ -1,6 +1,6 @@
 
 
-export enum Events {
+export enum EventsCommands {
     advertisement = "robot.advertisement",
     lost = "robot.lost"
 
