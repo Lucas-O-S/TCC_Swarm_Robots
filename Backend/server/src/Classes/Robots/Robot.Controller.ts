@@ -4,6 +4,7 @@ import { BaseController } from 'src/Classes/Base/Base.Controller';
 import { RobotModel } from 'src/Model/Robot.Model';
 import { JwtAuthGuard } from 'src/Auth/Guards/JwtAuth.Guard';
 import { PayloadType } from 'src/Enums/PayloadType.enum';
+import { Command } from 'src/Enums/Command.enum';
 import { RobotService } from './Robot.Service';
 import { RobotCreateDto } from './DTO/robot.create.dto';
 import { RobotUpdateDto } from './DTO/robot.update.dto';
@@ -57,34 +58,34 @@ export class RobotController extends BaseController<RobotModel> {
     @Put(':address/move-raw')
     @ApiBody(MoveRawSchema)
     async moveRaw(@Param('address') address: string, @Body() dto: MoveRawDto) {
-        return this.robotService.sendCommand(address, PayloadType.CMD_MOVE_RAW, 'move-raw', dto);
+        return this.robotService.sendCommand(address, PayloadType.CMD_MOVE_RAW, Command.MoveRaw, dto);
     }
 
     /** Comando de cor do LED RGB para um robô específico. */
     @Put(':address/rgb-led')
     @ApiBody(RgbLedSchema)
     async rgbLed(@Param('address') address: string, @Body() dto: RgbLedDto) {
-        return this.robotService.sendCommand(address, PayloadType.CMD_RGB_LED, 'rgb-led', dto);
+        return this.robotService.sendCommand(address, PayloadType.CMD_RGB_LED, Command.RgbLed, dto);
     }
 
     /** Alterna o modo de controle do robô (Manual/Auto). */
     @Put(':address/control-mode')
     @ApiBody(ControlModeSchema)
     async controlMode(@Param('address') address: string, @Body() dto: ControlModeDto) {
-        return this.robotService.sendCommand(address, PayloadType.CONTROL_MODE, 'control-mode', dto);
+        return this.robotService.sendCommand(address, PayloadType.CONTROL_MODE, Command.ControlMode, dto);
     }
 
     /** Envia uma lista de waypoints (LH2) para o robô seguir. */
     @Put(':address/waypoints')
     @ApiBody(WaypointsSchema)
     async waypoints(@Param('address') address: string, @Body() dto: WaypointsDto) {
-        return this.robotService.sendCommand(address, PayloadType.LH2_WAYPOINTS, 'waypoints', dto);
+        return this.robotService.sendCommand(address, PayloadType.LH2_WAYPOINTS, Command.Waypoints, dto);
     }
 
     /** Envia uma ação para um robô XGO. */
     @Put(':address/xgo-action')
     @ApiBody(XgoActionSchema)
     async xgoAction(@Param('address') address: string, @Body() dto: XgoActionDto) {
-        return this.robotService.sendCommand(address, PayloadType.CMD_XGO_ACTION, 'xgo-action', dto);
+        return this.robotService.sendCommand(address, PayloadType.CMD_XGO_ACTION, Command.XgoAction, dto);
     }
 }

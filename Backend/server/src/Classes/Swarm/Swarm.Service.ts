@@ -3,6 +3,8 @@ import * as GatewayAdapterInterface from "src/adapter/GatewayAdapter.interface";
 import { Protocol } from "src/Protocols/Protocol";
 import { PayloadSelector } from "src/Protocols/PayloadSelector";
 import { RobotWebsockets } from "src/Websockets/Robot.Websockets";
+import { injectReplacements } from "sequelize/lib/utils/sql";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 
 /**
  * Estado "quente" da frota (mirror do Controller.dotbots do PyDotBot): guarda
@@ -18,6 +20,7 @@ export class SwarmService implements OnModuleInit {
     constructor(
         @Inject(GatewayAdapterInterface.GATEWAY_ADAPTER) private readonly gateway: GatewayAdapterInterface.GatewayAdapter,
         private readonly ws: RobotWebsockets,
+        private readonly events : EventEmitter2
     ) {}
 
     // Registra o handler quando o módulo sobe (não no construtor - é uma ação
@@ -25,6 +28,14 @@ export class SwarmService implements OnModuleInit {
     onModuleInit(): void {
         this.gateway.onFrameReceived((bytes) => this.handleFrame(bytes));
     }
+
+
+    private checkLost() : void {
+        const now = Date.now();
+
+
+    }
+
 
     /** Frame chegou: desmonta, escolhe o decoder pelo tipo, decodifica e guarda. */
     private handleFrame(bytes: Buffer): void {
@@ -57,6 +68,10 @@ export class SwarmService implements OnModuleInit {
 
         this.states.set(address, state);   // guarda no quadro (memória)
         this.ws.emitUpdate(address, state); // empurra pro front ao vivo
+
+
+        //Gera o evento de advertisement
+        this.events.emit("robot.advertisement", { address, data });
 
         console.log(`[SWARM] estado de ${address} atualizado:`, data);
     }

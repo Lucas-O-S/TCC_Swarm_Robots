@@ -5,6 +5,7 @@ import { TaskService } from "../Tasks/Task.Service";
 import { RobotModel } from "src/Model/Robot.Model";
 import { TaskStatus } from "src/Model/Enums/TaskStatus.enum";
 import { PayloadType } from "src/Enums/PayloadType.enum";
+import { Command } from "src/Enums/Command.enum";
 
 
 @Injectable()
@@ -82,24 +83,22 @@ export class OrchestratorService implements OnModuleInit {
     }
 
     private async sendCommandToRobot(robot: RobotModel, task: TaskModel): Promise<boolean> {
-
-        await this.robotService.sendCommand(
-            robot.address,
-            PayloadType.LH2_WAYPOINTS,                
-            "waypoints",
-            {
-                threshold: robot.waypointsThreshold,
-                waypoints: task.waypoints
-                    .sort((a,b) => a.orderIndex - b.orderIndex)
-                    .map(wp => ({ x: wp.x, y: wp.y }))
-            }
-
-        ).catch(error => {
+        try {
+            await this.robotService.sendCommand(
+                robot.address,
+                PayloadType.LH2_WAYPOINTS,
+                Command.Waypoints,
+                {
+                    threshold: robot.waypointsThreshold,
+                    waypoints: task.waypoints
+                        .sort((a, b) => a.orderIndex - b.orderIndex)
+                        .map(wp => ({ x: wp.x, y: wp.y }))
+                }
+            );
+            return true;
+        } catch (error) {
             console.error(`Erro ao enviar comando para o robô ${robot.address}:`, error);
             return false;
-        });
-
-        return true;
-
+        }
     }
 }
