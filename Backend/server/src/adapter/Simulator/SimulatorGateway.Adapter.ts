@@ -2,10 +2,12 @@ import { Injectable } from "@nestjs/common";
 import { Protocol, Frame } from "src/Protocols/Protocol";
 import { GatewayAdapter } from "../GatewayAdapter.interface";
 import { PayloadType } from "src/Enums/PayloadType.enum";
+import { simulatorConfig } from "src/config/simulator.config";
 
 
 @Injectable()
 export class SimulatorGatewayAdapter implements GatewayAdapter{
+
 
 
     send(
@@ -16,6 +18,8 @@ export class SimulatorGatewayAdapter implements GatewayAdapter{
         type: number = 16,
     ): void {
 
+
+        
         const header : Buffer = Protocol.buildHeader(
             destination,
             version,
@@ -33,6 +37,11 @@ export class SimulatorGatewayAdapter implements GatewayAdapter{
     onFrameReceived(
         callback: (frame: Buffer) => void
     ): void {
+
+        if (!simulatorConfig.fakeAdvertisement) {
+            return;
+        }
+
         // Simula um robô fake "reportando" um advertisement a cada 3s. Como é
         // um frame que ENTRA, o `source` (offset 10) é o endereço do robô -
         // por isso montamos o header na mão aqui (o buildHeader é pro envio,

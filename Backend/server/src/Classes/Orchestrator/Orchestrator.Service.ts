@@ -39,9 +39,15 @@ export class OrchestratorService implements OnModuleInit {
 
         for (const task of pendingTasks) {
             
+            // Task sem pontos não é atribuível (ex.: a "Tarefa padrão" do seed,
+            // que é Pending mas não tem waypoints). Pula sem gastar um robô.
+            if (!task.waypoints?.length) {
+                continue;
+            }
+
             const robot = freeRobots.pop() ?? null;
 
-            if (!robot) 
+            if (!robot)
                 break;
             
             const sent = await this.sendCommandToRobot(robot, task);
@@ -56,6 +62,8 @@ export class OrchestratorService implements OnModuleInit {
             busyRobots.push(robot);
 
             tasksAssigned.push(task);
+
+            console.log(`Atribuindo tarefa ${task.name} (uuid: ${task.uuid}) ao robô ${robot.name} (uuid: ${robot.uuid})`);
             
         }
 

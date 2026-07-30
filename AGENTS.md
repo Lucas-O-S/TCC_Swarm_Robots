@@ -387,6 +387,51 @@ O ciclo agora **vai e volta** (comando sai, status entra). Peças:
 status Active/Inactive/Lost por `lastSync` (itens 13/14 do bloco E), e não emite
 eventos/WebSocket (bloco G).
 
+### WebSocket (bloco G, tempo real) - FEITO
+
+- `RobotWebsockets` (`src/Websockets/Robot.Websockets.ts`, `@WebSocketGateway({ cors })`)
+  com `@WebSocketServer() server` e `emitUpdate(address, state)` →
+  `server.emit("robot:update", ...)`.
+- O `SwarmService` injeta ele e chama `emitUpdate` no fim do `handleFrame` - cada
+  estado decodificado é empurrado ao vivo pro front (evento `robot:update`), sem
+  polling.
+- Deps: `@nestjs/websockets` + `@nestjs/platform-socket.io`. Registrado nos
+  `providers` do `SwarmModule`. Testado com um cliente socket.io simples.
+
+### Automação nível 1 (blocos A + F) - FEITO
+
+**A - Task ganhou conteúdo de missão:**
+- `TaskStatus` enum (`src/Model/Enums/`, Pending/InProgress/Completed/Cancelled).
+- `TaskModel.status` (`@Default(Pending)`) + `@HasMany(() => TaskWaypointModel) waypoints`.
+- `TaskWaypointModel` (tabela `task_waypoints`: `taskId`, `orderIndex`, `x`, `y`).
+- `init.sql`: coluna `status` em `tasks`, tabela `task_waypoints`, e um seed da task
+  "Patrulha de teste" (uuid `...0002`) com 3 waypoints pra testar a automação.
+
+**F - `OrchestratorService`** (`src/Classes/Orchestrator/`):
+- `assignPending()`: pega tasks Pending com waypoints (`taskService.getPendingTask`
+  com `include: [TaskWaypointModel]`, order por priority) + robôs livres em Auto
+  (`robotService.getFreeRobots`, `taskId=null` e `mode=Auto`), emparelha 1:1; pra
+  cada par manda os waypoints (reusa `sendCommand`) e **só então** marca a task
+  InProgress + grava `taskId` no robô (persiste só o campo mudado).
+- Guardas: pula task sem waypoints; envio protegido (retorna bool) - só atribui se
+  o envio funcionou (o próximo ciclo tenta de novo se falhar).
+- Gatilho: `onModuleInit` + `setInterval(assignPending, 5000)` com `.catch` (é job
+  de fundo, sem o ExceptionFilter do HTTP - por isso o catch é obrigatório).
+- `OrchestratorModule` importa `RobotModule` + `TaskModule`; registrado no `IndexModule`.
+- **1 task ↔ N robôs já cabe no schema** (`robots.task_id` é muitos-pra-um); hoje o
+  Orchestrator faz 1:1. Pra N robôs por task depois: adicionar `requiredRobots` na
+  Task + mudar o loop - o banco não muda.
+
+### Armadilha resolvida: `useDefineForClassFields`
+
+Com `target: ES2023`, o TS liga `useDefineForClassFields` por padrão, o que faz os
+campos declarados nos models (`name`, `status`, `waypoints`, ...) virarem campos de
+classe reais que **encobrem** os getters/setters do Sequelize → atributos e
+associações vinham `undefined` (foi o bug do `task.waypoints` no Orchestrator).
+**Corrigido** com `"useDefineForClassFields": false` no `tsconfig.json`. Se um dia
+os atributos voltarem a vir `undefined` ou aparecer o warning "declaring public
+class fields", é essa flag.
+
 ## Pendente (próximos passos)
 
 Itens já concluídos, resumidos (histórico completo nas seções acima):
@@ -405,20 +450,27 @@ só pra legibilidade de SQL/relatório) segue de baixa prioridade, sem data.
 manual + automatizado" acima) - o plano abaixo está ordenado por
 dependência real, cada bloco precisa do anterior:
 
-**Status dos blocos abaixo (ver seções "CONSTRUÍDO" e "recebimento" acima):**
-- **Bloco C (Protocolo): FEITO** - frame build/parse + motor metadata
-  (encode/decode) + todos os payloads (encoders + decoders) + os dois selectors.
-- **Bloco D (Transporte): parcial** - interface (8) e `SimulatorGatewayAdapter`
-  (10) FEITOS, com `onFrameReceived` já ligado no SwarmService. Falta o
-  transporte real via **Mari** (9) - ver seção "Rede Mari" abaixo.
-- **Bloco E (SwarmService): começado** - `Map` de estado + `handleFrame`
-  (recebe/decodifica/guarda) FEITOS (11/12). Falta job de status por `lastSync`
-  (13), throttling de escrita no Postgres (14) e emitir eventos (15).
-- **Bloco H (Rotas): parcial** - as 5 rotas de comando (21) + o
-  `GET /robots/:address/status` FEITOS; falta a atribuição de task (22).
-- **Próximos pedaços lógicos**: (a) WebSocket (bloco G) pra empurrar o estado ao
-  front em tempo real - custo baixo, o estado já existe; (b) automação (bloco F,
-  Orchestrator); (c) transporte real via Mari (bloco D) - ver abaixo.
+**Status dos blocos abaixo (ver seções "CONSTRUÍDO", "recebimento" e
+"Automação nível 1" acima):**
+- **Bloco A (Task com conteúdo): FEITO** - `status` + `task_waypoints` + seed.
+- **Bloco C (Protocolo): FEITO** - frame + motor encode/decode + payloads + selectors.
+- **Bloco D (Transporte): parcial** - interface (8) e `SimulatorGatewayAdapter` (10)
+  FEITOS, com `onFrameReceived` ligado no SwarmService. Falta o transporte real via
+  **Mari** (9) - ver seção "Rede Mari".
+- **Bloco E (SwarmService): começado** - `Map` + `handleFrame` FEITOS (11/12). Falta
+  job de status por `lastSync` (13), throttling de escrita no Postgres (14) e emitir
+  eventos internos (15).
+- **Bloco F (Orchestrator): nível 1 FEITO** - atribuição automática task↔robô livre
+  em Auto, com envio de waypoints. Falta o **nível 2** (regras reativas: robô `Lost`
+  libera a task, bateria baixa recolhe, `waypoint_idx` no fim conclui) - depende do
+  bloco E emitir eventos.
+- **Bloco G (WebSocket): FEITO** - `RobotWebsockets` empurra `robot:update` ao front.
+- **Bloco H (Rotas): parcial** - 5 comandos + `GET /status` FEITOS. A atribuição de
+  task (22) hoje é **automática** (Orchestrator); falta só a atribuição **manual** por
+  rota, se quiser.
+- **Próximos pedaços lógicos**: (a) **nível 2 do Orchestrator** (precisa do bloco E
+  emitir eventos de estado); (b) persistir estado no Postgres (E, itens 13/14);
+  (c) transporte real via **Mari** (D); (d) **frontend**.
 
 **A. Schema/model** (rápido, sem dependência de nada)
 1. `TaskModel` ganha `status` (pendente/em_andamento/concluída/cancelada) -
