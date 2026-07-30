@@ -65,4 +65,8 @@ export class RobotService extends BaseService<RobotModel> {
         this.dispatch(address, payloadType, payload);
         return { address, command, payload };
     }
+
+    async getFreeRobots(): Promise<RobotModel[] | null> {
+        return await this.robotRepository.getFreeRobots();
+    }
 }

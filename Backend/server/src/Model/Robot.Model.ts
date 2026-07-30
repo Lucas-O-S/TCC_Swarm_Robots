@@ -61,7 +61,7 @@ export class RobotModel extends BaseModel<RobotModel> {
      */
     @ForeignKey(() => TaskModel)
     @Column({ type: DataType.UUID, allowNull: true })
-    taskId: string;
+    taskId: string | null;
 
     @BelongsTo(() => TaskModel)
     task: TaskModel;

@@ -10,4 +10,4 @@ import { TaskModule } from "../Tasks/Task.module";
     providers: [OrquestratorService],
     exports: [OrquestratorService],
 })
-export class OrquestratorModule {}
+export class OrchestratorModule {}

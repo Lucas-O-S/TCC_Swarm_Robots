@@ -1,7 +1,9 @@
 import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
+import { Op } from "sequelize";
 import { RobotModel } from "src/Model/Robot.Model";
 import { BaseRepository } from "src/Classes/Base/Base.Repository";
+import { RobotControlMode } from "src/Model/Enums/RobotControlMode.enum";
 
 /**
  * Camada de acesso a dados: só chama o Sequelize. Regra de negócio
@@ -21,5 +23,11 @@ export class RobotRepository extends BaseRepository<RobotModel> {
 
     async getByAddress(address: string): Promise<RobotModel | null> {
         return await this.model.findOne({ where: { address } });
+    }
+
+    async getFreeRobots(): Promise<RobotModel[] | null> {
+        return await this.model.findAll({
+            where: { taskId: { [Op.is]: null }, mode: RobotControlMode.Auto }
+        });
     }
 }

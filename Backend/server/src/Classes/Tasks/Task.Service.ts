@@ -12,4 +12,10 @@ export class TaskService extends BaseService<TaskModel> {
     constructor(private readonly taskRepository: TaskRepository) {
         super(taskRepository);
     }
+
+
+    async getPendingTask() : Promise<TaskModel[] | null> {
+        return await this.taskRepository.getPendingTask();
+    }
+
 }

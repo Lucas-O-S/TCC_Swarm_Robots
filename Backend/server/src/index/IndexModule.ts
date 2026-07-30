@@ -4,7 +4,7 @@ import { AuthModule } from "src/Auth/Auth.module";
 import { TaskModule } from "src/Classes/Tasks/Task.module";
 import { PositionModule } from "src/Classes/Positions/Position.module";
 import { SwarmModule } from "src/Classes/Swarm/Swarm.Module";
-import { OrquestratorModule } from "src/Classes/Orchestrator/Orquestrator.Module";
+import { OrchestratorModule } from "src/Classes/Orchestrator/Orchestrator.Module";
 
 /**
  * Lista central de módulos de negócio (estilo ApiGameHit) - importada com
@@ -18,5 +18,5 @@ export const AllModules = [
     TaskModule,
     PositionModule,
     SwarmModule,
-    OrquestratorModule,
+    OrchestratorModule,
 ];
