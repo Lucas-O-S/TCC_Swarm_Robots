@@ -1,13 +1,13 @@
 import { Module } from "@nestjs/common";
-import { OrquestratorService } from "./Orquestrator.Service";
 import { RobotModule } from "../Robots/Robot.module";
 import { TaskModule } from "../Tasks/Task.module";
+import { OrchestratorService } from "./Orchestrator.Service";
 
 
 @Module({
     imports: [TaskModule, RobotModule],
     controllers: [],
-    providers: [OrquestratorService],
-    exports: [OrquestratorService],
+    providers: [OrchestratorService],
+    exports: [OrchestratorService],
 })
 export class OrchestratorModule {}
