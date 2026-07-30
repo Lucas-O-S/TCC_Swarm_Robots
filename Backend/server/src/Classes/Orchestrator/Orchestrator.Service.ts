@@ -3,14 +3,21 @@ import { TaskModel } from "src/Model/Task.Model";
 import { RobotService } from "../Robots/Robot.Service";
 import { TaskService } from "../Tasks/Task.Service";
 import { RobotModel } from "src/Model/Robot.Model";
-import { TaskStatus } from "src/Model/Enums/TaskStatus.enum";
+import { TaskStatus } from "src/Enums/TaskStatus.enum";
 import { PayloadType } from "src/Enums/PayloadType.enum";
 import { Command } from "src/Enums/Command.enum";
+import { OnEvent } from "@nestjs/event-emitter";
+import { EventsCommands } from "src/Enums/Events.Enum";
+import { RobotStatus } from "src/Enums/RobotStatus.enum";
 
 
 @Injectable()
 export class OrchestratorService implements OnModuleInit {
 
+    private RUN_TIME = 5000;
+    
+    /** Limiar de bateria baixa, em Volts. O protocolo manda mV; convertemos ao comparar. */
+    private LOW_BATTERY_VOLTS = 3.0;
 
     constructor(
         private readonly taskService: TaskService,
@@ -25,7 +32,7 @@ export class OrchestratorService implements OnModuleInit {
                 console.error("Erro ao atribuir tarefas pendentes:", error);
             });
 
-        }, 5000);
+        }, this.RUN_TIME);
     }
 
     async assignPending() : Promise<void> {
@@ -101,4 +108,81 @@ export class OrchestratorService implements OnModuleInit {
             return false;
         }
     }
+
+    async handleRobotLost(payload: {address : string}) : Promise<void>{
+
+        const robot = await this.robotService.getByAddress(payload.address);
+
+        if (!robot || !robot.taskId){
+            return
+        }
+
+        await this.handleRobotLost(robot)
+
+        console.log(`[ORQ] robô ${payload.address} sumiu → task ${robot.taskId} voltou pra fila`);
+
+
+    }
+
+    async onAdvertisement( payload : {address : string, data : any}) : Promise<void>{
+
+        const robot = await this.robotService.getByAddress(payload.address);
+
+        if (!robot || !robot.taskId){
+            return
+        } 
+
+        //Verifica bateria baixa (data.battery vem em mV; comparamos em Volts)
+        const batteryVolts = payload.data.battery / 1000;
+
+        if (batteryVolts <= this.LOW_BATTERY_VOLTS){
+
+            //To do task de recarregar
+            await this.resetTask(robot)
+            return
+        }
+
+        const task = await this.taskService.getOneTaskWithWaypoints(robot.taskId);
+
+        const howManyWaypoints = task?.waypoints.length ?? 0
+
+        if(payload.data.waypoint_idx >= howManyWaypoints){
+            await this.completeTask(robot);
+            return
+        }
+
+    }
+
+
+    private async resetTask(robot : RobotModel) : Promise<void>{
+       
+        const taskId : string = robot.taskId ?? "";
+       
+        await this.taskService.update(taskId, {status : TaskStatus.Pending});
+
+        await this.robotService.update(robot.uuid, {taskId : null});
+    }
+
+    private async completeTask(robot : RobotModel) : Promise<void>{
+       
+        const taskId : string = robot.taskId ?? "";
+       
+        await this.taskService.update(taskId, {status : TaskStatus.Completed});
+
+        await this.robotService.update(robot.uuid, {taskId : null});
+    }
+
+    private async handleLostRobot(robot : RobotModel) : Promise<void>{
+       
+        const taskId : string = robot.taskId ?? "";
+       
+        await this.taskService.update(taskId, {status : TaskStatus.Pending});
+
+        await this.robotService.update(robot.uuid, {taskId : null, status : RobotStatus.Lost});
+    }
+
+
+
+
 }
+

@@ -1,7 +1,7 @@
 import { BelongsTo, Column, DataType, Default, ForeignKey, Table } from "sequelize-typescript";
 import { BaseModel } from "./Base.Model";
 import { TaskModel } from "./Task.Model";
-import { RobotStatus } from "./Enums/RobotStatus.enum";
+import { RobotStatus } from "../Enums/RobotStatus.enum";
 import { RobotApplication } from "../Enums/RobotApplication.enum";
 import { RobotControlMode } from "../Enums/RobotControlMode.enum";
 

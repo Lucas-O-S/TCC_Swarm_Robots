@@ -18,4 +18,8 @@ export class TaskService extends BaseService<TaskModel> {
         return await this.taskRepository.getPendingTask();
     }
 
+    async getOneTaskWithWaypoints(taskId) : Promise<TaskModel | null>{
+        return await this.taskRepository.getOneTaskWithWaypoints(taskId);
+    } 
+
 }
