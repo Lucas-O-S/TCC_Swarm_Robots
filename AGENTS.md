@@ -53,6 +53,13 @@ convivendo**, não um só:
   humano clicando em cada robô - `RobotControlMode.Auto`. Cada robô tem seu
   próprio modo (coluna `mode` em `robots`), então dá pra ter parte da frota
   em manual e parte em automático ao mesmo tempo.
+- **SemiAuto** (`RobotControlMode.SemiAuto = 2`, adicionado depois): executa
+  tasks de forma autônoma (segue waypoints) igual ao Auto, MAS fica fora da
+  fila do orquestrador - a task é atribuída **manualmente** por um humano (rota
+  `PUT /orchestrator/robots/:address/assign`). É o meio-termo entre Manual e
+  Auto: não é dirigido no joystick, mas também não recebe task sozinho. O
+  `getFreeRobots` só pega `Auto`, então o SemiAuto naturalmente não entra na
+  atribuição automática.
 
 Sobre funcionar **"de forma adaptativa"** (pergunta feita no chat) - a
 resposta é "depende do nível", ainda nenhum foi implementado:
@@ -62,13 +69,13 @@ resposta é "depende do nível", ainda nenhum foi implementado:
    escolhe automaticamente qual robô pega qual task pendente, com base em
    prioridade/status/bateria. É lógica de consulta ao Postgres, não precisa
    de nada em tempo real.
-2. **Reativo/adaptativo de verdade** (precisa do `SwarmService` + WebSocket,
-   itens 5/6 do "Pendente", ainda não construídos): o sistema reage a
-   mudanças de estado *enquanto elas acontecem* - reatribui a task se o
-   robô ficar `LOST` no meio, manda voltar pra carregar se a bateria cair
-   demais, rebalanceia quando um robô novo entra na rede. Sem o estado
-   quente em memória + os eventos de WebSocket, isso só dá pra fazer via
-   polling do banco (funciona, mas não é "tempo real").
+2. **Reativo/adaptativo de verdade** (**FEITO**, menos a recarga - ver
+   "Adiado" abaixo): o sistema reage a mudanças de estado *enquanto elas
+   acontecem* - solta a task de volta pra fila se o robô ficar `Lost` no
+   meio, conclui a task quando o `waypoint_idx` chega no fim. Isso roda via
+   eventos internos (EventEmitter2): o `SwarmService` emite, um
+   `OrchestratorListener` escuta e chama o `OrchestratorService`. A recarga
+   em bateria baixa foi adiada (decisão de design, ver "Adiado").
 3. **Aprendizado/otimização** (ex.: machine learning pra decidir alocação) -
    fora de escopo por enquanto, não faz parte do plano atual.
 
@@ -194,7 +201,8 @@ separação em módulos NestJS:
   binários. Guarda só o que **realmente trafega no pacote de rádio**:
   - `Enums/RobotApplication.enum.ts` - `ApplicationType` (0=DotBot, 1=SailBot,
     2=Freebot, 3=XGO, 4=LH2_mini_mote)
-  - `Enums/RobotControlMode.enum.ts` - `ControlModeType` (0=Manual, 1=Auto)
+  - `Enums/RobotControlMode.enum.ts` - `RobotControlMode` (0=Auto, 1=Manual,
+    2=SemiAuto - ver "Objetivo" acima; o CHECK em `robots.mode` é 0..2)
   - `Enums/PositionSource.enum.ts` - de onde veio uma amostra de posição
     (LH2 vs GPS), decidido pelo tipo de payload recebido.
 - `src/Model/` - persistência (Sequelize). Guarda só o que faz sentido durar
@@ -233,9 +241,12 @@ foi:
   em tempo real e o próprio robô é quem "lembra" o valor de verdade - o
   backend é só um espelho.
 - **Muda com frequência mas tem valor histórico → banco, com escrita
-  throttled (não a cada pacote).** `status` e `battery`: gravar a cada
-  pacote recebido geraria centenas de writes/segundo num enxame grande.
-  Ainda não implementado (depende do `SwarmService`, ver "Pendente" abaixo).
+  throttled (não a cada pacote).** `status`, `battery`, `lastSync` e o
+  histórico de `position`: gravar a cada pacote geraria centenas de
+  writes/segundo num enxame grande. **Implementado** - o `SwarmService` é o
+  único escritor, via um job periódico (1s) que só grava quando algo muda
+  (status/bateria) e descarta amostras de posição muito próximas da última
+  (throttle por distância). Ver "Persistência de estado" abaixo.
 - **Baixa frequência (muda só por ação explícita) → banco, sem
   necessidade de throttling.** `address`, `name`, `application`, `swarmId`,
   `calibrated`, `mode`, `waypointsThreshold`, `taskId`.
@@ -383,9 +394,10 @@ O ciclo agora **vai e volta** (comando sai, status entra). Peças:
 - Testado ponta a ponta: o simulador emite o advertisement, o SwarmService
   decodifica e o `GET /status` mostra `{direction, pos_x, battery, mode, ...}`.
 
-**Ainda de memória-só**: o SwarmService não persiste no Postgres nem recalcula
-status Active/Inactive/Lost por `lastSync` (itens 13/14 do bloco E), e não emite
-eventos/WebSocket (bloco G).
+**Atualização**: o "ainda de memória-só" foi resolvido - o SwarmService agora
+persiste no Postgres, recalcula status por `lastSync`, grava histórico de
+posição e emite eventos (internos + WebSocket). Ver "Persistência de estado" e
+"Automação nível 2" abaixo.
 
 ### WebSocket (bloco G, tempo real) - FEITO
 
@@ -422,6 +434,69 @@ eventos/WebSocket (bloco G).
   Orchestrator faz 1:1. Pra N robôs por task depois: adicionar `requiredRobots` na
   Task + mudar o loop - o banco não muda.
 
+### Automação nível 2 - reativo (bloco F + E15) - FEITO (menos recarga)
+
+O ciclo reativo funciona por **eventos internos** (EventEmitter2), desacoplando
+quem detecta de quem age:
+
+- `Enums/Events.Enum.ts` - `EventsCommands` (`robot.advertisement`,
+  `robot.lost`), nomes dos eventos do barramento interno (backend-pra-backend).
+- `SwarmService` **emite**: `robot.advertisement` a cada frame decodificado, e
+  `robot.lost` uma vez quando um robô fica silencioso além do `LOST_LIMIT` (5s).
+- `OrchestratorListener` (provider `@Injectable` na pasta do Orchestrator, **não
+  um Controller** - `@OnEvent` não funciona em Controller) **escuta** os eventos
+  e chama o `OrchestratorService`. Registrado nos `providers` do
+  `OrchestratorModule`.
+- Regras no `OrchestratorService`:
+  - `handleRobotLost` → se o robô tinha task, solta ela pra fila (`Pending`) e
+    marca o robô `Lost` (`handleLostRobot`).
+  - `onAdvertisement` → se `waypoint_idx >= nº de waypoints`, conclui a task
+    (`Completed`) e libera o robô. Se a bateria (mV/1000 → Volts) está abaixo do
+    `LOW_BATTERY_VOLTS`, hoje só solta a task (placeholder - recarga adiada).
+
+**Atribuição manual (SemiAuto)**: `OrchestratorController` expõe
+`PUT /orchestrator/robots/:address/assign` (body `{ taskId }`). Faz o mesmo que
+o loop automático, mas disparado por humano: valida (robô existe, não é Manual,
+está livre), pega a task com waypoints, manda o comando e grava `taskId` +
+`InProgress`. Reusa o `sendCommandToRobot` do próprio service.
+
+**Bugs corrigidos junto** (auditoria): `handleRobotLost` chamava a si mesmo
+(recursão infinita) - era pra chamar `handleLostRobot`; o `OrchestratorListener`
+chamava métodos que não existiam no service e não estava registrado no módulo
+(os `@OnEvent` não disparavam).
+
+### Persistência de estado (bloco E, itens 13/14) - FEITO
+
+O `SwarmService` é o **único escritor** do estado quente no Postgres, num job
+periódico (1s, mesmo timer do `checkLost`), espelhando o
+`_dotbots_status_refresh` do PyDotBot:
+
+- **Status por `lastSync`**: recalcula `Active/Inactive/Lost` a partir do tempo
+  de silêncio, com os limiares exatos do PyDotBot - `INACTIVE_DELAY = 5s`,
+  `LOST_DELAY = 60s` (< 5s = Active, 5–60s = Inactive, > 60s = Lost). O status
+  **nunca vem do robô**, é calculado.
+- **Throttle de graça**: grava `status`/`battery`/`lastSync` só quando o status
+  ou a bateria mudam desde a última gravação (guardado num `Map` em memória por
+  address). Vários pacotes viram no máximo 1 write/robô/ciclo, e nada se o robô
+  está parado. `battery` é gravada em **Volts** (o fio manda mV → divide por
+  1000, igual PyDotBot).
+- **Histórico de posição** (tabela `position`, via `PositionService`): grava a
+  posição decodificada com throttle por **distância** - descarta se moveu menos
+  que `LH2_DISTANCE_MM = 20` (LH2, mm) ou `GPS_DISTANCE_M = 5` (GPS, metros por
+  haversine). Trata `DOTBOT_ADVERTISEMENT` (LH2, com guarda do sentinela
+  `0xFFFFFFFF` = "sem localização") e `GPS_POSITION`. **Nota**: o PyDotBot só
+  grava LH2 quando o robô está totalmente calibrado; esse gate ainda não existe
+  aqui (não temos o estado de calibração no backend), só a guarda do sentinela.
+- **WebSocket**: `emitStatus` empurra `robot:status` pro front quando o status
+  muda (isso acontece SEM pacote novo - por timeout - então o front só fica
+  sabendo por aqui; é o equivalente ao `RELOAD` do PyDotBot). Os nomes de evento
+  do socket ficam no enum `SocketEvents` (`robot:update`, `robot:status`),
+  separado do `EventsCommands` interno de propósito.
+
+`SwarmModule` importa `RobotModule` + `PositionModule` (pra injetar
+`RobotService`/`PositionService`); sem ciclo, porque nenhum deles importa o
+`SwarmModule`.
+
 ### Armadilha resolvida: `useDefineForClassFields`
 
 Com `target: ES2023`, o TS liga `useDefineForClassFields` por padrão, o que faz os
@@ -457,20 +532,21 @@ dependência real, cada bloco precisa do anterior:
 - **Bloco D (Transporte): parcial** - interface (8) e `SimulatorGatewayAdapter` (10)
   FEITOS, com `onFrameReceived` ligado no SwarmService. Falta o transporte real via
   **Mari** (9) - ver seção "Rede Mari".
-- **Bloco E (SwarmService): começado** - `Map` + `handleFrame` FEITOS (11/12). Falta
-  job de status por `lastSync` (13), throttling de escrita no Postgres (14) e emitir
-  eventos internos (15).
-- **Bloco F (Orchestrator): nível 1 FEITO** - atribuição automática task↔robô livre
-  em Auto, com envio de waypoints. Falta o **nível 2** (regras reativas: robô `Lost`
-  libera a task, bateria baixa recolhe, `waypoint_idx` no fim conclui) - depende do
-  bloco E emitir eventos.
-- **Bloco G (WebSocket): FEITO** - `RobotWebsockets` empurra `robot:update` ao front.
-- **Bloco H (Rotas): parcial** - 5 comandos + `GET /status` FEITOS. A atribuição de
-  task (22) hoje é **automática** (Orchestrator); falta só a atribuição **manual** por
-  rota, se quiser.
-- **Próximos pedaços lógicos**: (a) **nível 2 do Orchestrator** (precisa do bloco E
-  emitir eventos de estado); (b) persistir estado no Postgres (E, itens 13/14);
-  (c) transporte real via **Mari** (D); (d) **frontend**.
+- **Bloco E (SwarmService): FEITO** - `Map` + `handleFrame` (11/12), job de status por
+  `lastSync` (13), escrita throttled no Postgres (14) e emissão de eventos (15). Ver
+  "Persistência de estado". (Falta só o gate de calibração LH2 pra gravar posição.)
+- **Bloco F (Orchestrator): nível 1 e nível 2 FEITOS** (menos recarga) - atribuição
+  automática task↔robô Auto + regras reativas (robô `Lost` solta a task, `waypoint_idx`
+  no fim conclui) via `OrchestratorListener`. A regra de **bateria baixa** hoje é
+  placeholder (só solta a task); a **recarga** foi adiada (ver "Adiado"). Ver
+  "Automação nível 2".
+- **Bloco G (WebSocket): FEITO** - `RobotWebsockets` empurra `robot:update` (a cada
+  frame) e `robot:status` (quando o status muda por timeout) ao front.
+- **Bloco H (Rotas): FEITO** - 5 comandos + `GET /status` + atribuição **manual**
+  (`PUT /orchestrator/robots/:address/assign`, usada pelo SemiAuto). A atribuição
+  automática segue no Orchestrator.
+- **Próximos pedaços lógicos**: (a) transporte real via **Mari** (D); (b) **frontend**;
+  (c) recarga (adiada, ver "Adiado"); (d) gate de calibração LH2 na gravação de posição.
 
 ### Adiado: comportamento de recarga (bateria baixa) - DECISÃO DE DESIGN PENDENTE
 
