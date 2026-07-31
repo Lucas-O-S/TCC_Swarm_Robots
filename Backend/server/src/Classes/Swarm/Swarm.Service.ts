@@ -6,6 +6,8 @@ import { RobotWebsockets } from "src/Websockets/Robot.Websockets";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { EventsCommands as EventCommands } from "src/Enums/Events.Enum";
 import { PayloadType } from "src/Enums/PayloadType.enum";
+import { RobotService } from "../Robots/Robot.Service";
+import { RobotStatus } from "src/Enums/RobotStatus.enum";
 
 /**
  * Último estado conhecido de um robô, guardado em memória pelo SwarmService.
@@ -37,11 +39,23 @@ export class SwarmService implements OnModuleInit {
 
     private readonly lostRobots = new Set<string>();
 
+    // Limiares de status por tempo de silêncio (iguais ao PyDotBot:
+    // INACTIVE_DELAY=5s, LOST_DELAY=60s). < 5s = Active, 5-60s = Inactive,
+    // > 60s = Lost. Calculado do lastSync, nunca vem do robô.
+    private readonly INACTIVE_AFTER_MS = 5000;
+
+    private readonly LOST_AFTER_MS = 60000;
+
+    // Último {status, bateria} que gravamos no banco por address. Serve de
+    // throttle: só escrevemos quando muda de verdade (não a cada pacote).
+    private readonly persisted = new Map<string, { status: RobotStatus; battery: number }>();
+
 
     constructor(
         @Inject(GatewayAdapterInterface.GATEWAY_ADAPTER) private readonly gateway: GatewayAdapterInterface.GatewayAdapter,
         private readonly ws: RobotWebsockets,
-        private readonly events : EventEmitter2
+        private readonly events : EventEmitter2,
+        private readonly robots : RobotService
     ) {}
 
     // Registra o handler quando o módulo sobe (não no construtor - é uma ação
@@ -49,9 +63,84 @@ export class SwarmService implements OnModuleInit {
     onModuleInit(): void {
    
         this.gateway.onFrameReceived((bytes) => this.handleFrame(bytes));
-   
-        setInterval(() => this.checkLost(), this.RUN_TIME)
 
+        setInterval(() => {
+            this.checkLost();
+            this.refreshAndPersist().catch(error =>
+                console.error("[SWARM] erro ao persistir estado:", error),
+            );
+        }, this.RUN_TIME)
+
+    }
+
+
+    /** Status a partir do tempo de silêncio (mesma régra do PyDotBot). */
+    private statusFromSilence(silentMs: number): RobotStatus {
+        if (silentMs > this.LOST_AFTER_MS) return RobotStatus.Lost;
+        if (silentMs > this.INACTIVE_AFTER_MS) return RobotStatus.Inactive;
+        return RobotStatus.Active;
+    }
+
+    /** Bateria em Volts se o payload tiver esse campo (mV/1000), senão null. */
+    private batteryVoltsOf(state: RobotState): number | null {
+        const raw = state.data?.battery;
+        return typeof raw === "number" ? raw / 1000 : null;
+    }
+
+    /**
+     * Único escritor no Postgres. Roda a cada RUN_TIME: pra cada robô no estado
+     * quente, recalcula o status por lastSync e grava status/battery/lastSync -
+     * mas SÓ quando status ou bateria mudam desde a última gravação (throttle).
+     * Assim vários pacotes viram no máximo 1 write/robô/ciclo, e nada se o robô
+     * está parado. Espelha o _dotbots_status_refresh do PyDotBot.
+     */
+    private async refreshAndPersist(): Promise<void> {
+
+        const now = Date.now();
+
+        for (const [address, state] of this.states) {
+
+            const silentMs = now - state.updatedAt.getTime();
+
+            const status = this.statusFromSilence(silentMs);
+
+            const batteryVolts = this.batteryVoltsOf(state);
+
+            const last = this.persisted.get(address);
+
+            const statusChanged = !last || last.status !== status;
+
+            const batteryChanged = batteryVolts !== null && (!last || last.battery !== batteryVolts);
+
+            if (!statusChanged && !batteryChanged) {
+                continue;
+            }
+
+            const robot = await this.robots.getByAddress(address);
+
+            if (!robot) {
+                continue; // anunciou na rede mas não está cadastrado no banco
+            }
+
+            const changes: { status?: RobotStatus; battery?: number; lastSync: Date } = {
+                lastSync: state.updatedAt,
+            };
+
+            if (statusChanged) changes.status = status;
+
+            if (batteryChanged) changes.battery = batteryVolts as number;
+
+            await this.robots.update(robot.uuid, changes);
+
+            this.persisted.set(address, {
+                status,
+                battery: batteryVolts ?? last?.battery ?? robot.battery,
+            });
+
+            if (statusChanged) {
+                console.log(`[SWARM] status de ${address}: ${RobotStatus[last?.status ?? robot.status]} → ${RobotStatus[status]}`);
+            }
+        }
     }
 
 

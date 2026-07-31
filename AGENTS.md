@@ -472,6 +472,41 @@ dependência real, cada bloco precisa do anterior:
   emitir eventos de estado); (b) persistir estado no Postgres (E, itens 13/14);
   (c) transporte real via **Mari** (D); (d) **frontend**.
 
+### Adiado: comportamento de recarga (bateria baixa) - DECISÃO DE DESIGN PENDENTE
+
+O dono do projeto decidiu **deixar a recarga pra depois** (precisa pensar no
+modelo antes de implementar). Hoje o `OrchestratorService.onAdvertisement`, no
+branch de bateria baixa (`batteryVolts <= LOW_BATTERY_VOLTS`, valor cru vem em
+**mV**, divide por 1000 pra Volts), só faz `resetTask` - **solta a task de volta
+pra fila e não faz nada com o robô**. Isso é um placeholder, não a recarga de
+verdade.
+
+Um protótipo de recarga chegou a ser escrito e **revertido** (estado `Charging`
+no `RobotStatus`, estação como config `orchestrator.config.ts`, `startCharging`/
+`finishCharging`, filtro do `getFreeRobots` excluindo `Charging`) - foi tudo
+desfeito de propósito. Se for retomar, **não** copiar aquele protótipo cru:
+ele tratava recarga como "um robô, uma estação infinita", que é justamente o
+que está errado.
+
+Questões de design a resolver ANTES de implementar (levantadas pelo dono):
+- **Estações são recurso finito.** Se há N estações e mais de N robôs precisando,
+  vira fila de espera *pela estação* - um mini-escalonador só pra recarga, não
+  só um "vai pro ponto (x,y)".
+- **Evitar corrida por estação.** Dois robôs mandados pra mesma estação ao mesmo
+  tempo. Precisa "reservar"/ocupar a estação.
+- **Saber quem já está carregando** pra não remandar, e quando liberar (histerese
+  de bateria: entra no Charging abaixo de X V, só sai acima de Y V > X, pra não
+  ficar oscilando).
+- **Recarga é `Task` ou é estado do robô?** Se virar `Task` de verdade (waypoint =
+  estação), entra no mesmo pipeline que já existe - mas precisa de prioridade alta
+  e de reserva da estação. Se for só estado (`Charging`), é mais simples mas a
+  gestão da estação fica por fora do pipeline de tasks.
+
+Enquanto não for decidido, o branch de bateria baixa fica como está (só
+`resetTask`). O `RobotControlMode.SemiAuto` e a atribuição manual
+(`PUT /orchestrator/robots/:address/assign`) **não** dependem da recarga e já
+estão prontos.
+
 **A. Schema/model** (rápido, sem dependência de nada)
 1. `TaskModel` ganha `status` (pendente/em_andamento/concluída/cancelada) -
    sem isso não dá pra saber quais tasks estão livres pra atribuir.
