@@ -8,6 +8,9 @@ import { EventsCommands as EventCommands } from "src/Enums/Events.Enum";
 import { PayloadType } from "src/Enums/PayloadType.enum";
 import { RobotService } from "../Robots/Robot.Service";
 import { RobotStatus } from "src/Enums/RobotStatus.enum";
+import { PositionService } from "../Positions/Position.Service";
+import { PositionSource } from "src/Enums/PositionSource.enum";
+import { PositionModel } from "src/Model/Position.Model";
 
 /**
  * Último estado conhecido de um robô, guardado em memória pelo SwarmService.
@@ -50,12 +53,23 @@ export class SwarmService implements OnModuleInit {
     // throttle: só escrevemos quando muda de verdade (não a cada pacote).
     private readonly persisted = new Map<string, { status: RobotStatus; battery: number }>();
 
+    // Última posição gravada por address, pro throttle por distância abaixo.
+    private readonly lastPosition = new Map<string, { x: number; y: number }>();
+
+    // Limiares de distância pra gravar uma nova amostra de posição (iguais ao
+    // PyDotBot: LH2_POSITION_DISTANCE_THRESHOLD=20mm, GPS=5m). Se moveu menos
+    // que isso, é considerado ruído e a amostra é descartada.
+    private readonly LH2_DISTANCE_MM = 20;
+
+    private readonly GPS_DISTANCE_M = 5;
+
 
     constructor(
         @Inject(GatewayAdapterInterface.GATEWAY_ADAPTER) private readonly gateway: GatewayAdapterInterface.GatewayAdapter,
         private readonly ws: RobotWebsockets,
         private readonly events : EventEmitter2,
-        private readonly robots : RobotService
+        private readonly robots : RobotService,
+        private readonly positions : PositionService
     ) {}
 
     // Registra o handler quando o módulo sobe (não no construtor - é uma ação
@@ -138,6 +152,7 @@ export class SwarmService implements OnModuleInit {
             });
 
             if (statusChanged) {
+                this.ws.emitStatus(address, status);
                 console.log(`[SWARM] status de ${address}: ${RobotStatus[last?.status ?? robot.status]} → ${RobotStatus[status]}`);
             }
         }
@@ -204,11 +219,96 @@ export class SwarmService implements OnModuleInit {
         this.states.set(address, state);   // guarda no quadro (memória)
         this.ws.emitUpdate(address, state); // empurra pro front ao vivo
 
+        // Grava a posição no histórico (throttled por distância). Fire-and-forget:
+        // não queremos travar o processamento do frame por um write no banco.
+        this.persistPosition(address, frame.payloadType, data).catch(error =>
+            console.error("[SWARM] erro ao gravar posição:", error),
+        );
+
 
         //Gera o evento de advertisement
         this.events.emit( EventCommands.advertisement, { address, data });
 
         console.log(`[SWARM] estado de ${address} atualizado:`, data);
+    }
+
+    /**
+     * Grava uma amostra de posição na tabela `position`, se o payload carregar
+     * posição e o robô tiver se movido o suficiente (throttle por distância,
+     * igual ao PyDotBot). LH2 (DotBot) vem em mm; GPS (SailBot) em graus.
+     */
+    private async persistPosition(address: string, payloadType: PayloadType, data: any): Promise<void> {
+
+        let source: PositionSource;
+        let x: number;
+        let y: number;
+        let direction: number | null = null;
+
+        if (payloadType === PayloadType.DOTBOT_ADVERTISEMENT) {
+            // 0xFFFFFFFF = "sem leitura de posição" (robô ainda não localizado).
+            if (data.pos_x === 0xFFFFFFFF || data.pos_y === 0xFFFFFFFF) {
+                return;
+            }
+            source = PositionSource.LH2;
+            x = data.pos_x;
+            y = data.pos_y;
+            // 0xFFFF (sem leitura) vira -1 no decode com sinal.
+            direction = data.direction === -1 ? null : data.direction;
+
+        } else if (payloadType === PayloadType.GPS_POSITION) {
+            source = PositionSource.GPS;
+            x = data.latitude / 1e6;   // graus decimais
+            y = data.longitude / 1e6;
+        } else {
+            return; // payload sem posição
+        }
+
+        // Throttle por distância: descarta amostra muito perto da última.
+        const last = this.lastPosition.get(address);
+        if (last) {
+           
+            const moved = source === PositionSource.GPS
+                ? this.gpsDistanceMeters(last.x, last.y, x, y)
+                : Math.hypot(x - last.x, y - last.y);
+
+            const threshold = source === PositionSource.GPS ? this.GPS_DISTANCE_M : this.LH2_DISTANCE_MM;
+            
+            if (moved < threshold) {
+                return;
+            }
+        }
+
+        const robot = await this.robots.getByAddress(address);
+        if (!robot) {
+            return; // anunciou na rede mas não está cadastrado no banco
+        }
+
+        const sample: Partial<PositionModel> = { robotId: robot.uuid, source, x, y };
+        if (direction !== null) {
+            sample.direction = direction;
+        }
+
+        await this.positions.create(sample);
+
+        this.lastPosition.set(address, { x, y });
+    }
+
+    /** Distância entre duas coordenadas GPS em metros (haversine, igual PyDotBot). */
+    private gpsDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+       
+        const R = 6371000; // raio da Terra em metros
+       
+        const toRad = (deg: number) => (deg * Math.PI) / 180;
+       
+        const dLat = toRad(lat2 - lat1);
+       
+        const dLon = toRad(lon2 - lon1);
+       
+        const a =
+            Math.sin(dLat / 2) ** 2 +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+        
+        return 2 * R * Math.asin(Math.sqrt(a));
     }
 
     /** Último estado conhecido de um robô (ou null se nunca chegou nada dele). */
