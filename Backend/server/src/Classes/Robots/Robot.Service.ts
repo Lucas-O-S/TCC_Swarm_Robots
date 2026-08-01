@@ -4,8 +4,8 @@ import { RobotModel } from 'src/Model/Robot.Model';
 import { RobotRepository } from './Robot.Repository';
 import { GATEWAY_ADAPTER } from 'src/adapter/GatewayAdapter.interface';
 import type { GatewayAdapter } from 'src/adapter/GatewayAdapter.interface';
-import { PayloadType } from 'src/Enums/PayloadType.enum';
-import { Command } from 'src/Enums/Command.enum';
+import { PayloadType } from 'src/Enums/PayloadType.Enum';
+import { Command } from 'src/Enums/Command.Enum';
 import { PayloadSelector } from 'src/Protocols/PayloadSelector';
 import { PayloadCoder } from 'src/Protocols/Wrappers/PayloadProtocol';
 

@@ -1,7 +1,7 @@
 import { Column, DataType, Default, HasMany, Table } from "sequelize-typescript";
 import { BaseModel } from "./Base.Model";
 import { RobotModel } from "./Robot.Model";
-import { TaskStatus } from "../Enums/TaskStatus.enum";
+import { TaskStatus } from "../Enums/TaskStatus.Enum";
 import { TaskWaypointModel } from "./TaskWaypoint.Model";
 
 /**

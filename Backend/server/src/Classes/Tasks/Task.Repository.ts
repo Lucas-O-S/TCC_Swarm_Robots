@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
 import { TaskModel } from "src/Model/Task.Model";
 import { BaseRepository } from "src/Classes/Base/Base.Repository";
-import { TaskStatus } from "src/Enums/TaskStatus.enum";
+import { TaskStatus } from "src/Enums/TaskStatus.Enum";
 import { TaskWaypointModel } from "src/Model/TaskWaypoint.Model";
 
 /**

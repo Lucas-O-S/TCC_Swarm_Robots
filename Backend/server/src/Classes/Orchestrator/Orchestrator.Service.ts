@@ -1,15 +1,15 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleInit } from "@nestjs/common";
-import { RobotControlMode } from "src/Enums/RobotControlMode.enum";
+import { RobotControlMode } from "src/Enums/RobotControlMode.Enum";
 import { TaskModel } from "src/Model/Task.Model";
 import { RobotService } from "../Robots/Robot.Service";
 import { TaskService } from "../Tasks/Task.Service";
 import { RobotModel } from "src/Model/Robot.Model";
-import { TaskStatus } from "src/Enums/TaskStatus.enum";
-import { PayloadType } from "src/Enums/PayloadType.enum";
-import { Command } from "src/Enums/Command.enum";
+import { TaskStatus } from "src/Enums/TaskStatus.Enum";
+import { PayloadType } from "src/Enums/PayloadType.Enum";
+import { Command } from "src/Enums/Command.Enum";
 import { OnEvent } from "@nestjs/event-emitter";
 import { EventsCommands } from "src/Enums/Events.Enum";
-import { RobotStatus } from "src/Enums/RobotStatus.enum";
+import { RobotStatus } from "src/Enums/RobotStatus.Enum";
 
 
 @Injectable()

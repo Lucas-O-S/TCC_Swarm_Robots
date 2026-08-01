@@ -1,6 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsUUID } from "class-validator";
-import { PositionSource } from "src/Enums/PositionSource.enum";
+import { PositionSource } from "src/Enums/PositionSource.Enum";
 
 export class PositionCreateDto {
 

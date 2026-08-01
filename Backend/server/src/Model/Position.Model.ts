@@ -1,7 +1,7 @@
 import { BelongsTo, Column, DataType, Default, ForeignKey, Table } from "sequelize-typescript";
 import { BaseModel } from "./Base.Model";
 import { RobotModel } from "./Robot.Model";
-import { PositionSource } from "../Enums/PositionSource.enum";
+import { PositionSource } from "../Enums/PositionSource.Enum";
 
 /**
  * Histórico de posição. Uma linha por amostra já "throttled" (o

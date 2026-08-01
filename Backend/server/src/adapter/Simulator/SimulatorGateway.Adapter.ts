@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { Protocol, Frame } from "src/Protocols/Protocol";
 import { GatewayAdapter } from "../GatewayAdapter.interface";
-import { PayloadType } from "src/Enums/PayloadType.enum";
+import { PayloadType } from "src/Enums/PayloadType.Enum";
 import { simulatorConfig } from "src/config/simulator.config";
 
 

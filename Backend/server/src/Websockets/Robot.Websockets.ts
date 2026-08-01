@@ -1,6 +1,6 @@
 import { WebSocketGateway, WebSocketServer } from "@nestjs/websockets";
 import { Server } from "socket.io";
-import { SocketEvents } from "src/Enums/SocketEvents.enum";
+import { SocketEvents } from "src/Enums/SocketEvents.Enum";
 
 
 @WebSocketGateway({
