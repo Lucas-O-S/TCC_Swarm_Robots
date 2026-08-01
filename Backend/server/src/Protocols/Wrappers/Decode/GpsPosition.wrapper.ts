@@ -1,4 +1,5 @@
-import { PayloadCodec, PayloadField } from "../../Protocol.Codec";
+import { PayloadCodec } from "../../Protocol.Codec";
+import { PayloadField } from "../../PayloadField";
 import { PayloadDecoder } from "../PayloadProtocol";
 
 /** Posição GPS (0x05): latitude e longitude em graus decimais * 1e6 (com sinal). */

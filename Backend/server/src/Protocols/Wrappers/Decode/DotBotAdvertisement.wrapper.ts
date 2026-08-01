@@ -1,4 +1,5 @@
-import { PayloadCodec, PayloadField } from "../../Protocol.Codec";
+import { PayloadCodec } from "../../Protocol.Codec";
+import { PayloadField } from "../../PayloadField";
 import { PayloadDecoder } from "../PayloadProtocol";
 
 /**

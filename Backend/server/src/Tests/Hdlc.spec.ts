@@ -1,5 +1,5 @@
-import { HdlcCodec } from "../Protocols/Mari/HdlcCodec";
-import { HdlcHandler } from "../Protocols/Mari/HdlcHandler";
+import { HdlcCodec } from "../Protocols/Mari/Hdlc/HdlcCodec";
+import { HdlcHandler } from "../Protocols/Mari/Hdlc/HdlcHandler";
 
 const codec = new HdlcCodec();
 const hdlcEncode = (payload: Buffer) => codec.hdlcEncode(payload);
