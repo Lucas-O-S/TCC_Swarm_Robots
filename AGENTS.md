@@ -670,42 +670,135 @@ feita na fonte (pacotes `marilib` e repo `DotBots/mari`):
   Dá pra **validar byte a byte contra o `marilib`** (gera no Python, compara),
   como já fizemos com o protocolo do DotBot.
 
-**Decisão tomada: caminho A (TS puro) - FEITO e validado byte a byte.**
+**Decisão tomada: caminho A (TS puro).** O dono está reimplementando **na mão**
+(exercício de aprendizado do TCC), validando cada peça **byte a byte contra o
+`marilib`** (Python instalado no ambiente: `python3` importa `marilib`; gere o
+frame de referência e compare com a saída do TS).
 
-O `MariGatewayAdapter` foi reimplementado em TypeScript, sem Python. Arquivos em
-`src/adapter/Mari/`:
+**Estrutura real dos arquivos** (nomes escolhidos pelo dono, diferentes de um
+rascunho anterior):
 
-- **`Hdlc.ts`** - porta 1:1 do `serial_hdlc.py`: tabela FCS16, `hdlcEncode`,
-  `hdlcDecode` e um `HdlcHandler` byte-a-byte (state machine IDLE/RECEIVING/READY)
-  pra montar frames vindos da serial. Validado contra os 8 doctests do marilib +
-  round-trips + streaming em pedaços irregulares.
-- **`MariProtocol.ts`** - Mari Header (21B LE: version=3, type=16, network_id 2B,
-  destination 8B, source 8B, next_proto 1B), enums `NextProto` (DOTBOT_APP=0x11) e
-  `EdgeEvent` (NODE_DATA=3, etc.), e `buildMariFrame`/`parseMariFrame`/`wrapEdgeEvent`.
-- **`MariGateway.Adapter.ts`** - implementa `GatewayAdapter`. Envio: DotBot Packet
-  (payloadType+body) → Mari Frame (next_proto=DOTBOT_APP) → `[EdgeEvent.NODE_DATA +
-  frame]` → HDLC → serial. Recepção: `HdlcHandler` → desembrulha EdgeEvent/Mari →
-  **traduz pro frame interno de 18B** (source no offset 10) que o `SwarmService` já
-  entende - por isso Swarm/Robot/Orchestrator não mudaram. `serialport` é carregado
-  de forma **lazy** (require dentro do connect), pra não quebrar o app quando se roda
-  o simulador sem ele instalado.
+```
+src/Protocols/Mari/
+  Hdlc/
+    Fcs16Table.ts     - tabela CRC-16 (256 valores; constante do padrão, copiada exata)
+    HdlcHelper.ts     - static frameCheckUpdate (FCS), escapeByte, unescapeStep
+    HdlcCodec.ts      - hdlcEncode / hdlcDecode (frame completo de uma vez)
+    HdlcHandler.ts    - máquina de estados byte-a-byte (Idle/Receiving/Ready) p/ a serial
+    Hdlc.ts           - barrel (reexporta os 3)
+  Mari.Protocol.ts    - classe MariProtocol: build/parseMariHeader (21B),
+                        build/parseMariFrame, wrapEdgeEvent
+  Mari.Payload.ts     - interfaces MariHeader / MariFrame
+src/Enums/
+  Hdlc.Enum.ts        - FLAG=0x7e, ESCAPE=0x7d, *_ESCAPED, FCS_INIT=0xffff, FCS_OK=0xf0b8
+  HdlcState.Enum.ts   - Idle / Receiving / Ready
+  NextProto.enum.ts   - DOTBOT_APP=0x11 (o nosso), MARI_INTERNAL=0x01, UNKNOWN=0xff
+  EdgeEvent.enum.ts   - NODE_JOINED=1, NODE_LEFT=2, NODE_DATA=3, NODE_KEEP_ALIVE=4, GATEWAY_INFO=5
+src/adapter/Mari/MariGateway.Adapter.ts  - o adapter (STUB - A FAZER, ver guia abaixo)
+src/config/mari.config.ts                - { port, baudrate, networkId } via env
+                                           MARI_PORT / MARI_BAUDRATE / MARI_NETWORK_ID
+```
 
-**Validação byte a byte contra o marilib** (Python instalado no ambiente): o frame
-de envio completo (Mari + EdgeEvent + HDLC) sai idêntico ao `hdlc_encode(...)` do
-marilib, e a recepção desembrulha corretamente (source, next_proto, payload). Mesmo
-método usado no protocolo do DotBot.
+**Status por etapa:**
+- **HDLC: FEITO e validado** - 8/8 doctests do marilib + round-trips + streaming
+  em pedaços irregulares. (Bugs pegos no caminho: precedência no FCS `(fcs^byte)&0xff`,
+  faltava a FLAG de fechamento no encode, `frame.length-1` no decode.)
+- **Mari protocol: FEITO e validado** - header (7/7 vs marilib, 2 endereços) +
+  frame + EdgeEvent + round-trip do `parseMariFrame`. (`destination` e `source` são
+  8 bytes → string hex + `BigUInt64LE`; `networkId` é 2 bytes → `number`.)
+- **`MariGatewayAdapter`: A FAZER** (hoje é stub) - guia completo abaixo.
+- **GatewayModule toggle + `npm i serialport`: A FAZER** (Passo 4).
 
-**Como ligar**: `GatewayModule` escolhe por env `GATEWAY_MODE` - `mari` usa o
-`MariGatewayAdapter`, qualquer outro valor (default) usa o `SimulatorGatewayAdapter`.
-Config em `src/config/mari.config.ts` (`MARI_SERIAL_PORT`, `MARI_SERIAL_BAUDRATE`
-default 1000000, `MARI_NETWORK_ID` default 0x0001). **Falta só** rodar `npm i
-serialport` no ambiente que tem o hardware (é módulo nativo, foi adicionado ao
-`package.json` mas não instalado aqui) e testar com o gateway físico.
+Os enums/vars de ambiente já estão no `.env` e `.env.example`: `GATEWAY_MODE`
+(simulator|mari), `MARI_PORT`, `MARI_BAUDRATE=1000000`, `MARI_NETWORK_ID=0x0001`.
+
+### Passo 3 - MariGatewayAdapter (guia pra retomar em qualquer máquina)
+
+Vai em `src/adapter/Mari/MariGateway.Adapter.ts`. Implementa `GatewayAdapter`
+(`send` + `onFrameReceived`) e `OnModuleInit` (abre a serial no boot). Junta o
+`HdlcCodec` + `HdlcHandler` + `MariProtocol` + `serialport`.
+
+```ts
+@Injectable()
+export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit {
+    private port: any = null;
+    private readonly codec = new HdlcCodec();
+    private frameCallback: ((frame: Buffer) => void) | null = null;
+    private readonly hdlc = new HdlcHandler((p) => this.onEdgePayload(p));
+
+    onModuleInit(): void { this.connect(); }
+
+    private connect(): void {
+        try {
+            const { SerialPort } = require("serialport"); // lazy: nativo, só p/ modo mari
+            this.port = new SerialPort({ path: mariConfig.port, baudRate: mariConfig.baudrate });
+            this.port.on("data", (chunk: Buffer) => this.hdlc.push(chunk));
+            this.port.on("error", (e: Error) => console.error("[MARI] serial:", e.message));
+            this.port.on("open", () => console.log(`[MARI] conectado em ${mariConfig.port}`));
+        } catch (error) {
+            console.error("[MARI] não abriu a serial (serialport instalado? porta certa?)", error);
+        }
+    }
+
+    send(destination: string, payloadType: PayloadType, body: Buffer): void {
+        const packet = Buffer.concat([Buffer.from([payloadType]), body]); // DotBot Packet
+        const header: MariHeader = {
+            version: 3, type: 16, networkId: mariConfig.networkId,
+            destination, source: "0000000000000000", nextProto: NextProto.DOTBOT_APP,
+        };
+        const frame = MariProtocol.buildMariFrame(header, packet);
+        const hdlc = this.codec.hdlcEncode(MariProtocol.wrapEdgeEvent(EdgeEvent.NODE_DATA, frame));
+        if (!this.port) { console.error("[MARI] serial não conectada"); return; }
+        this.port.write(hdlc);
+    }
+
+    onFrameReceived(callback: (frame: Buffer) => void): void { this.frameCallback = callback; }
+
+    private onEdgePayload(payload: Buffer): void {
+        if (payload.length < 1 || payload[0] !== EdgeEvent.NODE_DATA) return;
+        const mari = MariProtocol.parseMariFrame(payload.subarray(1));
+        if (mari.header.nextProto !== NextProto.DOTBOT_APP) return;
+        this.frameCallback?.(this.toInternalFrame(mari));
+    }
+
+    // Traduz o Mari frame pro formato interno de 18B (source@10 + payloadType@18)
+    // que o SwarmService já lê - por isso Swarm/Robot/Orchestrator não mudam.
+    private toInternalFrame(mari: MariFrame): Buffer {
+        const header = Buffer.alloc(18);
+        header.writeUInt8(1, 0);   // version
+        header.writeUInt8(16, 1);  // type = DATA
+        header.writeBigUInt64LE(BigInt("0x" + mari.header.destination), 2);
+        header.writeBigUInt64LE(BigInt("0x" + mari.header.source), 10);
+        return Buffer.concat([header, mari.payload]); // header + (payloadType + body)
+    }
+}
+```
+
+Imports: `Injectable`/`OnModuleInit` (@nestjs/common), `GatewayAdapter`, `PayloadType`,
+`HdlcCodec`/`HdlcHandler` (de `Protocols/Mari/Hdlc`), `MariProtocol` +
+`MariHeader`/`MariFrame`, `NextProto`/`EdgeEvent`, `mariConfig`.
+
+Validar o `send` (cadeia inteira até o HDLC) contra o marilib, como no HDLC/protocolo.
+
+### Passo 4 - ligar (o que falta pro hardware)
+
+1. **`GatewayModule` escolhe por env** (hoje está fixo no Simulator):
+   ```ts
+   const GatewayAdapterClass =
+       process.env.GATEWAY_MODE === "mari" ? MariGatewayAdapter : SimulatorGatewayAdapter;
+   // providers: [{ provide: GATEWAY_ADAPTER, useClass: GatewayAdapterClass }]
+   ```
+2. **`npm i serialport`** no ambiente com o hardware (nativo; já está no `package.json`).
+3. No `.env`: `GATEWAY_MODE=mari`, `MARI_PORT` (Windows: `COM3`), conferir `MARI_NETWORK_ID`
+   com o firmware. Testar com o gateway físico.
 
 > **Achado importante**: o `SerialAdapter` "cru" do PyDotBot (nosso frame de 18B do
 > `Protocol.ts`) está **deprecado** - o gateway real hoje só fala Mari. Nosso frame
 > de 18B agora é um formato **interno** (usado pelo simulador e pra alimentar o
 > SwarmService); o que vai no fio real é o Mari frame.
+>
+> **Melhorias opcionais** (não feitas): tratar `GATEWAY_INFO` pra aprender o
+> network_id dinamicamente, e usar `NODE_JOINED`/`NODE_LEFT` pra presença de nós.
 
 ## Don't
 
