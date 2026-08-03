@@ -1,4 +1,4 @@
-import { PayloadType } from "src/Enums/PayloadType.Enum";
+import { PayloadType } from "src/Enums/PayloadType.enum";
 import { PayloadCoder, PayloadDecoder } from "./Wrappers/PayloadProtocol";
 import { MovePayloadProtocol } from "./Wrappers/Encode/MovePayload.wrapper";
 import { RgbLedPayloadProtocol } from "./Wrappers/Encode/RgbLedPayload.wrapper";

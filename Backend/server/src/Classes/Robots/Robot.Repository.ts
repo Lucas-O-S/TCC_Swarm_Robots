@@ -3,8 +3,8 @@ import { InjectModel } from "@nestjs/sequelize";
 import { Op } from "sequelize";
 import { RobotModel } from "src/Model/Robot.Model";
 import { BaseRepository } from "src/Classes/Base/Base.Repository";
-import { RobotControlMode } from "src/Enums/RobotControlMode.Enum";
-import { RobotStatus } from "src/Enums/RobotStatus.Enum";
+import { RobotControlMode } from "src/Enums/RobotControlMode.enum";
+import { RobotStatus } from "src/Enums/RobotStatus.enum";
 
 /**
  * Camada de acesso a dados: só chama o Sequelize. Regra de negócio

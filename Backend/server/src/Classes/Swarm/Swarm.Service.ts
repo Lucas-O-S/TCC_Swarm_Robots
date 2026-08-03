@@ -5,11 +5,11 @@ import { PayloadSelector } from "src/Protocols/PayloadSelector";
 import { RobotWebsockets } from "src/Websockets/Robot.Websockets";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { EventsCommands as EventCommands } from "src/Enums/Events.Enum";
-import { PayloadType } from "src/Enums/PayloadType.Enum";
+import { PayloadType } from "src/Enums/PayloadType.enum";
 import { RobotService } from "../Robots/Robot.Service";
-import { RobotStatus } from "src/Enums/RobotStatus.Enum";
+import { RobotStatus } from "src/Enums/RobotStatus.enum";
 import { PositionService } from "../Positions/Position.Service";
-import { PositionSource } from "src/Enums/PositionSource.Enum";
+import { PositionSource } from "src/Enums/PositionSource.enum";
 import { PositionModel } from "src/Model/Position.Model";
 
 /**

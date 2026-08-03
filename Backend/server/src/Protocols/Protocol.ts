@@ -1,4 +1,4 @@
-import { PayloadType, isValidPayloadType } from "src/Enums/PayloadType.Enum";
+import { PayloadType, isValidPayloadType } from "src/Enums/PayloadType.enum";
 
 
 

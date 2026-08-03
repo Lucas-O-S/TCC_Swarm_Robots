@@ -1,6 +1,6 @@
 import { ExecutionContext, Injectable } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
-import { authConfig } from "src/config/Auth.Config";
+import { authConfig } from "src/config/auth.config";
 
 /**
  * Wrapper do AuthGuard('jwt') do passport que respeita o

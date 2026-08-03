@@ -1,6 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { IsEnum } from "class-validator";
-import { RobotControlMode } from "src/Enums/RobotControlMode.Enum";
+import { RobotControlMode } from "src/Enums/RobotControlMode.enum";
 
 /** Corpo do comando control-mode: alterna o robô entre Manual (0) e Auto (1). */
 export class ControlModeDto {

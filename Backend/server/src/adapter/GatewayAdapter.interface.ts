@@ -1,4 +1,4 @@
-import { PayloadType } from "src/Enums/PayloadType.Enum";
+import { PayloadType } from "src/Enums/PayloadType.enum";
 
 /**
  * Token de injeção. Como `GatewayAdapter` é uma interface (some em runtime),

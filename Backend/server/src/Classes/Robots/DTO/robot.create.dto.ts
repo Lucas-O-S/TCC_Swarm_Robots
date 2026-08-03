@@ -1,6 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, Min } from "class-validator";
-import { RobotApplication } from "src/Enums/RobotApplication.Enum";
+import { RobotApplication } from "src/Enums/RobotApplication.enum";
 
 /**
  * Campos aceitos ao registrar um robô via API. Campos calculados/geridos

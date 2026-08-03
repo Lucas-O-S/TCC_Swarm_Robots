@@ -6,15 +6,15 @@ export interface MariHeader{
     version: number;
     type: number;
     networkId : number;
-    destination: String;
-    source: String;
+    destination: string;
+    source: string;
     nextProto: NextProto;
 
 
 }
 
 export interface MariFrame {
-    header: Buffer
+    header: MariHeader
     payload: Buffer
 
 }
