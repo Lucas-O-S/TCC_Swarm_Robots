@@ -581,9 +581,12 @@ dependência real, cada bloco precisa do anterior:
 - **Bloco H (Rotas): FEITO** - 5 comandos + `GET /status` + atribuição **manual**
   (`PUT /orchestrator/robots/:address/assign`, usada pelo SemiAuto). A atribuição
   automática segue no Orchestrator.
-- **Próximos pedaços lógicos**: (a) testar o transporte **Mari** com o gateway FÍSICO
-  (código pronto, ver Passo 4.3); (b) **frontend** (ver SIMULADOR_PLANO.md); (c) recarga
-  (adiada, ver "Adiado"); (d) gate de calibração LH2 na gravação de posição.
+- **Próximos pedaços lógicos**: (a) escrever o **`MqttGatewayAdapter`** pra conectar no
+  **RobotSwarmSimulator** (guia completo em "Conexão com o RobotSwarmSimulator" abaixo —
+  é o caminho pra rodar API + frota simulada sem hardware); (b) testar o transporte
+  **Mari** com o gateway FÍSICO (código pronto, ver Passo 4.3); (c) **frontend** (ver
+  SIMULADOR_PLANO.md); (d) recarga (adiada, ver "Adiado"); (e) gate de calibração LH2 na
+  gravação de posição.
 
 ### Adiado: comportamento de recarga (bateria baixa) - DECISÃO DE DESIGN PENDENTE
 
@@ -836,6 +839,220 @@ Validar o `send` (cadeia inteira até o HDLC) contra o marilib, como no HDLC/pro
 >
 > **Melhorias opcionais** (não feitas): tratar `GATEWAY_INFO` pra aprender o
 > network_id dinamicamente, e usar `NODE_JOINED`/`NODE_LEFT` pra presença de nós.
+
+## Conexão com o RobotSwarmSimulator (transporte MQTT — EM ESCOPO)
+
+Além do gateway FÍSICO (serial/HDLC, seção "Rede Mari"), existe um repo
+separado — **RobotSwarmSimulator** (TypeScript/Vite) — que **impersona gateway
++ frota** sem hardware nenhum, pra desenvolver e testar o backend contra uma
+frota simulada. Ele fala o **mesmo** protocolo (Mari frame v3 de 21 B +
+payloads DotBot já validados aqui), mas **NÃO fala serial** — só **MQTT** (via
+um broker Mosquitto). Então, pra a API conversar com o simulador, falta um
+**terceiro** adapter: o `MqttGatewayAdapter`, irmão do `MariGatewayAdapter`.
+
+**Estado atual (pendente):** hoje o `GATEWAY_MODE` só tem `simulator` (adapter
+fake, que só loga hex/emite robô falso interno — **não** conecta em broker
+nenhum) e `mari` (serial/HDLC, hardware físico). **Não existe adapter MQTT**;
+`mqtt` nem está no `package.json`. Logo, backend e RobotSwarmSimulator **não se
+conectam** enquanto este adapter não for escrito. É o item que o `PLANO.md` do
+simulador lista como risco/pendência do lado backend.
+
+### Como o simulador espera a conversa (fronteira MQTT)
+
+Dois tópicos, namespaced pelo NETID (network_id em **4 hex MAIÚSCULOS**):
+
+```text
+/mari/{NETID}/to_edge     # comandos  descendo  — CLOUD → gateway
+/mari/{NETID}/to_cloud    # telemetria subindo  — gateway → CLOUD
+```
+
+- Payload MQTT = **`base64( [1 B EdgeEvent] + Mari frame )`**, QoS 0, MQTT v5.
+  É o **mesmo** stream de bytes do serial, só que relayado por MQTT em vez de
+  enquadrado em HDLC.
+- O backend entra como o lado **CLOUD** (o oposto do edge): **publica** comandos
+  em `to_edge` e **assina** telemetria em `to_cloud`. O simulador faz o inverso
+  (assina `to_edge`, publica `to_cloud`).
+
+### Por que um adapter novo e não reusar o Mari
+
+O `MariGatewayAdapter` já monta/desmonta o `[EdgeEvent] + Mari frame` certo — só
+que enquadra em **HDLC sobre serial**. O `MqttGatewayAdapter` é o **mesmo**
+adapter com **4 trocas** (todo o resto — `buildMariFrame`/`wrapEdgeEvent`/
+`toInternalFrame` — é idêntico):
+
+1. `serialport` → `mqtt` (mqtt.js).
+2. `HdlcCodec.hdlcEncode(wire)` → `wire.toString("base64")`.
+3. `this.port.write(hdlc)` → `this.client.publish(toEdge, b64, { qos: 0 })`.
+4. `this.port.on("data", chunk => hdlc.push(chunk))` (máquina HDLC byte-a-byte) →
+   `client.on("message", (t, p) => this.onCloudMessage(p))` decodificando base64
+   de uma vez (mensagem MQTT já chega inteira, não precisa de máquina de estados).
+
+### Passo 5 — MqttGatewayAdapter (guia pra retomar em qualquer máquina)
+
+Vai em `src/adapter/Mqtt/MqttGateway.Adapter.ts`. Implementa `GatewayAdapter`
+(`send` + `onFrameReceived`) + `OnModuleInit` (conecta no broker no boot) +
+`OnModuleDestroy` (fecha).
+
+```ts
+import { Injectable, OnModuleInit, OnModuleDestroy } from "@nestjs/common";
+import { connect, MqttClient } from "mqtt";
+import { GatewayAdapter } from "../GatewayAdapter.interface";
+import { PayloadType } from "src/Enums/PayloadType.enum";
+import { MariProtocol } from "src/Protocols/Mari/Mari.Protocol";
+import { MariHeader, MariFrame } from "src/Protocols/Mari/Mari.Payload";
+import { NextProto } from "src/Enums/NextProto.enum";
+import { EdgeEvent } from "src/Enums/EdgeEvent.enum";
+import { Protocol } from "src/Protocols/Protocol";
+import { mqttConfig } from "src/config/mqtt.config";
+
+// NETID = network_id em 4 hex MAIÚSCULOS (igual marilib/simulador).
+const netid = (n: number) => n.toString(16).padStart(4, "0").toUpperCase();
+const toEdgeTopic  = (n: number) => `/mari/${netid(n)}/to_edge`;   // comandos (backend → sim)
+const toCloudTopic = (n: number) => `/mari/${netid(n)}/to_cloud`;  // telemetria (sim → backend)
+
+@Injectable()
+export class MqttGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModuleDestroy {
+    private client: MqttClient | null = null;
+    private frameCallback: ((frame: Buffer) => void) | null = null;
+    private readonly toEdge  = toEdgeTopic(mqttConfig.networkId);
+    private readonly toCloud = toCloudTopic(mqttConfig.networkId);
+
+    onModuleInit(): void {
+        this.client = connect(mqttConfig.url, { protocolVersion: mqttConfig.protocolVersion });
+        this.client.on("connect", () => {
+            console.log(`[MQTT] conectado em ${mqttConfig.url} — assinando ${this.toCloud}`);
+            this.client!.subscribe(this.toCloud, { qos: 0 });
+        });
+        this.client.on("message", (topic, payload) => {
+            if (topic !== this.toCloud) return;
+            this.onCloudMessage(payload.toString());
+        });
+        this.client.on("error", (e) => console.error("[MQTT] erro:", e.message));
+    }
+
+    onModuleDestroy(): void { this.client?.end(); }
+
+    // Igual ao MariGatewayAdapter, mas publica base64 em to_edge em vez de HDLC na serial.
+    send(destination: string, payloadType: PayloadType, body: Buffer): void {
+        const packet = Buffer.concat([Buffer.from([payloadType]), body]); // DotBot Packet
+        const header: MariHeader = {
+            version: 3, type: 16, networkId: mqttConfig.networkId,
+            destination, source: "0000000000000000", nextProto: NextProto.DOTBOT_APP,
+        };
+        const frame = MariProtocol.buildMariFrame(header, packet);
+        const wire  = MariProtocol.wrapEdgeEvent(EdgeEvent.NODE_DATA, frame); // [EdgeEvent]+Mari
+        if (!this.client) { console.error("[MQTT] cliente não conectado"); return; }
+        this.client.publish(this.toEdge, wire.toString("base64"), { qos: 0 });
+    }
+
+    onFrameReceived(callback: (frame: Buffer) => void): void { this.frameCallback = callback; }
+
+    // to_cloud → base64([EdgeEvent]+Mari frame). Só NODE_DATA de app DotBot vira
+    // frame interno pro SwarmService (JOINED/LEFT/KEEP_ALIVE/GATEWAY_INFO ignorados por ora).
+    private onCloudMessage(b64: string): void {
+        const wire = Buffer.from(b64, "base64");
+        if (wire.length < 1 || wire[0] !== EdgeEvent.NODE_DATA) return;
+        const mari = MariProtocol.parseMariFrame(wire.subarray(1));
+        if (mari.header.networkId !== mqttConfig.networkId) return; // rede alheia
+        if (mari.header.nextProto !== NextProto.DOTBOT_APP) return; // swarmit fica de fora por ora
+        this.frameCallback?.(this.toInternalFrame(mari));
+    }
+
+    // Mari frame → frame interno de 18B (source@10 + payloadType@18) que o SwarmService
+    // já lê. IDÊNTICO ao MariGatewayAdapter — Swarm/Robot/Orchestrator não mudam.
+    private toInternalFrame(mari: MariFrame): Buffer {
+        const header = Protocol.buildHeader(mari.header.destination, 1, 16, mari.header.source);
+        return Buffer.concat([header, mari.payload]);
+    }
+}
+```
+
+### Config — `src/config/mqtt.config.ts`
+
+```ts
+import 'dotenv/config';
+// Broker do RobotSwarmSimulator. networkId compartilha o MARI_NETWORK_ID (mesmo
+// NETID nos dois transportes) e TEM que bater com o `network.id` do cenário
+// carregado no simulador (exemplo.json usa "1200" → MARI_NETWORK_ID=0x1200).
+export const mqttConfig = {
+    url: process.env.MQTT_URL ?? "mqtt://localhost:1883",
+    networkId: Number(process.env.MARI_NETWORK_ID ?? 0x1200),
+    protocolVersion: (process.env.MQTT_PROTOCOL_VERSION === "4" ? 4 : 5) as 4 | 5,
+};
+```
+
+### GatewayModule — 3º modo
+
+O `GatewayModule` passa a alternar por 3 valores de `GATEWAY_MODE`:
+
+```ts
+const GatewayAdapterClass =
+    process.env.GATEWAY_MODE === "mari" ? MariGatewayAdapter :
+    process.env.GATEWAY_MODE === "mqtt" ? MqttGatewayAdapter :
+    SimulatorGatewayAdapter; // default: fake
+// providers: [{ provide: GATEWAY_ADAPTER, useClass: GatewayAdapterClass }]
+```
+
+`RobotModule`/`SwarmModule` continuam importando o `GatewayModule` — nada além
+do módulo muda (mesma instância compartilhada, mesmo `onFrameReceived`).
+
+### Dependência + broker
+
+- **`npm i mqtt`** no `Backend/server` (a mesma lib do simulador; funciona em
+  node via `mqtt://` e no browser via `ws://`).
+- **Broker**: o jeito mais simples é **reusar o Mosquitto do RobotSwarmSimulator**
+  (`docker compose up -d` lá no repo do simulador — expõe `1883` TCP pro backend
+  e `9001` WS pro simulador no browser). Alternativa: copiar o serviço
+  `mosquitto` (eclipse-mosquitto:2 + `mosquitto.conf` com os dois listeners)
+  pro `docker-compose.yml` do Backend, ao lado do Postgres.
+
+### network_id TEM que bater (pega comum)
+
+O `exemplo.json` do simulador usa `network.id = "1200"`. Se o backend ficar no
+default `MARI_NETWORK_ID=0x0001`:
+- o **tópico** não casa (`/mari/0001/...` do backend vs `/mari/1200/...` do sim);
+- e mesmo que casasse, o simulador **dropa** o comando (`network_id ... não é o
+  nosso`).
+
+Então no `.env` do backend: `GATEWAY_MODE=mqtt` + `MARI_NETWORK_ID=0x1200`
+(ou trocar o `network.id` do cenário pra `0001` — mas é mais fácil ajustar o
+backend).
+
+### Ordem de subida (ponta a ponta)
+
+```bash
+# 1) Postgres do backend (schema)
+cd Backend && docker compose up -d
+
+# 2) Broker MQTT (no repo do simulador)
+cd RobotSwarmSimulator && docker compose up -d      # Mosquitto: 1883 (TCP) + 9001 (WS)
+
+# 3) Gateway simulado (frota fake publicando telemetria / obedecendo comandos)
+npm install                                          # 1ª vez
+MQTT_URL=mqtt://localhost:1883 npm run gateway       # usa scenarios/exemplo.json (NETID 1200)
+
+# 4) Backend NestJS no modo MQTT
+cd Backend/server
+# .env: GATEWAY_MODE=mqtt, MARI_NETWORK_ID=0x1200, MQTT_URL=mqtt://localhost:1883
+npm install && npm run start:dev
+```
+
+Validação: o log do backend deve mostrar `[MQTT] conectado ... assinando
+/mari/1200/to_cloud`; em segundos o `SwarmService` decodifica os advertisements
+da frota e o auto-cadastro cria os robôs. Conferir em `GET /robots/:address/status`
+(ex.: `BDF2B04BC00D2725`, do `exemplo.json`) e mandar um comando de volta com
+`PUT /robots/:address/move-raw` — o log do gateway simulado deve mostrar o
+`⇩ move-raw` chegando.
+
+> **Alternativa sem gateway headless (browser)**: em vez do `npm run gateway`,
+> dá pra usar a UI do simulador (`npm run dev`) apontando o MqttLink pro
+> `ws://localhost:9001`. O backend continua no `mqtt://localhost:1883`. Os dois
+> listeners do Mosquitto (1883 TCP + 9001 WS) existem justamente pra isso.
+
+> **Swarmit (orquestração) fica de fora por ora**: o `onCloudMessage` filtra
+> `next_proto === DOTBOT_APP`, então frames swarmit (`SWARMIT_TESTBED`) são
+> ignorados. Se um dia for integrar o lado swarmit, é aqui que entra (+ decode
+> dos payloads `0x80..0xA2`).
 
 ## Don't
 
