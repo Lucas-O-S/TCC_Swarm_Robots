@@ -42,6 +42,8 @@ export class SwarmService implements OnModuleInit {
 
     private readonly lostRobots = new Set<string>();
 
+    private readonly knownRobots = new Set<string>();
+
     // Limiares de status por tempo de silêncio (iguais ao PyDotBot:
     // INACTIVE_DELAY=5s, LOST_DELAY=60s). < 5s = Active, 5-60s = Inactive,
     // > 60s = Lost. Calculado do lastSync, nunca vem do robô.
@@ -159,6 +161,34 @@ export class SwarmService implements OnModuleInit {
     }
 
 
+    private async verifyCreateRobot(address: string, payloadType : PayloadType): Promise<void> {
+        if (!this.knownRobots.has(address) && payloadType === PayloadType.DOTBOT_ADVERTISEMENT) {
+
+            
+            await this.robots.findOrCreateByAddress(address, { name: `DotBot-${address}`, status: RobotStatus.Active })
+            .then(([robot, created]) => {
+                
+                this.knownRobots.add(address); 
+
+                if (created) {
+                    
+                    console.log(`[SWARM] robô ${address} criado no banco`);
+                    
+                    this.ws.emitNew(robot);
+                    
+                }
+            })
+            .catch(error => {
+
+                this.knownRobots.delete(address); 
+
+                console.error(`[SWARM] erro ao criar robô ${address}:`, error);
+            });
+
+        }
+    }
+
+
     private checkLost() : void {
         
         const now = Date.now();
@@ -214,6 +244,11 @@ export class SwarmService implements OnModuleInit {
         // Quem mandou = campo `source` do header (offset 10, 8 bytes) -> hex.
         const address = frame.header.readBigUInt64LE(10).toString(16).padStart(16, "0");
 
+        this.verifyCreateRobot(address, frame.payloadType);
+
+  
+
+        
         const state = new RobotState(frame.payloadType, data);
 
         this.states.set(address, state);   // guarda no quadro (memória)

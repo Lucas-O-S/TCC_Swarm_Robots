@@ -9,4 +9,5 @@
 export enum SocketEvents {
     RobotUpdate = "robot:update",
     RobotStatus = "robot:status",
+    RobotNew = "robot:new",
 }

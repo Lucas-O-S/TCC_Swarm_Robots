@@ -43,9 +43,7 @@ export class SimulatorGatewayAdapter implements GatewayAdapter{
         }
 
         // Simula um robô fake "reportando" um advertisement a cada 3s. Como é
-        // um frame que ENTRA, o `source` (offset 10) é o endereço do robô -
-        // por isso montamos o header na mão aqui (o buildHeader é pro envio,
-        // onde source=0).
+        // um frame que ENTRA, o `source` (offset 10) é o endereço do robô.
         const fakeRobot = "0000000000000001";
         const advBody = Buffer.from(
             "01a6ffe8030000d0070000e40cce32019cffffffc8000000dc0500002003000003",
@@ -53,17 +51,11 @@ export class SimulatorGatewayAdapter implements GatewayAdapter{
         );
 
         setInterval(() => {
-            const header = Buffer.alloc(18);
-            header.writeUInt8(1, 0);                                  // version
-            header.writeUInt8(16, 1);                                 // type = DATA
-            header.writeBigUInt64LE(0n, 2);                           // destination = gateway
-            header.writeBigUInt64LE(BigInt("0x" + fakeRobot), 10);    // source = robô
+            const header = Protocol.buildHeader("0000000000000000", 1, 16, fakeRobot);
 
-            const frame = Buffer.concat([
-                header,
-                Buffer.from([PayloadType.DOTBOT_ADVERTISEMENT]),
-                advBody,
-            ]);
+            const frame = Protocol.buildFrame(
+                new Frame(header, PayloadType.DOTBOT_ADVERTISEMENT, advBody)
+            );
 
             callback(frame);
         }, 3000);

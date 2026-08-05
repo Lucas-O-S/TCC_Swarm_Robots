@@ -399,6 +399,36 @@ persiste no Postgres, recalcula status por `lastSync`, grava histórico de
 posição e emite eventos (internos + WebSocket). Ver "Persistência de estado" e
 "Automação nível 2" abaixo.
 
+### Auto-cadastro de robô (FEITO)
+
+Antes, um advertisement de um `address` desconhecido era ignorado (o robô tinha
+que ser criado antes via `POST /robots`/seed). Agora o robô **se cadastra sozinho**
+ao anunciar - mirror do `NEW_DOTBOT` do PyDotBot:
+
+- `SwarmService.verifyCreateRobot(address, payloadType)`, chamado no `handleFrame`:
+  só age em `DOTBOT_ADVERTISEMENT` e usa um `Set knownRobots` em memória pra não
+  bater no banco a cada frame.
+- Cria via `RobotService.findOrCreateByAddress(address, defaults)` →
+  `RobotRepository` usa `model.findOrCreate({ where: { address }, defaults })`, que
+  devolve a tupla `[robot, created]`. O `UNIQUE` em `address` + o próprio
+  `findOrCreate` blindam a corrida (dois frames juntos não duplicam a linha).
+- Defaults do robô novo: `name = DotBot-<address>` (obrigatório - `name` é NOT NULL
+  e não tem `@Default`) e `status = Active` (acabou de anunciar). O resto cai nos
+  `@Default` do model: `mode = Manual` (nasce FORA da atribuição automática, que só
+  pega `Auto` no `getFreeRobots`), `swarmId = "0000"`, `battery = 3.0`, etc.
+- Quando `created === true`, emite `robot:new` no WebSocket com o `RobotModel`
+  inteiro (ver seção WebSocket abaixo).
+- Os guardas em `refreshAndPersist`/`persistPosition` (`if (!robot) continue/return`,
+  "anunciou mas não está cadastrado") **continuam** como defesa, mas agora raramente
+  disparam, porque o robô é criado já no primeiro anúncio.
+
+**Pontas soltas conhecidas** (não bloqueiam): (a) o `knownRobots.add` está dentro do
+`if (created)`, então robô já existente (ex.: depois de restart do backend) re-consulta
+o banco a cada advertisement - não duplica (o `findOrCreate` protege), só é query a
+mais; mover o `add` pra fora do `if` resolve. (b) `application` não é capturado (todo
+robô nasce `DotBot`, default do model), porque o `DOTBOT_ADVERTISEMENT` não carrega
+esse campo - pra tipar certo precisaria também tratar o `ADVERTISEMENT` (0x04).
+
 ### WebSocket (bloco G, tempo real) - FEITO
 
 - `RobotWebsockets` (`src/Websockets/Robot.Websockets.ts`, `@WebSocketGateway({ cors })`)
@@ -407,6 +437,11 @@ posição e emite eventos (internos + WebSocket). Ver "Persistência de estado" 
 - O `SwarmService` injeta ele e chama `emitUpdate` no fim do `handleFrame` - cada
   estado decodificado é empurrado ao vivo pro front (evento `robot:update`), sem
   polling.
+- `emitNew(robot)` → `server.emit("robot:new", { robot })`: robô recém-descoberto
+  (auto-cadastro, ver seção acima). Manda o `RobotModel` inteiro - não só
+  address+status - em canal separado do `robot:status`, pro front desenhar o
+  marcador novo sem refetch. Chamado pelo `SwarmService` quando `findOrCreate` cria
+  a linha.
 - Deps: `@nestjs/websockets` + `@nestjs/platform-socket.io`. Registrado nos
   `providers` do `SwarmModule`. Testado com um cliente socket.io simples.
 
@@ -490,7 +525,7 @@ periódico (1s, mesmo timer do `checkLost`), espelhando o
 - **WebSocket**: `emitStatus` empurra `robot:status` pro front quando o status
   muda (isso acontece SEM pacote novo - por timeout - então o front só fica
   sabendo por aqui; é o equivalente ao `RELOAD` do PyDotBot). Os nomes de evento
-  do socket ficam no enum `SocketEvents` (`robot:update`, `robot:status`),
+  do socket ficam no enum `SocketEvents` (`robot:update`, `robot:status`, `robot:new`),
   separado do `EventsCommands` interno de propósito.
 
 `SwarmModule` importa `RobotModule` + `PositionModule` (pra injetar
@@ -529,9 +564,10 @@ dependência real, cada bloco precisa do anterior:
 "Automação nível 1" acima):**
 - **Bloco A (Task com conteúdo): FEITO** - `status` + `task_waypoints` + seed.
 - **Bloco C (Protocolo): FEITO** - frame + motor encode/decode + payloads + selectors.
-- **Bloco D (Transporte): parcial** - interface (8) e `SimulatorGatewayAdapter` (10)
-  FEITOS, com `onFrameReceived` ligado no SwarmService. Falta o transporte real via
-  **Mari** (9) - ver seção "Rede Mari".
+- **Bloco D (Transporte): FEITO em código** - interface (8), `SimulatorGatewayAdapter`
+  (10) e `MariGatewayAdapter` (9) prontos, com `onFrameReceived` ligado no SwarmService.
+  `GatewayModule` alterna por `GATEWAY_MODE`. Falta só validar com o gateway FÍSICO - ver
+  seção "Rede Mari".
 - **Bloco E (SwarmService): FEITO** - `Map` + `handleFrame` (11/12), job de status por
   `lastSync` (13), escrita throttled no Postgres (14) e emissão de eventos (15). Ver
   "Persistência de estado". (Falta só o gate de calibração LH2 pra gravar posição.)
@@ -545,8 +581,9 @@ dependência real, cada bloco precisa do anterior:
 - **Bloco H (Rotas): FEITO** - 5 comandos + `GET /status` + atribuição **manual**
   (`PUT /orchestrator/robots/:address/assign`, usada pelo SemiAuto). A atribuição
   automática segue no Orchestrator.
-- **Próximos pedaços lógicos**: (a) transporte real via **Mari** (D); (b) **frontend**;
-  (c) recarga (adiada, ver "Adiado"); (d) gate de calibração LH2 na gravação de posição.
+- **Próximos pedaços lógicos**: (a) testar o transporte **Mari** com o gateway FÍSICO
+  (código pronto, ver Passo 4.3); (b) **frontend** (ver SIMULADOR_PLANO.md); (c) recarga
+  (adiada, ver "Adiado"); (d) gate de calibração LH2 na gravação de posição.
 
 ### Adiado: comportamento de recarga (bateria baixa) - DECISÃO DE DESIGN PENDENTE
 
@@ -694,7 +731,7 @@ src/Enums/
   HdlcState.Enum.ts   - Idle / Receiving / Ready
   NextProto.enum.ts   - DOTBOT_APP=0x11 (o nosso), MARI_INTERNAL=0x01, UNKNOWN=0xff
   EdgeEvent.enum.ts   - NODE_JOINED=1, NODE_LEFT=2, NODE_DATA=3, NODE_KEEP_ALIVE=4, GATEWAY_INFO=5
-src/adapter/Mari/MariGateway.Adapter.ts  - o adapter (STUB - A FAZER, ver guia abaixo)
+src/adapter/Mari/MariGateway.Adapter.ts  - o adapter (FEITO - implementado conforme o guia abaixo)
 src/config/mari.config.ts                - { port, baudrate, networkId } via env
                                            MARI_PORT / MARI_BAUDRATE / MARI_NETWORK_ID
 ```
@@ -706,8 +743,8 @@ src/config/mari.config.ts                - { port, baudrate, networkId } via env
 - **Mari protocol: FEITO e validado** - header (7/7 vs marilib, 2 endereços) +
   frame + EdgeEvent + round-trip do `parseMariFrame`. (`destination` e `source` são
   8 bytes → string hex + `BigUInt64LE`; `networkId` é 2 bytes → `number`.)
-- **`MariGatewayAdapter`: A FAZER** (hoje é stub) - guia completo abaixo.
-- **GatewayModule toggle + `npm i serialport`: A FAZER** (Passo 4).
+- **`MariGatewayAdapter`: FEITO** - implementado (bate byte a byte com o guia abaixo).
+- **GatewayModule toggle + `npm i serialport`: FEITO** - `serialport@^12` no package.json e instalado; `GatewayModule` alterna o adapter por `GATEWAY_MODE`. Falta só testar com o gateway FÍSICO (Passo 4.3).
 
 Os enums/vars de ambiente já estão no `.env` e `.env.example`: `GATEWAY_MODE`
 (simulator|mari), `MARI_PORT`, `MARI_BAUDRATE=1000000`, `MARI_NETWORK_ID=0x0001`.
@@ -782,7 +819,7 @@ Validar o `send` (cadeia inteira até o HDLC) contra o marilib, como no HDLC/pro
 
 ### Passo 4 - ligar (o que falta pro hardware)
 
-1. **`GatewayModule` escolhe por env** (hoje está fixo no Simulator):
+1. **`GatewayModule` escolhe por env** (FEITO - implementado exatamente assim):
    ```ts
    const GatewayAdapterClass =
        process.env.GATEWAY_MODE === "mari" ? MariGatewayAdapter : SimulatorGatewayAdapter;

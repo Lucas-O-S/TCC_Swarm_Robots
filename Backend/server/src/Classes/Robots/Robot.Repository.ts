@@ -26,6 +26,14 @@ export class RobotRepository extends BaseRepository<RobotModel> {
         return await this.model.findOne({ where: { address } });
     }
 
+    async findOrCreateByAddress(address: string, defaults : Partial<RobotModel> = {}): Promise<[RobotModel, boolean]> {
+        const [robot, created] = await this.model.findOrCreate({
+            where: { address },
+            defaults: defaults as any
+        });
+        return [robot, created];
+    }
+
     async getFreeRobots(): Promise<RobotModel[] | null> {
         return await this.model.findAll({
             where: {

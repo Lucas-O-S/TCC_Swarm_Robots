@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit } from "@nestjs/common";
 import { GatewayAdapter } from "../GatewayAdapter.interface";
+import { Protocol } from "src/Protocols/Protocol";
 import { PayloadType } from "src/Enums/PayloadType.enum";
 import { HdlcCodec } from "src/Protocols/Mari/Hdlc/HdlcCodec";
 import { HdlcHandler } from "src/Protocols/Mari/Hdlc/HdlcHandler";
@@ -11,9 +12,13 @@ import { mariConfig } from "src/config/Mari.Config";
 
 @Injectable()
 export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit {
+    
     private port: any = null;
+    
     private readonly codec = new HdlcCodec();
+    
     private frameCallback: ((frame: Buffer) => void) | null = null;
+    
     private readonly hdlc = new HdlcHandler((p) => this.onEdgePayload(p));
 
     onModuleInit(): void {
@@ -22,11 +27,17 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit {
 
     private connect(): void {
         try {
+           
             const { SerialPort } = require("serialport");
+           
             this.port = new SerialPort({ path: mariConfig.port, baudRate: mariConfig.baudrate });
+           
             this.port.on("data", (chunk: Buffer) => this.hdlc.push(chunk));
+           
             this.port.on("error", (e: Error) => console.error("[MARI] serial:", e.message));
+           
             this.port.on("open", () => console.log(`[MARI] conectado em ${mariConfig.port}`));
+
         } catch (error) {
             console.error("[MARI] não abriu a serial (serialport instalado? porta certa?)", error);
         }
@@ -34,6 +45,7 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit {
 
     send(destination: string, payloadType: PayloadType, body: Buffer): void {
         const packet = Buffer.concat([Buffer.from([payloadType]), body]);
+        
         const header: MariHeader = {
             version: 3,
             type: 16,
@@ -42,12 +54,15 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit {
             source: "0000000000000000",
             nextProto: NextProto.DOTBOT_APP,
         };
+   
         const frame = MariProtocol.buildMariFrame(header, packet);
         const hdlc = this.codec.hdlcEncode(MariProtocol.wrapEdgeEvent(EdgeEvent.NODE_DATA, frame));
+   
         if (!this.port) {
             console.error("[MARI] serial não conectada");
             return;
         }
+   
         this.port.write(hdlc);
     }
 
@@ -65,11 +80,7 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit {
     // Traduz o Mari frame pro formato interno de 18B (source@10 + payloadType@18)
     // que o SwarmService já lê - por isso Swarm/Robot/Orchestrator não mudam.
     private toInternalFrame(mari: MariFrame): Buffer {
-        const header = Buffer.alloc(18);
-        header.writeUInt8(1, 0);
-        header.writeUInt8(16, 1);
-        header.writeBigUInt64LE(BigInt("0x" + mari.header.destination), 2);
-        header.writeBigUInt64LE(BigInt("0x" + mari.header.source), 10);
+        const header = Protocol.buildHeader(mari.header.destination, 1, 16, mari.header.source);
         return Buffer.concat([header, mari.payload]);
     }
 }

@@ -19,7 +19,8 @@ export class Protocol{
     static buildHeader(
         destination : string,
         version : number = 1,
-        type : number = 16
+        type : number = 16,
+        source : string = "0000000000000000"
     ): Buffer
     {
 
@@ -28,10 +29,11 @@ export class Protocol{
         //Geralmente 16 e 1 para comando e tipo
         buffer.writeUInt8(version,0);
         buffer.writeUInt8(type,1);
-        
+
         buffer.writeBigUInt64LE(BigInt("0x" + destination), 2);
 
-        buffer.writeBigUInt64LE(0n,10)
+        // source=0 (host) pra envio; frames que ENTRAM passam o endereço real do robô
+        buffer.writeBigUInt64LE(BigInt("0x" + source),10)
 
         return buffer;
 

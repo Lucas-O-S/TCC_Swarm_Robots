@@ -70,4 +70,10 @@ export class RobotService extends BaseService<RobotModel> {
     async getFreeRobots(): Promise<RobotModel[] | null> {
         return await this.robotRepository.getFreeRobots();
     }
+
+
+    async findOrCreateByAddress(address: string, defaults : Partial<RobotModel> = {}): Promise<[RobotModel, boolean]> {
+
+        return await this.robotRepository.findOrCreateByAddress(address, defaults);;
+    }
 }
