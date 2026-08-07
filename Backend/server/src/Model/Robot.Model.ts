@@ -1,9 +1,9 @@
 import { BelongsTo, Column, DataType, Default, ForeignKey, Table } from "sequelize-typescript";
 import { BaseModel } from "./Base.Model";
 import { TaskModel } from "./Task.Model";
-import { RobotStatus } from "./Enums/RobotStatus.enum";
-import { RobotApplication } from "../Protocol/Enums/RobotApplication.enum";
-import { RobotControlMode } from "../Protocol/Enums/RobotControlMode.enum";
+import { RobotStatus } from "../Enums/RobotStatus.enum";
+import { RobotApplication } from "../Enums/RobotApplication.enum";
+import { RobotControlMode } from "../Enums/RobotControlMode.enum";
 
 @Table({ tableName: "robots", underscored: true, paranoid: true })
 export class RobotModel extends BaseModel<RobotModel> {
@@ -61,7 +61,7 @@ export class RobotModel extends BaseModel<RobotModel> {
      */
     @ForeignKey(() => TaskModel)
     @Column({ type: DataType.UUID, allowNull: true })
-    taskId: string;
+    taskId: string | null;
 
     @BelongsTo(() => TaskModel)
     task: TaskModel;
