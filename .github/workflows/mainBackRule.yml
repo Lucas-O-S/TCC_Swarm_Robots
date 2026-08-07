@@ -7,7 +7,6 @@ on:
     
 jobs:
   deploy:
-
     
     runs-on: ubuntu-latest
           
@@ -20,7 +19,7 @@ jobs:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           if [[ "$HEAD_REF" != dev=Back ]]; then
-            echo "❌ ERRO: A branch de origem ('$HEAD_REF') não começa com 'main'. Merge bloqueado!"
+            echo "❌ ERRO: A branch de origem ('$HEAD_REF') não começa com 'Dev-Back'. Merge bloqueado!"
             exit 1
           fi
           echo "✅ Branch de origem é '$HEAD_REF' — liberado."
