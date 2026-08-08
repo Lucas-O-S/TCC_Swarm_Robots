@@ -1,29 +1,28 @@
 name: Deploy to Preproduction Backend
 
-on: 
-  pull_request: 
+on:
+  pull_request:
     branches:
       - main-Back
-    
+
 jobs:
   deploy:
-    
     runs-on: ubuntu-latest
-          
+
     steps:
       - name: Checkout Codigo
         uses: actions/checkout@v4
-    
+
       - name: Validar Branch de origem
         env:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
-          if [[ "$HEAD_REF" != dev-Back ]]; then
-            echo "❌ ERRO: A branch de origem ('$HEAD_REF') não começa com 'Dev-Back'. Merge bloqueado!"
+          if [[ "$HEAD_REF" != "dev-Back" ]]; then
+            echo "❌ ERRO: A branch de origem ('$HEAD_REF') não é 'dev-Back'. Merge bloqueado!"
             exit 1
           fi
           echo "✅ Branch de origem é '$HEAD_REF' — liberado."
-          
-            - name: Executar Deploy
-              run: |
-                echo "Fazendo deploy..."
+
+      - name: Executar Deploy
+        run: |
+          echo "Fazendo deploy..."
