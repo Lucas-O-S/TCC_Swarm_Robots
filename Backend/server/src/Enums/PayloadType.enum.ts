@@ -1,0 +1,23 @@
+
+export enum PayloadType {
+    CMD_MOVE_RAW = 0x00,
+    CMD_RGB_LED = 0x01,
+    ADVERTISEMENT = 0x04,
+    GPS_POSITION = 0x05,
+    DOTBOT_ADVERTISEMENT = 0x06,
+    CONTROL_MODE = 0x07,
+    LH2_WAYPOINTS = 0x08,
+    GPS_WAYPOINTS = 0x09,
+    SAILBOT_DATA = 0x0A,
+    CMD_XGO_ACTION = 0x0B,
+    LH2_PROCESSED_DATA = 0x0C,
+    LH2_CALIBRATION_HOMOGRAPHY = 0x0E,
+    RAW_DATA = 0x10,
+    DOTBOT_SIMULATOR_DATA = 0xFA
+
+}
+
+export const isValidPayloadType = (payloadType: number) => {
+    return Object.values(PayloadType).includes(payloadType);
+}
+
