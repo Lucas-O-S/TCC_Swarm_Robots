@@ -18,7 +18,7 @@ jobs:
         env:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
-          if [[ "$HEAD_REF" != Dev-Back ]]; then
+          if [[ "$HEAD_REF" != dev-Back ]]; then
             echo "❌ ERRO: A branch de origem ('$HEAD_REF') não começa com 'Dev-Back'. Merge bloqueado!"
             exit 1
           fi
