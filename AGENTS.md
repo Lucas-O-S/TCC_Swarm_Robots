@@ -1044,10 +1044,20 @@ da frota e o auto-cadastro cria os robôs. Conferir em `GET /robots/:address/sta
 `PUT /robots/:address/move-raw` — o log do gateway simulado deve mostrar o
 `⇩ move-raw` chegando.
 
-> **Alternativa sem gateway headless (browser)**: em vez do `npm run gateway`,
-> dá pra usar a UI do simulador (`npm run dev`) apontando o MqttLink pro
-> `ws://localhost:9001`. O backend continua no `mqtt://localhost:1883`. Os dois
-> listeners do Mosquitto (1883 TCP + 9001 WS) existem justamente pra isso.
+> **Dois jeitos de conectar o simulador na API:**
+> 1. **Gateway headless** — `npm run gateway` (`gateway-run.ts` → `MqttLink`),
+>    sem tela, conecta em `mqtt://localhost:1883`. Bom pra deixar rodando.
+> 2. **UI do navegador** — `npm run dev` → modo Simular tem um botão **"Conectar
+>    à API"** (default `ws://localhost:9001`). Ligado, o `useWorld` passa a
+>    dirigir o World por um `SimGateway` (autoTick:false, `step()` chamado pelo
+>    próprio loop de rAF — fonte de tempo única, sem duplo tick) plugado num
+>    `MqttLink` sobre WebSocket. Aí a frota **que você vê e edita na tela** é a
+>    mesma que o backend enxerga e comanda. Desligado, roda 100% local (como
+>    antes). É por isso que o Mosquitto expõe 1883 (TCP, gateway/backend) **e**
+>    9001 (WebSocket, browser).
+>
+> Nos dois casos o backend precisa estar em `GATEWAY_MODE=mqtt` e com o
+> `MARI_NETWORK_ID` batendo com o `network.id` do cenário (0x1200 no exemplo).
 
 > **Swarmit (orquestração) fica de fora por ora**: o `onCloudMessage` filtra
 > `next_proto === DOTBOT_APP`, então frames swarmit (`SWARMIT_TESTBED`) são
