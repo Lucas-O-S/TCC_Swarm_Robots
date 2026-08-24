@@ -11,10 +11,14 @@
 
   --color-dark: #2d2d2d;
   --color-text: #333;
+  --color-text-muted: #6b6355;
+  --color-border: rgba(45, 45, 45, 0.15);
   --color-green: #1a9e45;
   --color-red: #c0392b;
+  --color-yellow: #b8860b;
 
   --radius: 16px;
+  --radius-sm: 8px;
 
   --font-sans: 'DM Sans', Arial, Helvetica, sans-serif;
   --font-mono: 'DM Mono', monospace;

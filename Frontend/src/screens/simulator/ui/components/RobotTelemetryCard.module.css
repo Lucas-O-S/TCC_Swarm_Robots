@@ -1,0 +1,56 @@
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.card:hover {
+  border-color: var(--color-border);
+}
+
+.selected {
+  border-color: #2f6fed;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.online {
+  color: var(--color-green);
+  font-size: 11px;
+}
+
+.offline {
+  color: var(--color-red);
+  font-size: 11px;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  margin-bottom: 10px;
+}
+
+.fields dt {
+  color: var(--color-text-muted);
+}
+
+.fields dd {
+  margin: 0;
+}
+
+.footer {
+  display: flex;
+}

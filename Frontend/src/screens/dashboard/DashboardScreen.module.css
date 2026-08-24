@@ -1,39 +1,56 @@
 .screen {
-  background: var(--color-bg);
-  min-height: 100vh;
+  padding: 28px 32px;
+  font-family: var(--font-mono);
+}
+
+.headerRow {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 36px;
-  position: relative;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
 }
 
-.container {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 18px;
-  max-width: 960px;
-  width: 100%;
-  position: relative;
-  z-index: 1;
-}
-
-.mapaTitle {
-  font-size: 14px;
+.title {
+  font-size: 13px;
   font-weight: 600;
-  color: #888;
-  margin-bottom: 14px;
   letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
 }
 
-.painel {
+.headerActions {
+  display: flex;
+  gap: 10px;
+}
+
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 32px;
+  align-items: start;
+}
+
+.mapColumn {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
-@media (max-width: 680px) {
-  .container {
+.mapActions {
+  display: flex;
+  gap: 10px;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  max-width: 460px;
+}
+
+@media (max-width: 780px) {
+  .body {
     grid-template-columns: 1fr;
   }
 }

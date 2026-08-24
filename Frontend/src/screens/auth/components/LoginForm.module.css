@@ -25,7 +25,7 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 22px;
+  gap: 16px;
   z-index: 2;
 }
 
@@ -35,22 +35,41 @@
   border: none;
   border-radius: 10px;
   text-align: center;
-  font-size: 20px;
+  font-size: 15px;
+  font-family: var(--font-mono);
   background-color: var(--color-bg-login);
-  color: #666;
+  color: var(--color-text);
+}
+
+.loginBox input:focus {
+  outline: 2px solid var(--color-dark);
 }
 
 .loginBox button {
   background-color: var(--color-dark);
   color: white;
   border: none;
-  padding: 10px 20px;
+  padding: 10px 26px;
   border-radius: 20px;
   cursor: pointer;
-  font-size: 20px;
-  transition: 0.3s;
+  font-size: 15px;
+  font-family: var(--font-mono);
+  transition: opacity 0.2s;
 }
 
-.loginBox button:hover {
-  background-color: #1a1a1a;
+.loginBox button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.loginBox button:not(:disabled):hover {
+  opacity: 0.85;
+}
+
+.error {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-red);
+  max-width: 200px;
+  text-align: center;
 }
