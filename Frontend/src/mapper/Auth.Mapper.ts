@@ -1,5 +1,5 @@
 import { decodeJwtPayload } from '../../Shared/Jwt';
-import type { LoginResponse } from '../DTO/login.dto';
+import type { LoginResponse } from '../dto/login.dto';
 import type { AuthSessionModel } from '../Model/AuthSession.Model';
 
 /** Formato do payload assinado pelo backend — ver `Auth.service.ts`, `jwtService.sign(payload)`. */

@@ -1,6 +1,6 @@
-import type { UserCreateResponse } from '../DTO/user.create.dto';
-import type { UserDto } from '../DTO/user.dto';
-import type { UserModel, UserSummaryModel } from '../Model/User.Model';
+import type { UserCreateResponse } from '../dto/user.create.dto';
+import type { UserDto } from '../dto/user.dto';
+import type { UserModel, UserSummaryModel } from '../model/User.Model';
 
 /** Converte o formato "de rede" (DTO já validado pelo Zod) pro formato usado na UI. */
 export const UserMapper = {
