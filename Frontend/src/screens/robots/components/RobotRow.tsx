@@ -5,21 +5,23 @@ import styles from './RobotRow.module.css';
 
 interface RobotRowProps {
   robot: Robot;
-  onSimulateFailure: (id: string) => void;
-  onMarkOutOfBounds: (id: string) => void;
-  onReconnect: (id: string) => void;
+  deleting: boolean;
+  onDelete: (id: string) => void;
 }
 
 const CONDITION_STYLE: Record<Robot['condition'], string> = {
   Ativo: styles.ativo,
-  Carregando: styles.carregando,
-  'Sem bateria': styles.critico,
-  'Out of Bounds': styles.critico,
+  Inativo: styles.carregando,
+  Perdido: styles.critico,
 };
 
-export function RobotRow({ robot, onSimulateFailure, onMarkOutOfBounds, onReconnect }: RobotRowProps) {
-  const isDown = robot.condition === 'Sem bateria' || robot.condition === 'Out of Bounds';
-
+// Os botões de simulação/mock ("Simular falha", "Out of Bounds",
+// "Reconectar") foram removidos ao ligar na API real: eles mexiam num
+// campo `condition` só local, sem nada por trás. `status` agora vem do
+// backend (calculado a partir de `lastSync`, ver `useRobots.ts`) e não é
+// algo que a API aceite gravar — a única ação de CRUD real que faz
+// sentido aqui é excluir o robô.
+export function RobotRow({ robot, deleting, onDelete }: RobotRowProps) {
   return (
     <div className={styles.row}>
       <span>{robot.label}</span>
@@ -28,20 +30,17 @@ export function RobotRow({ robot, onSimulateFailure, onMarkOutOfBounds, onReconn
       <span className={styles.task}>{robot.task}</span>
 
       <div className={styles.actions}>
-        {isDown ? (
-          <Button variant="outline" onClick={() => onReconnect(robot.id)}>
-            Reconectar
-          </Button>
-        ) : (
-          <>
-            <Button variant="solid" onClick={() => onSimulateFailure(robot.id)}>
-              Simular falha
-            </Button>
-            <Button variant="outline" onClick={() => onMarkOutOfBounds(robot.id)}>
-              Out of Bounds
-            </Button>
-          </>
-        )}
+        <Button
+          variant="outline"
+          onClick={() => {
+            if (window.confirm(`Excluir o robô "${robot.label}"? Essa ação não pode ser desfeita.`)) {
+              onDelete(robot.id);
+            }
+          }}
+          disabled={deleting}
+        >
+          {deleting ? 'Excluindo...' : 'Excluir'}
+        </Button>
       </div>
     </div>
   );

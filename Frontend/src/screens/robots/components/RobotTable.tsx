@@ -4,17 +4,11 @@ import styles from './RobotTable.module.css';
 
 interface RobotTableProps {
   robots: Robot[];
-  onSimulateFailure: (id: string) => void;
-  onMarkOutOfBounds: (id: string) => void;
-  onReconnect: (id: string) => void;
+  deletingIds: Set<string>;
+  onDelete: (id: string) => void;
 }
 
-export function RobotTable({
-  robots,
-  onSimulateFailure,
-  onMarkOutOfBounds,
-  onReconnect,
-}: RobotTableProps) {
+export function RobotTable({ robots, deletingIds, onDelete }: RobotTableProps) {
   return (
     <div className={styles.table}>
       <div className={styles.tableHeader}>
@@ -25,13 +19,14 @@ export function RobotTable({
         <span>Ação</span>
       </div>
 
+      {robots.length === 0 && <p>Nenhum robô cadastrado.</p>}
+
       {robots.map((robot) => (
         <RobotRow
           key={robot.id}
           robot={robot}
-          onSimulateFailure={onSimulateFailure}
-          onMarkOutOfBounds={onMarkOutOfBounds}
-          onReconnect={onReconnect}
+          deleting={deletingIds.has(robot.id)}
+          onDelete={onDelete}
         />
       ))}
     </div>

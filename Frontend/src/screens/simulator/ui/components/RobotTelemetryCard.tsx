@@ -1,6 +1,7 @@
+import type { MouseEvent } from 'react';
 import type { SimRobotState } from '../../core/types';
 import { ControlModeType } from '../../protocol/enums';
-import { Button } from '../../../components/Button/Button';
+import { Button } from '../../../../components/Button/Button';
 import styles from './RobotTelemetryCard.module.css';
 
 interface RobotTelemetryCardProps {
@@ -17,6 +18,13 @@ const MODE_LABEL: Record<number, string> = {
   [ControlModeType.SemiAuto]: 'SEMI-AUTO',
 };
 
+// BUG PRÉ-EXISTENTE CORRIGIDO: importava `Button` de
+// '../../../components/Button/Button' (3 níveis) mas este arquivo está em
+// src/screens/simulator/ui/components/ — precisa de 4 níveis pra chegar em
+// src/components/Button/Button. Quebrava `tsc -b` (TS2307). Os parâmetros
+// `e` dos handlers de clique também não tinham tipo (TS7006) — anotados
+// como `MouseEvent<HTMLButtonElement>`.
+//
 // Cartão de telemetria de um robô simulado — mesmo conjunto de campos do
 // RobotSwarmSimulator de referência (posição, theta, modo, bateria, pwm das
 // rodas, índice do waypoint atual).
@@ -73,7 +81,7 @@ export function RobotTelemetryCard({
         {robot.online ? (
           <Button
             variant="outline"
-            onClick={(e) => {
+            onClick={(e: MouseEvent<HTMLButtonElement>) => {
               e.stopPropagation();
               onDropFailure();
             }}
@@ -83,7 +91,7 @@ export function RobotTelemetryCard({
         ) : (
           <Button
             variant="solid"
-            onClick={(e) => {
+            onClick={(e: MouseEvent<HTMLButtonElement>) => {
               e.stopPropagation();
               onReconnect();
             }}

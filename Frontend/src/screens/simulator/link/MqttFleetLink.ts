@@ -22,13 +22,22 @@ function topic(part: 'to_edge' | 'to_cloud', networkId: number): string {
 // (gateway + frota) de um broker MQTT, publicando telemetria em `to_cloud` e
 // assinando comandos em `to_edge` — o inverso do papel do backend. Payload
 // MQTT = base64([EdgeEvent] + Mari frame), QoS 0.
+//
+// BUG PRÉ-EXISTENTE CORRIGIDO: o construtor usava uma "constructor parameter
+// property" (`constructor(private readonly options: ...)`), que gera
+// atribuição implícita (`this.options = options`) — não permitido com
+// `erasableSyntaxOnly: true` no tsconfig deste projeto (TS1294). Trocado
+// pelo campo declarado + atribuição explícita, mesmo padrão já usado nos
+// outros campos desta classe.
 export class MqttFleetLink implements FleetLink {
   private client: MqttClient | null = null;
   private commandHandler: CommandHandler | null = null;
   private readonly toEdge: string;
   private readonly toCloud: string;
+  private readonly options: MqttFleetLinkOptions;
 
-  constructor(private readonly options: MqttFleetLinkOptions) {
+  constructor(options: MqttFleetLinkOptions) {
+    this.options = options;
     this.toEdge = topic('to_edge', options.networkId);
     this.toCloud = topic('to_cloud', options.networkId);
   }

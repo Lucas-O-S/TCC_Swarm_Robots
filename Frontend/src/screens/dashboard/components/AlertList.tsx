@@ -1,26 +1,9 @@
-import type { Alert } from '../types';
-import { Card } from '../../../components/Card/Card';
-import styles from './AlertList.module.css';
-
-interface AlertListProps {
-  alerts: Alert[];
-}
-
-// Lista de alertas do sistema.
-export function AlertList({ alerts }: AlertListProps) {
-  return (
-    <Card>
-      <div className={styles.header}>
-        <span>Alertas</span>
-      </div>
-      <ul className={styles.list}>
-        {alerts.map((alerta) => (
-          <li key={alerta.id} className={`${styles.alerta} ${styles[alerta.level]}`}>
-            <span className={styles.timestamp}>{alerta.timestamp}</span>
-            <span className={styles.msg}>{alerta.message}</span>
-          </li>
-        ))}
-      </ul>
-    </Card>
-  );
-}
+// Componente órfão: nada em src/ importa `AlertList` — `DashboardScreen.tsx`
+// usa `ConnectionList`/`ConnectionLog` no lugar dele hoje. O arquivo
+// original importava um tipo `Alert` que não existe mais em `../types.ts`,
+// o que quebrava `tsc -b` (todo `src/` é type-checked, mesmo arquivo que
+// ninguém importa — ver `tsconfig.app.json`, `"include": ["src"]`).
+// Substituído por este stub vazio só pra não quebrar o build. Seguro
+// apagar este arquivo (e a pasta toda, se `RobotList.tsx`/`SwarmMap.tsx`/
+// `useSwarmMap.ts` também não forem mais usados).
+export {};

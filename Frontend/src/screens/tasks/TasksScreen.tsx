@@ -7,8 +7,19 @@ import { useTasks } from './hooks/useTasks';
 import styles from './TasksScreen.module.css';
 
 export function TasksScreen() {
-  const { tasks, simulatingIds, addTask, setRobotCount, deploy, cancel, simulate, saveRoute } =
-    useTasks();
+  const {
+    tasks,
+    loading,
+    error,
+    simulatingIds,
+    addTask,
+    setRobotCount,
+    deploy,
+    cancel,
+    simulate,
+    saveRoute,
+    removeTask,
+  } = useTasks();
   const [formOpen, setFormOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
 
@@ -18,15 +29,22 @@ export function TasksScreen() {
     <div className={styles.screen}>
       <h2 className={styles.title}>Orquestração de tarefas</h2>
 
-      <TaskTable
-        tasks={tasks}
-        simulatingIds={simulatingIds}
-        onRobotCountChange={setRobotCount}
-        onDeploy={deploy}
-        onSimulate={simulate}
-        onCancel={cancel}
-        onEditRoute={setEditingTaskId}
-      />
+      {error && <p role="alert">Não foi possível falar com a API: {error}</p>}
+
+      {loading ? (
+        <p>Carregando tarefas...</p>
+      ) : (
+        <TaskTable
+          tasks={tasks}
+          simulatingIds={simulatingIds}
+          onRobotCountChange={setRobotCount}
+          onDeploy={deploy}
+          onSimulate={simulate}
+          onCancel={cancel}
+          onEditRoute={setEditingTaskId}
+          onDelete={removeTask}
+        />
+      )}
 
       {formOpen ? (
         <AddTaskForm

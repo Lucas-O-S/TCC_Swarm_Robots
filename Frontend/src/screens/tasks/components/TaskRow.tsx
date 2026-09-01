@@ -11,6 +11,7 @@ interface TaskRowProps {
   onSimulate: () => void;
   onCancel: () => void;
   onEditRoute: () => void;
+  onDelete: () => void;
 }
 
 const STATUS_STYLE: Record<Task['status'], string> = {
@@ -28,6 +29,7 @@ export function TaskRow({
   onSimulate,
   onCancel,
   onEditRoute,
+  onDelete,
 }: TaskRowProps) {
   const isCancelled = task.status === 'Cancelada';
 
@@ -59,6 +61,16 @@ export function TaskRow({
           </Button>
           <Button variant="outline" onClick={onCancel} disabled={isCancelled}>
             Cancelar
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (window.confirm(`Excluir a tarefa "${task.name}"? Essa ação não pode ser desfeita.`)) {
+                onDelete();
+              }
+            }}
+          >
+            Excluir
           </Button>
         </div>
 

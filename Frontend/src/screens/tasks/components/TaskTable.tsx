@@ -10,6 +10,7 @@ interface TaskTableProps {
   onSimulate: (id: string) => void;
   onCancel: (id: string) => void;
   onEditRoute: (id: string) => void;
+  onDelete: (id: string) => void;
 }
 
 export function TaskTable({
@@ -20,6 +21,7 @@ export function TaskTable({
   onSimulate,
   onCancel,
   onEditRoute,
+  onDelete,
 }: TaskTableProps) {
   return (
     <div>
@@ -29,6 +31,8 @@ export function TaskTable({
         <span>Local</span>
         <span>Execução</span>
       </div>
+
+      {tasks.length === 0 && <p>Nenhuma tarefa cadastrada.</p>}
 
       {tasks.map((task) => (
         <TaskRow
@@ -40,6 +44,7 @@ export function TaskTable({
           onSimulate={() => onSimulate(task.id)}
           onCancel={() => onCancel(task.id)}
           onEditRoute={() => onEditRoute(task.id)}
+          onDelete={() => onDelete(task.id)}
         />
       ))}
     </div>

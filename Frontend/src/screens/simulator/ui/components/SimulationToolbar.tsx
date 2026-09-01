@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import type { ChangeEvent } from 'react';
-import { Button } from '../../../components/Button/Button';
+import { Button } from '../../../../components/Button/Button';
 import type { Arena } from '../../core/types';
 import styles from './SimulationToolbar.module.css';
 
@@ -22,6 +22,10 @@ interface SimulationToolbarProps {
   onImport: (json: string) => void;
 }
 
+// BUG PRÉ-EXISTENTE CORRIGIDO: mesmo import de `Button` com profundidade
+// errada de `AppRoutes.tsx`/`RobotTelemetryCard.tsx` — corrigido de 3 pra 4
+// níveis (`../../../../components/Button/Button`).
+//
 // Barra de controle da simulação — mesmo papel da barra do RobotSwarmSimulator
 // de referência (Pause/Reset/Cenário/Import-Export/Conectar), só que na
 // paleta visual do MARI em vez do estilo neutro original.
