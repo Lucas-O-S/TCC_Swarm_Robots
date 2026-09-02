@@ -1,4 +1,4 @@
-import { Callout } from './Callout';
+import { Callout } from '../Integration/Callout';
 import { robotDtoSchema } from '../dto/robot.dto';
 import { RobotMapper } from '../mapper/Robot.Mapper';
 import type { RobotModel } from '../model/Robot.Model';
