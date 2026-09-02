@@ -1,4 +1,4 @@
-import { Callout } from './Callout';
+import { Callout } from '../Integration/Callout';
 import { taskDtoSchema } from '../dto/task.dto';
 import { taskCreateRequestSchema } from '../dto/task.create.dto';
 import type { TaskCreateRequest } from '../dto/task.create.dto';

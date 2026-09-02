@@ -1,8 +1,8 @@
 import axios from 'axios';
 import type { AxiosError, AxiosRequestConfig } from 'axios';
 import type { z } from 'zod';
-import type { ApiEnvelope } from './ApiEnvelope';
-import { parseApiEnvelope } from './ApiEnvelope';
+import type { ApiEnvelope } from '../services/ApiEnvelope';
+import { parseApiEnvelope } from '../services/ApiEnvelope';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
