@@ -2,6 +2,7 @@ import { Callout } from '../Integration/Callout';
 import { robotDtoSchema } from '../dto/robot.dto';
 import { RobotMapper } from '../mapper/Robot.Mapper';
 import type { RobotModel } from '../model/Robot.Model';
+import { RobotRepository } from '../repository/RobotRepository';
 
 export type ServiceResult<T> = { ok: true; data: T } | { ok: false; message: string };
 
@@ -26,6 +27,15 @@ export const RobotService = {
     const result = await Callout.get('/robots', robotDtoSchema);
     if (!result.ok) return { ok: false, message: result.message };
     return { ok: true, data: (result.envelope.data ?? []).map(RobotMapper.fromDto) };
+  },
+  
+  async getByUuid(uuid: string): Promise<ServiceResult<RobotModel>> {
+    const result = await RobotRepository.findByUuid(uuid);
+    if (!result.ok) return { ok: false, message: result.message };
+    if (!result.envelope.dataUnit) {
+      return { ok: false, message: `Robô ${uuid} não encontrado na resposta da API.` };
+    }
+    return { ok: true, data: RobotMapper.fromDto(result.envelope.dataUnit) };
   },
 
   async remove(uuid: string): Promise<ServiceResult<void>> {
