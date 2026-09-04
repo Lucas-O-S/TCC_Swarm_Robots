@@ -1,0 +1,21 @@
+.logoText {
+  color: var(--color-orange-logo);
+  letter-spacing: 12px;
+  font-size: 42px;
+  margin-bottom: 20px;
+  font-weight: 400;
+  font-family: var(--font-mono);
+}
+
+.beeArea {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 24px;
+  color: var(--color-orange-logo);
+}
+
+.beeArea svg {
+  width: 100%;
+  height: 100%;
+}
