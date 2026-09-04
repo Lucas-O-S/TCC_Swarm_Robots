@@ -1,0 +1,11 @@
+.card {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+}
+
+.title {
+  margin: 0;
+  font-size: 16px;
+}
