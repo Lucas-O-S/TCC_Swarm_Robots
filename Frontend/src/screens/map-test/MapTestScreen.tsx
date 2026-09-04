@@ -22,7 +22,7 @@ const MOCK_ROBOTS: MockRobot[] = [
   { id: '1', label: 'R01', status: RobotStatus.Active, col: 2, row: 1 },
   { id: '2', label: 'R02', status: RobotStatus.Active, col: 5, row: 4 },
   { id: '3', label: 'R03', status: RobotStatus.Inactive, col: 9, row: 2 },
-  { id: '4', label: 'R04', status: RobotStatus.Lost, col: 11, row: 6 },
+  { id: '4', label: 'R04', status: RobotStatus.Lost, col: 9, row: 6 },
 ];
 
 // Tela isolada só pra visualizar <Map> + <Robot> com dados mockados,
