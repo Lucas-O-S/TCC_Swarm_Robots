@@ -1,5 +1,4 @@
-import { Callout } from '../Integration/Callout';
-import type { CalloutResult } from '../Integration/Callout';
+import { createBaseRepository } from './BaseRepository';
 import { robotDtoSchema } from '../dto/robot.dto';
 import type { RobotDto } from '../dto/robot.dto';
 
@@ -8,15 +7,5 @@ import type { RobotDto } from '../dto/robot.dto';
  * devolve o `CalloutResult` cru, ainda em `RobotDto` (sem mapear pra `RobotModel`).
  */
 export const RobotRepository = {
-    findAll(): Promise<CalloutResult<RobotDto>> {
-        return Callout.get('/robots', robotDtoSchema);
-    },
-    
-    findByUuid(uuid: string): Promise<CalloutResult<RobotDto>> {
-        return Callout.get(`/robots/${uuid}`, robotDtoSchema);
-    },
-    
-    remove(uuid: string) {
-        return Callout.delete(`/robots/${uuid}`);
-    },
+    ...createBaseRepository<RobotDto>('/robots', robotDtoSchema),
 };
