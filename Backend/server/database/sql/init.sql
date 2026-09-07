@@ -103,3 +103,37 @@ CREATE TABLE position (
 
     FOREIGN KEY (robot_id) REFERENCES robots(uuid)
 );
+
+CREATE TABLE cenario (
+    
+    uuid UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    description TEXT NULL,
+    
+    size_x INT NOT NULL,
+    size_y INT NOT NULL,
+    
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL
+);
+
+CREATE TABLE obstacle (
+    
+    uuid UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    description TEXT NULL,
+    size_x INT NOT NULL,
+    size_y INT NOT NULL,
+    start_point_x INT NOT NULL,
+    start_point_y INT NOT NULL, 
+    
+    cenario_id UUID NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
+
+    FOREIGN KEY (cenario_id) REFERENCES cenario(uuid)
+);
+
+
