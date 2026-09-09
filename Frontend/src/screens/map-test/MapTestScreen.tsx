@@ -3,7 +3,9 @@ import { Card } from '../../components/Card/Card';
 import { Robot } from '../../components/Robot/RobotProp';
 import { Obstacle } from '../../components/Obstacle/Obstacle';
 import { MapCanvas } from '../../components/MapCanvas/MapCanvas';
+import { RobotPath } from '../../components/RobotPath/RobotPath';
 import type { MapModel } from '../../model/Map.Model';
+import type { TaskWaypointModel } from '../../model/Task.Model';
 import styles from './MapTestScreen.module.css';
 
 const CELL_SIZE = 32;
@@ -56,10 +58,25 @@ interface MockRobot {
   row: number;
   /** Graus, 0° = pra cima — mesma convenção do `theta` do simulador. */
   direction: number;
+  /** Rota planejada (TaskModel.waypoints) — x/y aqui são célula do grid, não mm. */
+  path?: TaskWaypointModel[];
 }
 
 const MOCK_ROBOTS: MockRobot[] = [
-  { id: '1', label: 'R01', status: RobotStatus.Active, col: 2, row: 1, direction: 0 },
+  {
+    id: '1',
+    label: 'R01',
+    status: RobotStatus.Active,
+    col: 2,
+    row: 1,
+    direction: 0,
+    path: [
+      { orderIndex: 0, x: 2, y: 1 },
+      { orderIndex: 1, x: 4, y: 1 },
+      { orderIndex: 2, x: 4, y: 5 },
+      { orderIndex: 3, x: 2, y: 5 },
+    ],
+  },
   { id: '2', label: 'R02', status: RobotStatus.Active, col: 5, row: 4, direction: 90 },
   { id: '3', label: 'R03', status: RobotStatus.Inactive, col: 9, row: 2, direction: 180 },
   { id: '4', label: 'R04', status: RobotStatus.Lost, col: 9, row: 6, direction: 270 },
@@ -85,6 +102,9 @@ export function MapTestScreen() {
               top: obstacle.startPointY * CELL_SIZE,
             }}
           />
+        ))}
+        {MOCK_ROBOTS.filter((robot) => robot.path).map((robot) => (
+          <RobotPath key={robot.id} points={robot.path!} cellSize={CELL_SIZE} />
         ))}
         {MOCK_ROBOTS.map((robot) => (
           <Robot
