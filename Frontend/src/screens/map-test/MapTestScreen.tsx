@@ -1,8 +1,8 @@
 import { RobotStatus } from '../../enums/RobotStatus.enum';
 import { Card } from '../../components/Card/Card';
-import { Map } from '../../components/Map/Map';
 import { Robot } from '../../components/Robot/RobotProp';
 import { Obstacle } from '../../components/Obstacle/Obstacle';
+import { MapCanvas } from '../../components/MapCanvas/MapCanvas';
 import type { MapModel } from '../../model/Map.Model';
 import styles from './MapTestScreen.module.css';
 
@@ -72,7 +72,7 @@ export function MapTestScreen() {
     <Card className={styles.card}>
       <h1 className={styles.title}>Teste: Map + Robot (mock)</h1>
 
-      <Map cols={MOCK_MAP.cenario.sizeX} rows={MOCK_MAP.cenario.sizeY} cellSize={CELL_SIZE}>
+      <MapCanvas cols={MOCK_MAP.cenario.sizeX} rows={MOCK_MAP.cenario.sizeY} cellSize={CELL_SIZE}>
         {MOCK_MAP.cenario.Obstacles.map((obstacle) => (
           <Obstacle
             key={obstacle.name}
@@ -99,7 +99,7 @@ export function MapTestScreen() {
             }}
           />
         ))}
-      </Map>
+      </MapCanvas>
     </Card>
   );
 }
