@@ -1,17 +1,46 @@
 .robot {
+  /* Marcador é ancorado pelo próprio centro — quem usa só informa left/top
+     do ponto, sem precisar repetir esse translate em todo lugar. */
+  position: relative;
+  transform: translate(-50%, -50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   border: 2px solid var(--color-text-muted);
   background: var(--color-text-muted);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 7px;
   font-weight: 600;
   color: #fff;
   user-select: none;
+}
+
+/* Seta de orientação: caixa um pouco maior que o círculo (inset negativo)
+   pra ponta ficar projetada pra fora da borda — daí gira inteira em torno
+   do centro (que continua sendo o mesmo centro do robô). O drop-shadow duplo
+   funciona como contorno escuro, então a seta branca aparece tanto sobre o
+   círculo colorido quanto sobre o fundo do mapa. */
+.direction {
+  position: absolute;
+  inset: -5px;
+  pointer-events: none;
+}
+
+.direction::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 7px solid #fff;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000);
 }
 
 .active {
