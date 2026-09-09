@@ -36,7 +36,21 @@ export function RobotPath({ points, cellSize, color = 'var(--color-orange)', cla
         />
       )}
       {pixelPoints.map((p, index) => (
-        <circle key={index} cx={p.x} cy={p.y} r={4} fill={color} />
+        <g key={index}>
+          <circle cx={p.x} cy={p.y} r={7} fill={color} />
+          <text
+            x={p.x}
+            y={p.y}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize={8}
+            fontFamily="var(--font-mono)"
+            fontWeight={600}
+            fill="#fff"
+          >
+            {index + 1}
+          </text>
+        </g>
       ))}
     </svg>
   );
