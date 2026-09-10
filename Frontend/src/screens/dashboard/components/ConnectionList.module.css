@@ -1,0 +1,30 @@
+.list {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--color-dark);
+  font-weight: 600;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.row:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.highlight {
+  background: rgba(47, 111, 237, 0.15);
+}

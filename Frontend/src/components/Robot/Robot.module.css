@@ -1,0 +1,39 @@
+.robot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--color-text-muted);
+  background: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  color: #fff;
+  user-select: none;
+}
+
+.active {
+  background: var(--color-green);
+  border-color: var(--color-green);
+}
+
+.inactive {
+  background: var(--color-text-muted);
+  border-color: var(--color-text-muted);
+}
+
+.lost {
+  background: var(--color-red);
+  border-color: var(--color-red);
+}
+
+.selected {
+  outline: 2px dashed #2f6fed;
+  outline-offset: 3px;
+}
+
+.label {
+  pointer-events: none;
+}

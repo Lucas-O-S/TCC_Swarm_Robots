@@ -1,0 +1,53 @@
+.map {
+  position: relative;
+  background-color: var(--color-surface-alt);
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.1) 1px, transparent 1px);
+  background-size: 26px 26px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.trails {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.robot {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: none;
+  border-radius: 50% 50% 50% 4px;
+  cursor: pointer;
+}
+
+.online {
+  background: var(--color-orange);
+}
+
+.offline {
+  background: var(--color-text-muted);
+  opacity: 0.5;
+}
+
+.selected {
+  outline: 2px dashed #2f6fed;
+  outline-offset: 3px;
+}
+
+.obstacle {
+  position: absolute;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(192, 57, 43, 0.35),
+    rgba(192, 57, 43, 0.35) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+  border: 1px dashed var(--color-red);
+}
