@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { MapCanvas } from '../../../../components/MapCanvas/MapCanvas';
 import type { Arena, Obstacle, SimRobotState } from '../../core/types';
 import styles from './SimulationMap.module.css';
 
@@ -39,9 +40,11 @@ export function SimulationMap({ arena, robots, obstacles, selectedAddress, onSel
   }, [robots]);
 
   return (
-    <div
+    <MapCanvas
+      cols={VIEW_PX / 26}
+      rows={heightPx / 26}
+      cellSize={26}
       className={styles.map}
-      style={{ width: VIEW_PX, height: heightPx }}
       onClick={() => onSelect(null)}
     >
       <svg className={styles.trails} width={VIEW_PX} height={heightPx}>
@@ -93,6 +96,6 @@ export function SimulationMap({ arena, robots, obstacles, selectedAddress, onSel
           title={robot.label}
         />
       ))}
-    </div>
+    </MapCanvas>
   );
 }

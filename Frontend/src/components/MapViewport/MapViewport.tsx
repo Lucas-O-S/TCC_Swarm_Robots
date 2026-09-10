@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import type { PointerEvent, PropsWithChildren, WheelEvent } from 'react';
+import type { PointerEvent, PropsWithChildren, ReactNode, WheelEvent } from 'react';
 import styles from './MapViewport.module.css';
 
 interface MapViewportProps extends PropsWithChildren {
@@ -7,6 +7,8 @@ interface MapViewportProps extends PropsWithChildren {
   height?: number;
   minZoom?: number;
   maxZoom?: number;
+  /** Conteúdo extra fixo sobre o quadro (não sofre pan/zoom), ex.: legenda de escala. */
+  overlay?: ReactNode;
 }
 
 const DEFAULT_WIDTH = 480;
@@ -31,6 +33,7 @@ export function MapViewport({
   height = DEFAULT_HEIGHT,
   minZoom = DEFAULT_MIN_ZOOM,
   maxZoom = DEFAULT_MAX_ZOOM,
+  overlay,
   children,
 }: MapViewportProps) {
   const [zoom, setZoom] = useState(1);
@@ -98,6 +101,8 @@ export function MapViewport({
           ⟲
         </button>
       </div>
+
+      {overlay}
     </div>
   );
 }

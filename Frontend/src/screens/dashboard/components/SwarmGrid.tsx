@@ -1,4 +1,5 @@
 import type { MouseEvent } from 'react';
+import { MapCanvas } from '../../../components/MapCanvas/MapCanvas';
 import type { ChargePoint, Obstacle, RobotConnection } from '../types';
 import { GRID_COLS, GRID_ROWS } from '../hooks/useSwarmGrid';
 import styles from './SwarmGrid.module.css';
@@ -39,9 +40,11 @@ export function SwarmGrid({
   }
 
   return (
-    <div
-      className={`${styles.grid} ${placingCharge ? styles.placing : ''}`}
-      style={{ width: GRID_COLS * CELL, height: GRID_ROWS * CELL }}
+    <MapCanvas
+      cols={GRID_COLS}
+      rows={GRID_ROWS}
+      cellSize={CELL}
+      className={placingCharge ? styles.placing : ''}
       onClick={handleBackgroundClick}
     >
       {obstacles.map((obstacle) => (
@@ -83,6 +86,6 @@ export function SwarmGrid({
           title={robot.label}
         />
       ))}
-    </div>
+    </MapCanvas>
   );
 }
