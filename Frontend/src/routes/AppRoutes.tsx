@@ -14,6 +14,9 @@ const DashboardScreen = lazy(() =>
 const SimulationScreen = lazy(() =>
   import('../screens/simulator/ui/SimulationScreen').then((m) => ({ default: m.SimulationScreen })),
 );
+const MapTestScreen = lazy(() =>
+  import('../screens/map-test/MapTestScreen').then((m) => ({ default: m.MapTestScreen })),
+);
 
 // Mapa de rotas do app. /login fica fora da casca de navegação; todas as
 // telas autenticadas são filhas de <AppLayout /> (barra MARI + menu + Sair).
@@ -33,6 +36,7 @@ export function AppRoutes() {
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<DashboardScreen />} />
             <Route path="/simulacao" element={<SimulationScreen />} />
+            <Route path="/mapa-teste" element={<MapTestScreen />} />
           </Route>
         </Routes>
       </Suspense>

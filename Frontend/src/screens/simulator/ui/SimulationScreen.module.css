@@ -1,0 +1,16 @@
+.screen {
+  padding: 24px 32px;
+}
+
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .body {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,33 @@
+.canvasContainer {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.canvas {
+  width: 100%;
+  border-radius: 8px;
+  display: block;
+}
+
+.tooltip {
+  position: absolute;
+  background: rgba(58, 48, 32, 0.95);
+  color: #f5e9cc;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  padding: 8px 12px;
+  border-radius: 8px;
+  pointer-events: none;
+  text-align: left;
+  opacity: 0;
+  transition: opacity 0.15s;
+  transform: translate(-50%, -115%);
+  z-index: 10;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.visible {
+  opacity: 1;
+}

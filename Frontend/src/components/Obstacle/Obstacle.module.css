@@ -1,0 +1,11 @@
+.obstacle {
+  position: absolute;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(192, 57, 43, 0.35),
+    rgba(192, 57, 43, 0.35) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+  border: 1px dashed var(--color-red);
+}
