@@ -1,4 +1,6 @@
 import type { HTMLAttributes } from 'react';
+import type { MapModel } from '../../model/Map.Model';
+import { BLOCK_AREA_CM2, BLOCK_SIDE_M, DEFAULT_CELL, DEFAULT_COLS, DEFAULT_ROWS } from '../../Consts/MapConsts';
 import { Map } from '../Map/Map';
 import { MapViewport } from '../MapViewport/MapViewport';
 import styles from './MapCanvas.module.css';
@@ -9,15 +11,9 @@ interface MapCanvasProps extends HTMLAttributes<HTMLDivElement> {
   cellSize?: number;
   minZoom?: number;
   maxZoom?: number;
+  /** Quando presente, `cenario.sizeX/sizeY` prevalecem sobre `cols`/`rows`. */
+  mapModel?: MapModel;
 }
-
-const DEFAULT_COLS = 14;
-const DEFAULT_ROWS = 8;
-const DEFAULT_CELL = 32;
-
-// Escala real representada por cada bloco (célula) do grid.
-const BLOCK_AREA_CM2 = 0.04;
-const BLOCK_SIDE_M = Math.sqrt(BLOCK_AREA_CM2);
 
 // <Map> (grid puro) dentro de <MapViewport> (quadro com zoom/arraste). O
 // quadro nasce do tamanho exato do mapa (cols * cellSize x rows * cellSize),
@@ -29,13 +25,17 @@ export function MapCanvas({
   cellSize = DEFAULT_CELL,
   minZoom,
   maxZoom,
+  mapModel,
   children,
   ...rest
 }: MapCanvasProps) {
+  const effectiveCols = mapModel?.cenario.sizeX ?? cols;
+  const effectiveRows = mapModel?.cenario.sizeY ?? rows;
+
   return (
     <MapViewport
-      width={cols * cellSize}
-      height={rows * cellSize}
+      width={effectiveCols * cellSize}
+      height={effectiveRows * cellSize}
       minZoom={minZoom}
       maxZoom={maxZoom}
       overlay={
@@ -44,7 +44,7 @@ export function MapCanvas({
         </span>
       }
     >
-      <Map cols={cols} rows={rows} cellSize={cellSize} {...rest}>
+      <Map cols={effectiveCols} rows={effectiveRows} cellSize={cellSize} {...rest}>
         {children}
       </Map>
     </MapViewport>

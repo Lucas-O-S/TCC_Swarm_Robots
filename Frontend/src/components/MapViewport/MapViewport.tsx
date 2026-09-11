@@ -1,5 +1,12 @@
 import { useRef, useState } from 'react';
 import type { PointerEvent, PropsWithChildren, ReactNode, WheelEvent } from 'react';
+import {
+  DEFAULT_MAX_ZOOM,
+  DEFAULT_MIN_ZOOM,
+  DEFAULT_VIEWPORT_HEIGHT,
+  DEFAULT_VIEWPORT_WIDTH,
+  ZOOM_STEP,
+} from '../../Consts/MapConsts';
 import styles from './MapViewport.module.css';
 
 interface MapViewportProps extends PropsWithChildren {
@@ -10,12 +17,6 @@ interface MapViewportProps extends PropsWithChildren {
   /** Conteúdo extra fixo sobre o quadro (não sofre pan/zoom), ex.: legenda de escala. */
   overlay?: ReactNode;
 }
-
-const DEFAULT_WIDTH = 480;
-const DEFAULT_HEIGHT = 320;
-const DEFAULT_MIN_ZOOM = 0.5;
-const DEFAULT_MAX_ZOOM = 3;
-const ZOOM_STEP = 0.15;
 
 interface DragState {
   startX: number;
@@ -29,8 +30,8 @@ interface DragState {
 // transform (translate + scale) — sem lib externa, mesmo espírito dos
 // outros componentes do projeto (CSS puro).
 export function MapViewport({
-  width = DEFAULT_WIDTH,
-  height = DEFAULT_HEIGHT,
+  width = DEFAULT_VIEWPORT_WIDTH,
+  height = DEFAULT_VIEWPORT_HEIGHT,
   minZoom = DEFAULT_MIN_ZOOM,
   maxZoom = DEFAULT_MAX_ZOOM,
   overlay,
