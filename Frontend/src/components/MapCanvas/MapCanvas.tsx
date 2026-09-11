@@ -16,7 +16,7 @@ interface MapCanvasProps extends HTMLAttributes<HTMLDivElement> {
   mapModel?: MapModel;
   /** Quando true, ignora `cellSize` e calcula a célula a partir da largura disponível do container pai, então o mapa cresce/encolhe pra preencher o espaço em vez de ficar em tamanho fixo. */
   fitWidth?: boolean;
-  /** Com `fitWidth`, limita a altura visível do quadro (px) — a célula continua sendo calculada só pela largura (o mapa sempre preenche as laterais); se o mapa ficar mais alto que isso, o excesso vira scroll/pan dentro do quadro em vez de encolher a célula. */
+  /** Com `fitWidth`, o mapa também preenche essa altura (px) por completo — a célula deixa de ser quadrada (vira retângulo) quando a proporção cols:rows não bate com largura:altura disponíveis. */
   maxHeight?: number;
 }
 
@@ -50,17 +50,19 @@ export function MapCanvas({
     return () => observer.disconnect();
   }, [fitWidth]);
 
-  const effectiveCellSize =
+  const effectiveCellWidth =
     fitWidth && containerWidth ? Math.max(1, Math.floor(containerWidth / effectiveCols)) : cellSize;
+  const effectiveCellHeight =
+    fitWidth && maxHeight ? Math.max(1, Math.floor(maxHeight / effectiveRows)) : effectiveCellWidth;
 
-  const mapWidth = effectiveCols * effectiveCellSize;
-  const mapHeight = effectiveRows * effectiveCellSize;
+  const mapWidth = effectiveCols * effectiveCellWidth;
+  const mapHeight = effectiveRows * effectiveCellHeight;
 
   return (
     <div ref={containerRef} className={fitWidth ? styles.fluid : undefined}>
       <MapViewport
         width={mapWidth}
-        height={maxHeight ? Math.min(mapHeight, maxHeight) : mapHeight}
+        height={mapHeight}
         minZoom={minZoom}
         maxZoom={maxZoom}
         overlay={
@@ -69,7 +71,13 @@ export function MapCanvas({
           </span>
         }
       >
-        <Map cols={effectiveCols} rows={effectiveRows} cellSize={effectiveCellSize} {...rest}>
+        <Map
+          cols={effectiveCols}
+          rows={effectiveRows}
+          cellWidth={effectiveCellWidth}
+          cellHeight={effectiveCellHeight}
+          {...rest}
+        >
           {children}
         </Map>
       </MapViewport>

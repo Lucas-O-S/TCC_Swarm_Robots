@@ -7,8 +7,12 @@ interface MapProps extends HTMLAttributes<HTMLDivElement> {
   cols?: number;
   /** Linhas do grid. Ver Consts/MapConsts. */
   rows?: number;
-  /** Tamanho de cada célula em pixels. Ver Consts/MapConsts. */
+  /** Tamanho de cada célula em pixels (largura e altura). Ver Consts/MapConsts. */
   cellSize?: number;
+  /** Sobrescreve a largura da célula (px), independente de `cellSize`. */
+  cellWidth?: number;
+  /** Sobrescreve a altura da célula (px), independente de `cellSize`. */
+  cellHeight?: number;
 }
 
 // Grade 2D vazia — só o "chão" do mapa (fundo quadriculado do tamanho
@@ -21,18 +25,23 @@ export function Map({
   cols = DEFAULT_COLS,
   rows = DEFAULT_ROWS,
   cellSize = DEFAULT_CELL,
+  cellWidth,
+  cellHeight,
   className = '',
   style,
   children,
   ...rest
 }: MapProps) {
+  const effectiveCellWidth = cellWidth ?? cellSize;
+  const effectiveCellHeight = cellHeight ?? cellSize;
+
   return (
     <div
       className={`${styles.grid} ${className}`}
       style={{
-        width: cols * cellSize,
-        height: rows * cellSize,
-        backgroundSize: `${cellSize}px ${cellSize}px`,
+        width: cols * effectiveCellWidth,
+        height: rows * effectiveCellHeight,
+        backgroundSize: `${effectiveCellWidth}px ${effectiveCellHeight}px`,
         ...style,
       }}
       {...rest}
