@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppLayout } from '../components/Layout/AppLayout';
+import { CenarioBuilder } from '../screens/CenarioBuilder/CenarioBuilder';
 
 // Cada tela vira um chunk JS separado, baixado só quando a rota é
 // visitada — evita carregar tudo (inclusive a lib `mqtt`, que só a tela
@@ -37,6 +38,7 @@ export function AppRoutes() {
             <Route path="/dashboard" element={<DashboardScreen />} />
             <Route path="/simulacao" element={<SimulationScreen />} />
             <Route path="/mapa-teste" element={<MapTestScreen />} />
+            <Route path="/CenarioBuilder" element={<CenarioBuilder />} />
           </Route>
         </Routes>
       </Suspense>
