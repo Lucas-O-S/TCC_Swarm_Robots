@@ -53,6 +53,24 @@ dotbot-provision fetch --fw-version 0.8.0
 **Sem o `v`.** O README do dotbot-provision diz `v0.7.0` e isso dá 404 — as
 tags do swarmit não têm prefixo.
 
+**O `fetch` termina em erro 404 e isso é NORMAL** (verificado em 2026-09-12):
+
+```
+[GET ] .../0.8.0/dotbot-dotbot-v3.bin
+Error: HTTP error ... HTTP Error 404: Not Found
+```
+
+O `dotbot-provision` tenta baixar o app sandbox do robô da release do **swarmit**,
+mas esse binário não existe lá — a release 0.8.0 do swarmit só publica
+`03app_gateway_*`, `bootloader-dotbot-v2/v3`, `bootloader-nrf5340dk` e
+`netcore-nrf5340-net` (.elf/.hex/.map). O app do robô vive nas releases do
+**DotBot-firmware**, outro repositório, e terá que ser baixado à mão na hora de
+flashar o robô.
+
+Para o GATEWAY o 404 é irrelevante: os dois arquivos necessários
+(`03app_gateway_app-nrf5340-app.hex` e `03app_gateway_net-nrf5340-net.hex`)
+baixam antes do erro. Siga para o flash normalmente.
+
 Onde os arquivos caem (`DEFAULT_BIN_DIR = Path("bin")`, ajustável com
 `--bin-dir`), relativo ao diretório onde você rodou o comando:
 
