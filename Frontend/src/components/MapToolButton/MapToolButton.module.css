@@ -10,10 +10,25 @@
   color: var(--color-text);
   font-family: var(--font-mono);
   cursor: pointer;
+  /* Sem isso, alguns navegadores (Safari/macOS) desenham o botão nativo
+     por cima do fundo customizado — a cor de "ativo" muda no estado, mas
+     visualmente quase não aparece. */
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+/* Feedback do tipo "click": escurece só no instante do clique (pressed),
+   sem precisar de estado — soma com o `.active` do tipo "tool" também. */
+.button:active {
+  background: var(--color-border);
 }
 
 .active {
   background: var(--color-orange);
   border-color: var(--color-orange);
   color: var(--color-dark);
+}
+
+.active:active {
+  background: var(--color-orange);
 }

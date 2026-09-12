@@ -11,7 +11,7 @@ import { MapToolButton } from '../MapToolButton/MapToolButton';
 import { MoveIcon, SelectIcon } from '../MapToolButton/icons';
 import styles from './MapViewport.module.css';
 
-type BaseTool = 'move' | 'select';
+export type BaseTool = 'move' | 'select';
 
 interface MapViewportProps extends PropsWithChildren {
   width?: number;
@@ -22,8 +22,16 @@ interface MapViewportProps extends PropsWithChildren {
   overlay?: ReactNode;
   /** Botões extra no canto de controles, ao lado do zoom (ex.: <MapToolButton>). */
   tools?: ReactNode;
-  /** Quando false, clicar e arrastar não move o mapa (ex.: outra ferramenta, tipo desenhar obstáculo, está ativa). Default: true. */
-  panEnabled?: boolean;
+  /**
+   * Ferramenta ativa, controlada de fora — só precisa disso quem tem uma
+   * ferramenta extra (ex.: "obstáculo" no CenarioBuilder) que deve entrar
+   * no mesmo grupo exclusivo de Mover/Selecionar (só uma ativa por vez).
+   * Sem isso, o componente controla sozinho (começa em "move"). Vem
+   * sempre acompanhado de `onToolChange`.
+   */
+  tool?: string;
+  /** Chamado quando o usuário clica Mover ou Selecionar (os botões que o próprio MapViewport renderiza). Obrigatório junto com `tool`. */
+  onToolChange?: (tool: BaseTool) => void;
 }
 
 interface DragState {
@@ -44,17 +52,27 @@ export function MapViewport({
   maxZoom = DEFAULT_MAX_ZOOM,
   overlay,
   tools,
-  panEnabled = true,
+  tool,
+  onToolChange,
   children,
 }: MapViewportProps) {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const drag = useRef<DragState | null>(null);
   // Ferramenta base de todo mapa (mover/pan vs. só clicar/selecionar) — vem
-  // pronta em qualquer tela que use <MapCanvas>/<MapViewport>. Ferramentas
-  // extras de uma tela específica (ex.: obstáculo no CenarioBuilder) entram
-  // via `tools` e desligam o pan por conta própria com `panEnabled={false}`.
-  const [baseTool, setBaseTool] = useState<BaseTool>('move');
+  // pronta em qualquer tela que use <MapCanvas>/<MapViewport>, sem precisar
+  // de nada de fora (estado interno). Quando a tela tem uma ferramenta
+  // extra (ex.: obstáculo no CenarioBuilder) que precisa entrar no mesmo
+  // grupo exclusivo, ela passa `tool`/`onToolChange` e passa a controlar
+  // tudo (inclusive Mover/Selecionar) — padrão controlado/não-controlado,
+  // igual um <input value/defaultValue>.
+  const [internalTool, setInternalTool] = useState<BaseTool>('move');
+  const activeTool = tool ?? internalTool;
+
+  function selectBaseTool(next: BaseTool) {
+    if (tool === undefined) setInternalTool(next);
+    onToolChange?.(next);
+  }
 
   function clampZoom(value: number) {
     return Math.min(maxZoom, Math.max(minZoom, value));
@@ -67,7 +85,7 @@ export function MapViewport({
   }
 
   function handlePointerDown(e: PointerEvent<HTMLDivElement>) {
-    if (baseTool !== 'move' || !panEnabled) return;
+    if (activeTool !== 'move') return;
     e.currentTarget.setPointerCapture(e.pointerId);
     drag.current = { startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y };
   }
@@ -92,7 +110,7 @@ export function MapViewport({
   return (
     <div className={styles.frame} style={{ width, height }}>
       <div
-        className={styles.surface}
+        className={`${styles.surface} ${activeTool === 'move' ? styles.grabCursor : ''}`.trim()}
         onWheel={handleWheel}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -109,15 +127,15 @@ export function MapViewport({
 
       <div className={styles.controls}>
         <MapToolButton
-          active={baseTool === 'move'}
-          onClick={() => setBaseTool('move')}
+          active={activeTool === 'move'}
+          onClick={() => selectBaseTool('move')}
           title="Mover mapa (clicar e arrastar)"
         >
           <MoveIcon />
         </MapToolButton>
         <MapToolButton
-          active={baseTool === 'select'}
-          onClick={() => setBaseTool('select')}
+          active={activeTool === 'select'}
+          onClick={() => selectBaseTool('select')}
           title="Selecionar (clique simples)"
         >
           <SelectIcon />
@@ -125,15 +143,15 @@ export function MapViewport({
 
         {tools}
 
-        <button type="button" onClick={() => setZoom((z) => clampZoom(z + ZOOM_STEP))}>
+        <MapToolButton variant="click" onClick={() => setZoom((z) => clampZoom(z + ZOOM_STEP))} title="Mais zoom">
           +
-        </button>
-        <button type="button" onClick={() => setZoom((z) => clampZoom(z - ZOOM_STEP))}>
+        </MapToolButton>
+        <MapToolButton variant="click" onClick={() => setZoom((z) => clampZoom(z - ZOOM_STEP))} title="Menos zoom">
           −
-        </button>
-        <button type="button" onClick={reset}>
+        </MapToolButton>
+        <MapToolButton variant="click" onClick={reset} title="Redefinir zoom/posição">
           ⟲
-        </button>
+        </MapToolButton>
       </div>
 
       {overlay}

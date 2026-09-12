@@ -13,6 +13,8 @@ import { ObstacleIcon } from "../../components/MapToolButton/icons";
 import { useObstacleEditor } from "./useObstacleEditor";
 import styles from "./CenarioBuilder.module.css";
 
+type Tool = "move" | "select" | "obstacle";
+
 export function CenarioBuilder() {
 
     const [mapConfig, setMapConfig] = useState<MapModel>({
@@ -41,7 +43,8 @@ export function CenarioBuilder() {
         updateCenario("Obstacles", obstacles);
     }
 
-    const [obstacleTool, setObstacleTool] = useState(false);
+    const [tool, setTool] = useState<Tool>("move");
+    const obstacleTool = tool === "obstacle";
 
     const { rectFor, previewRect, removeObstacle, gridHandlers } = useObstacleEditor({
         enabled: obstacleTool,
@@ -102,11 +105,12 @@ export function CenarioBuilder() {
                     fitWidth
                     maxHeight={maxMapHeight}
                     className={obstacleTool ? styles.editableGrid : undefined}
-                    panEnabled={!obstacleTool}
+                    tool={tool}
+                    onToolChange={setTool}
                     tools={
                         <MapToolButton
                             active={obstacleTool}
-                            onClick={() => setObstacleTool((v) => !v)}
+                            onClick={() => setTool(obstacleTool ? "move" : "obstacle")}
                             title="Desenhar obstáculo (arraste no mapa)"
                         >
                             <ObstacleIcon />

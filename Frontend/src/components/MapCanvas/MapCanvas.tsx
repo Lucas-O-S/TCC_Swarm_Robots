@@ -4,6 +4,7 @@ import type { MapModel } from '../../model/Map.Model';
 import { BLOCK_AREA_CM2, BLOCK_SIDE_M, DEFAULT_CELL, DEFAULT_COLS, DEFAULT_ROWS } from '../../Consts/MapConsts';
 import { Map } from '../Map/Map';
 import { MapViewport } from '../MapViewport/MapViewport';
+import type { BaseTool } from '../MapViewport/MapViewport';
 import styles from './MapCanvas.module.css';
 
 interface MapCanvasProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'> {
@@ -26,8 +27,10 @@ interface MapCanvasProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'
   children?: ReactNode | ((cellWidth: number, cellHeight: number) => ReactNode);
   /** Botões extra no canto de controles, ao lado do zoom (ver MapViewport). */
   tools?: ReactNode;
-  /** Quando false, clicar e arrastar não move o mapa (ver MapViewport). Default: true. */
-  panEnabled?: boolean;
+  /** Ferramenta ativa controlada de fora (ver MapViewport) — só necessário com uma ferramenta extra própria da tela. */
+  tool?: string;
+  /** Vem sempre junto com `tool` (ver MapViewport). */
+  onToolChange?: (tool: BaseTool) => void;
 }
 
 // <Map> (grid puro) dentro de <MapViewport> (quadro com zoom/arraste). O
@@ -45,7 +48,8 @@ export function MapCanvas({
   maxHeight,
   children,
   tools,
-  panEnabled,
+  tool,
+  onToolChange,
   ...rest
 }: MapCanvasProps) {
   const effectiveCols = Math.max(1, mapModel?.cenario.sizeX ?? cols);
@@ -85,7 +89,8 @@ export function MapCanvas({
           </span>
         }
         tools={tools}
-        panEnabled={panEnabled}
+        tool={tool}
+        onToolChange={onToolChange}
       >
         <Map
           cols={effectiveCols}
