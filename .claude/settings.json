@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(npm -v)",
+      "Bash(mkdir -p /tmp/pw-check)",
+      "Bash(npm init *)",
+      "Bash(npm install *)",
+      "Bash(echo \"exit:$?\")"
+    ]
+  }
+}

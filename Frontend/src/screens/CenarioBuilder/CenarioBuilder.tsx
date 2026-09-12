@@ -1,15 +1,15 @@
-import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
+import { useState } from "react";
 import type { CenarioModel } from "../../model/Cenario.Model";
+import type { ObstaclesModel } from "../../model/Obstacles.Model";
 import type { MapModel } from "../../model/Map.Model";
 import { DEFAULT_COLS, DEFAULT_ROWS } from "../../Consts/MapConsts";
 import { MapCanvas } from "../../components/MapCanvas/MapCanvas";
-import { Card } from "../../components/Card/Card";
+import { MapMenuLayout } from "../../components/MapMenuLayout/MapMenuLayout";
+import { Menu } from "../../components/Menu/Menu";
+import { Obstacle } from "../../components/Obstacle/Obstacle";
+import { useObstacleEditor } from "./useObstacleEditor";
 import styles from "./CenarioBuilder.module.css";
-
-// Espaço reservado abaixo do mapa (bate com o padding-bottom de .screen) pra
-// ele não colar na borda inferior da tela.
-const SCREEN_BOTTOM_GAP = 28;
 
 export function CenarioBuilder() {
 
@@ -35,75 +35,108 @@ export function CenarioBuilder() {
         };
     }
 
-    const mapColumnRef = useRef<HTMLDivElement>(null);
-    const [maxMapHeight, setMaxMapHeight] = useState<number>();
+    function handleObstaclesChange(obstacles: ObstaclesModel[]) {
+        updateCenario("Obstacles", obstacles);
+    }
 
-    useEffect(() => {
-        function updateMaxHeight() {
-            if (!mapColumnRef.current) return;
-            const top = mapColumnRef.current.getBoundingClientRect().top;
-            setMaxMapHeight(Math.max(0, window.innerHeight - top - SCREEN_BOTTOM_GAP));
-        }
-
-        updateMaxHeight();
-        window.addEventListener("resize", updateMaxHeight);
-        return () => window.removeEventListener("resize", updateMaxHeight);
-    }, []);
+    const { rectFor, previewRect, removeObstacle, gridHandlers } = useObstacleEditor({
+        sizeX: mapConfig.cenario.sizeX,
+        sizeY: mapConfig.cenario.sizeY,
+        obstacles: mapConfig.cenario.Obstacles,
+        onChange: handleObstaclesChange,
+    });
 
     return (
-        <div className={styles.screen}>
-            <div className={styles.body}>
-                <div className={styles.mapColumn} ref={mapColumnRef}>
-                    <MapCanvas mapModel={mapConfig} fitWidth maxHeight={maxMapHeight} />
-                </div>
+        <MapMenuLayout
+            menu={
+                <Menu title="Configuração do mapa">
+                    <label className={styles.field}>
+                        Nome
+                        <input
+                            type="text"
+                            value={mapConfig.cenario.name}
+                            onChange={(e) => updateCenario("name", e.target.value)}
+                        />
+                    </label>
 
-                <aside className={styles.menu}>
-                    <Card className={styles.configCard}>
-                        <h3 className={styles.cardTitle}>Configuração do mapa</h3>
+                    <label className={styles.field}>
+                        Descrição
+                        <textarea
+                            value={mapConfig.cenario.description}
+                            onChange={(e) => updateCenario("description", e.target.value)}
+                        />
+                    </label>
 
+                    <div className={styles.fieldRow}>
                         <label className={styles.field}>
-                            Nome
+                            Largura (colunas)
                             <input
-                                type="text"
-                                value={mapConfig.cenario.name}
-                                onChange={(e) => updateCenario("name", e.target.value)}
+                                type="number"
+                                min={1}
+                                value={mapConfig.cenario.sizeX}
+                                onChange={handleNumberChange("sizeX")}
                             />
                         </label>
 
                         <label className={styles.field}>
-                            Descrição
-                            <textarea
-                                value={mapConfig.cenario.description}
-                                onChange={(e) => updateCenario("description", e.target.value)}
+                            Altura (linhas)
+                            <input
+                                type="number"
+                                min={1}
+                                value={mapConfig.cenario.sizeY}
+                                onChange={handleNumberChange("sizeY")}
                             />
                         </label>
+                    </div>
+                </Menu>
+            }
+        >
+            {(maxMapHeight) => (
+                <MapCanvas
+                    mapModel={mapConfig}
+                    fitWidth
+                    maxHeight={maxMapHeight}
+                    className={styles.editableGrid}
+                    {...gridHandlers}
+                >
+                    {(cellWidth, cellHeight) => (
+                        <>
+                            {mapConfig.cenario.Obstacles.map((obstacle, index) => {
+                                const rect = rectFor(obstacle, index);
+                                return (
+                                    <Obstacle
+                                        key={index}
+                                        label={`${obstacle.name} (duplo clique remove)`}
+                                        width={rect.sizeX * cellWidth}
+                                        height={rect.sizeY * cellHeight}
+                                        className={styles.placedObstacle}
+                                        onDoubleClick={() => removeObstacle(index)}
+                                        style={{
+                                            position: "absolute",
+                                            left: rect.startPointX * cellWidth,
+                                            top: rect.startPointY * cellHeight,
+                                        }}
+                                    />
+                                );
+                            })}
 
-                        <div className={styles.fieldRow}>
-                            <label className={styles.field}>
-                                Largura (colunas)
-                                <input
-                                    type="number"
-                                    min={1}
-                                    value={mapConfig.cenario.sizeX}
-                                    onChange={handleNumberChange("sizeX")}
+                            {previewRect && (
+                                <Obstacle
+                                    width={previewRect.sizeX * cellWidth}
+                                    height={previewRect.sizeY * cellHeight}
+                                    className={styles.obstaclePreview}
+                                    style={{
+                                        position: "absolute",
+                                        left: previewRect.startPointX * cellWidth,
+                                        top: previewRect.startPointY * cellHeight,
+                                    }}
                                 />
-                            </label>
-
-                            <label className={styles.field}>
-                                Altura (linhas)
-                                <input
-                                    type="number"
-                                    min={1}
-                                    value={mapConfig.cenario.sizeY}
-                                    onChange={handleNumberChange("sizeY")}
-                                />
-                            </label>
-                        </div>
-
-                    </Card>
-                </aside>
-            </div>
-        </div>
+                            )}
+                        </>
+                    )}
+                </MapCanvas>
+            )}
+        </MapMenuLayout>
     )
 
 }

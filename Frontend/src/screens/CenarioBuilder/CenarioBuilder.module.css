@@ -1,39 +1,18 @@
-.screen {
-  padding: 28px 32px;
-  font-family: var(--font-mono);
+.editableGrid {
+  touch-action: none;
 }
 
-.body {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 32px;
-  align-items: start;
+.placedObstacle {
+  cursor: grab;
 }
 
-.mapColumn {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.placedObstacle:active {
+  cursor: grabbing;
 }
 
-.menu {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.configCard {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.cardTitle {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
+.obstaclePreview {
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .field {
@@ -74,10 +53,4 @@
   gap: 8px;
   font-size: 13px;
   color: var(--color-text-muted);
-}
-
-@media (max-width: 780px) {
-  .body {
-    grid-template-columns: 1fr;
-  }
 }

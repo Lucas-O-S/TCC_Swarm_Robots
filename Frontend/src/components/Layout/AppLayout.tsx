@@ -14,6 +14,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Mapa & Conexão' },
   { to: '/simulacao', label: 'Simulação' },
   { to: '/mapa-teste', label: 'Teste Mapa' },
+  { to: '/CenarioBuilder', label: 'Construtor de Cenários' },
 ];
 
 // Casca compartilhada por todas as telas autenticadas: marca MARI, menu de

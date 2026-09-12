@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import type { HTMLAttributes } from 'react';
+import type { HTMLAttributes, ReactNode } from 'react';
 import type { MapModel } from '../../model/Map.Model';
 import { BLOCK_AREA_CM2, BLOCK_SIDE_M, DEFAULT_CELL, DEFAULT_COLS, DEFAULT_ROWS } from '../../Consts/MapConsts';
 import { Map } from '../Map/Map';
 import { MapViewport } from '../MapViewport/MapViewport';
 import styles from './MapCanvas.module.css';
 
-interface MapCanvasProps extends HTMLAttributes<HTMLDivElement> {
+interface MapCanvasProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'> {
   cols?: number;
   rows?: number;
   cellSize?: number;
@@ -18,6 +18,12 @@ interface MapCanvasProps extends HTMLAttributes<HTMLDivElement> {
   fitWidth?: boolean;
   /** Com `fitWidth`, o mapa também preenche essa altura (px) por completo — a célula deixa de ser quadrada (vira retângulo) quando a proporção cols:rows não bate com largura:altura disponíveis. */
   maxHeight?: number;
+  /**
+   * Conteúdo posicionado sobre o grid (robôs, obstáculos...). Como função,
+   * recebe o tamanho de célula (px) já calculado — necessário com
+   * `fitWidth`, já que aí a célula não é conhecida por quem chama.
+   */
+  children?: ReactNode | ((cellWidth: number, cellHeight: number) => ReactNode);
 }
 
 // <Map> (grid puro) dentro de <MapViewport> (quadro com zoom/arraste). O
@@ -58,6 +64,8 @@ export function MapCanvas({
   const mapWidth = effectiveCols * effectiveCellWidth;
   const mapHeight = effectiveRows * effectiveCellHeight;
 
+  const content = typeof children === 'function' ? children(effectiveCellWidth, effectiveCellHeight) : children;
+
   return (
     <div ref={containerRef} className={fitWidth ? styles.fluid : undefined}>
       <MapViewport
@@ -78,7 +86,7 @@ export function MapCanvas({
           cellHeight={effectiveCellHeight}
           {...rest}
         >
-          {children}
+          {content}
         </Map>
       </MapViewport>
     </div>
