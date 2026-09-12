@@ -8,6 +8,8 @@ import { MapCanvas } from "../../components/MapCanvas/MapCanvas";
 import { MapMenuLayout } from "../../components/MapMenuLayout/MapMenuLayout";
 import { Menu } from "../../components/Menu/Menu";
 import { Obstacle } from "../../components/Obstacle/Obstacle";
+import { MapToolButton } from "../../components/MapToolButton/MapToolButton";
+import { ObstacleIcon } from "../../components/MapToolButton/icons";
 import { useObstacleEditor } from "./useObstacleEditor";
 import styles from "./CenarioBuilder.module.css";
 
@@ -39,7 +41,10 @@ export function CenarioBuilder() {
         updateCenario("Obstacles", obstacles);
     }
 
+    const [obstacleTool, setObstacleTool] = useState(false);
+
     const { rectFor, previewRect, removeObstacle, gridHandlers } = useObstacleEditor({
+        enabled: obstacleTool,
         sizeX: mapConfig.cenario.sizeX,
         sizeY: mapConfig.cenario.sizeY,
         obstacles: mapConfig.cenario.Obstacles,
@@ -96,7 +101,17 @@ export function CenarioBuilder() {
                     mapModel={mapConfig}
                     fitWidth
                     maxHeight={maxMapHeight}
-                    className={styles.editableGrid}
+                    className={obstacleTool ? styles.editableGrid : undefined}
+                    panEnabled={!obstacleTool}
+                    tools={
+                        <MapToolButton
+                            active={obstacleTool}
+                            onClick={() => setObstacleTool((v) => !v)}
+                            title="Desenhar obstáculo (arraste no mapa)"
+                        >
+                            <ObstacleIcon />
+                        </MapToolButton>
+                    }
                     {...gridHandlers}
                 >
                     {(cellWidth, cellHeight) => (
@@ -106,11 +121,11 @@ export function CenarioBuilder() {
                                 return (
                                     <Obstacle
                                         key={index}
-                                        label={`${obstacle.name} (duplo clique remove)`}
+                                        label={obstacleTool ? `${obstacle.name} (duplo clique remove)` : obstacle.name}
                                         width={rect.sizeX * cellWidth}
                                         height={rect.sizeY * cellHeight}
-                                        className={styles.placedObstacle}
-                                        onDoubleClick={() => removeObstacle(index)}
+                                        className={obstacleTool ? styles.placedObstacle : undefined}
+                                        onDoubleClick={obstacleTool ? () => removeObstacle(index) : undefined}
                                         style={{
                                             position: "absolute",
                                             left: rect.startPointX * cellWidth,

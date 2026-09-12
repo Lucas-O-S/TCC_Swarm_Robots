@@ -24,6 +24,10 @@ interface MapCanvasProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'
    * `fitWidth`, já que aí a célula não é conhecida por quem chama.
    */
   children?: ReactNode | ((cellWidth: number, cellHeight: number) => ReactNode);
+  /** Botões extra no canto de controles, ao lado do zoom (ver MapViewport). */
+  tools?: ReactNode;
+  /** Quando false, clicar e arrastar não move o mapa (ver MapViewport). Default: true. */
+  panEnabled?: boolean;
 }
 
 // <Map> (grid puro) dentro de <MapViewport> (quadro com zoom/arraste). O
@@ -40,6 +44,8 @@ export function MapCanvas({
   fitWidth = false,
   maxHeight,
   children,
+  tools,
+  panEnabled,
   ...rest
 }: MapCanvasProps) {
   const effectiveCols = Math.max(1, mapModel?.cenario.sizeX ?? cols);
@@ -78,6 +84,8 @@ export function MapCanvas({
             1 bloco = {BLOCK_AREA_CM2} m² ({BLOCK_SIDE_M} × {BLOCK_SIDE_M} m)
           </span>
         }
+        tools={tools}
+        panEnabled={panEnabled}
       >
         <Map
           cols={effectiveCols}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { ObstaclesModel } from '../../model/Obstacles.Model';
 
@@ -41,21 +41,33 @@ function obstacleIndexAt(col: number, row: number, obstacles: ObstaclesModel[]) 
 }
 
 interface UseObstacleEditorArgs {
+  /** Só desenha/move obstáculo enquanto true; caso contrário o grid fica só leitura e o arraste vira pan normal do MapViewport. */
+  enabled: boolean;
   sizeX: number;
   sizeY: number;
   obstacles: ObstaclesModel[];
   onChange: (obstacles: ObstaclesModel[]) => void;
 }
 
-// Edição de obstáculos direto no grid, por clicar-e-arrastar: arrastar a
-// partir de uma célula vazia desenha um obstáculo novo (retângulo entre o
-// ponto inicial e o final do arraste); arrastar a partir de um obstáculo
-// existente reposiciona ele. `stopPropagation` no pointerdown evita que o
-// pan do MapViewport (mesmo gesto) capture o arraste no lugar.
-export function useObstacleEditor({ sizeX, sizeY, obstacles, onChange }: UseObstacleEditorArgs) {
+// Edição de obstáculos direto no grid, por clicar-e-arrastar — só ativa
+// quando `enabled` (ligado pelo botão de ferramenta perto do zoom, ver
+// CenarioBuilder): arrastar a partir de uma célula vazia desenha um
+// obstáculo novo (retângulo entre o ponto inicial e o final do arraste);
+// arrastar a partir de um obstáculo existente reposiciona ele.
+// `stopPropagation` no pointerdown evita que o pan do MapViewport (mesmo
+// gesto) capture o arraste no lugar; com `enabled` false o handler nem
+// entra nessa lógica, então o mapa se comporta como o componente base
+// (pan normal), sem qualquer efeito colateral.
+export function useObstacleEditor({ enabled, sizeX, sizeY, obstacles, onChange }: UseObstacleEditorArgs) {
   const [drag, setDrag] = useState<DragState | null>(null);
 
+  useEffect(() => {
+    if (!enabled) setDrag(null);
+  }, [enabled]);
+
   function handlePointerDown(e: ReactPointerEvent<HTMLDivElement>) {
+    if (!enabled) return;
+
     const { col, row } = cellFromEvent(e, sizeX, sizeY);
     const hitIndex = obstacleIndexAt(col, row, obstacles);
 
