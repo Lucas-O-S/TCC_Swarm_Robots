@@ -40,42 +40,56 @@ function obstacleIndexAt(col: number, row: number, obstacles: ObstaclesModel[]) 
   );
 }
 
+// Próximo "Obstáculo N" livre — olha o maior N já usado (não só a
+// quantidade), pra não repetir número depois de apagar um obstáculo no meio.
+function nextObstacleName(obstacles: ObstaclesModel[]) {
+  let max = 0;
+  for (const o of obstacles) {
+    const match = /^Obstáculo (\d+)$/.exec(o.name);
+    if (match) max = Math.max(max, Number(match[1]));
+  }
+  return `Obstáculo ${max + 1}`;
+}
+
+type ObstacleTool = 'move' | 'select' | 'obstacle';
+
 interface UseObstacleEditorArgs {
-  /** Só desenha/move obstáculo enquanto true; caso contrário o grid fica só leitura e o arraste vira pan normal do MapViewport. */
-  enabled: boolean;
+  /** "obstacle": desenha um novo (arraste em célula vazia) e move um existente. "select": só move um existente. "move": nenhum dos dois — arraste vira pan normal do MapViewport. */
+  tool: ObstacleTool;
   sizeX: number;
   sizeY: number;
   obstacles: ObstaclesModel[];
   onChange: (obstacles: ObstaclesModel[]) => void;
 }
 
-// Edição de obstáculos direto no grid, por clicar-e-arrastar — só ativa
-// quando `enabled` (ligado pelo botão de ferramenta perto do zoom, ver
-// CenarioBuilder): arrastar a partir de uma célula vazia desenha um
-// obstáculo novo (retângulo entre o ponto inicial e o final do arraste);
-// arrastar a partir de um obstáculo existente reposiciona ele.
-// `stopPropagation` no pointerdown evita que o pan do MapViewport (mesmo
-// gesto) capture o arraste no lugar; com `enabled` false o handler nem
-// entra nessa lógica, então o mapa se comporta como o componente base
-// (pan normal), sem qualquer efeito colateral.
-export function useObstacleEditor({ enabled, sizeX, sizeY, obstacles, onChange }: UseObstacleEditorArgs) {
+// Edição de obstáculos direto no grid, por clicar-e-arrastar: arrastar a
+// partir de uma célula vazia desenha um obstáculo novo (retângulo entre o
+// ponto inicial e o final do arraste, só com a ferramenta "obstacle");
+// arrastar a partir de um obstáculo existente reposiciona ele (ferramenta
+// "select" ou "obstacle"). `stopPropagation` no pointerdown evita que o
+// pan do MapViewport (mesmo gesto) capture o arraste no lugar; com a
+// ferramenta "move" o handler nem entra nessa lógica, então o mapa se
+// comporta como o componente base (pan normal), sem efeito colateral.
+export function useObstacleEditor({ tool, sizeX, sizeY, obstacles, onChange }: UseObstacleEditorArgs) {
+  const canDraw = tool === 'obstacle';
+  const canMove = tool === 'select' || tool === 'obstacle';
   const [drag, setDrag] = useState<DragState | null>(null);
 
   useEffect(() => {
-    if (!enabled) setDrag(null);
-  }, [enabled]);
+    if (!canDraw && !canMove) setDrag(null);
+  }, [canDraw, canMove]);
 
   function handlePointerDown(e: ReactPointerEvent<HTMLDivElement>) {
-    if (!enabled) return;
+    if (!canDraw && !canMove) return;
 
     const { col, row } = cellFromEvent(e, sizeX, sizeY);
     const hitIndex = obstacleIndexAt(col, row, obstacles);
 
-    e.currentTarget.setPointerCapture(e.pointerId);
-    e.stopPropagation();
-
     if (hitIndex >= 0) {
+      if (!canMove) return;
       const obstacle = obstacles[hitIndex];
+      e.currentTarget.setPointerCapture(e.pointerId);
+      e.stopPropagation();
       setDrag({
         mode: 'move',
         index: hitIndex,
@@ -87,6 +101,9 @@ export function useObstacleEditor({ enabled, sizeX, sizeY, obstacles, onChange }
         row,
       });
     } else {
+      if (!canDraw) return;
+      e.currentTarget.setPointerCapture(e.pointerId);
+      e.stopPropagation();
       setDrag({ mode: 'draw', startCol: col, startRow: row, col, row });
     }
   }
@@ -112,7 +129,7 @@ export function useObstacleEditor({ enabled, sizeX, sizeY, obstacles, onChange }
       onChange([
         ...obstacles,
         {
-          name: `Obstáculo ${obstacles.length + 1}`,
+          name: nextObstacleName(obstacles),
           description: '',
           sizeX: newSizeX,
           sizeY: newSizeY,

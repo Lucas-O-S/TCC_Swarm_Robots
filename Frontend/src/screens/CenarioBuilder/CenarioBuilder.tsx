@@ -45,9 +45,10 @@ export function CenarioBuilder() {
 
     const [tool, setTool] = useState<Tool>("move");
     const obstacleTool = tool === "obstacle";
+    const canMoveObstacle = tool === "select" || tool === "obstacle";
 
     const { rectFor, previewRect, removeObstacle, gridHandlers } = useObstacleEditor({
-        enabled: obstacleTool,
+        tool,
         sizeX: mapConfig.cenario.sizeX,
         sizeY: mapConfig.cenario.sizeY,
         obstacles: mapConfig.cenario.Obstacles,
@@ -125,10 +126,11 @@ export function CenarioBuilder() {
                                 return (
                                     <Obstacle
                                         key={index}
-                                        label={obstacleTool ? `${obstacle.name} (duplo clique remove)` : obstacle.name}
+                                        label={obstacle.name}
+                                        title={obstacleTool ? `${obstacle.name} (duplo clique remove)` : obstacle.name}
                                         width={rect.sizeX * cellWidth}
                                         height={rect.sizeY * cellHeight}
-                                        className={obstacleTool ? styles.placedObstacle : undefined}
+                                        className={canMoveObstacle ? styles.placedObstacle : undefined}
                                         onDoubleClick={obstacleTool ? () => removeObstacle(index) : undefined}
                                         style={{
                                             position: "absolute",

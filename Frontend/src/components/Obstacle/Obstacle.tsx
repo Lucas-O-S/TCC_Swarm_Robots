@@ -15,6 +15,8 @@ export function Obstacle({ width, height, label, className = '', style, ...rest 
       style={{ width, height, ...style }}
       title={label}
       {...rest}
-    />
+    >
+      {label && <span className={styles.label}>{label}</span>}
+    </div>
   );
 }

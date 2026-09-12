@@ -1,5 +1,10 @@
 .obstacle {
   position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 2px;
   background: repeating-linear-gradient(
     45deg,
     rgba(192, 57, 43, 0.35),
@@ -8,4 +13,30 @@
     transparent 8px
   );
   border: 1px dashed var(--color-red);
+}
+
+.label {
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--color-surface);
+  text-shadow:
+    -1px -1px 0 var(--color-dark),
+    1px -1px 0 var(--color-dark),
+    -1px 1px 0 var(--color-dark),
+    1px 1px 0 var(--color-dark);
+  background: repeating-linear-gradient(
+    45deg,
+    var(--color-red),
+    var(--color-red) 4px,
+    rgba(192, 57, 43, 0.7) 4px,
+    rgba(192, 57, 43, 0.7) 8px
+  );
+  padding: 1px 4px;
+  border-radius: 3px;
+  text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 100%;
+  pointer-events: none;
 }
