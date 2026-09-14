@@ -6,7 +6,8 @@
       "Bash(mkdir -p /tmp/pw-check)",
       "Bash(npm init *)",
       "Bash(npm install *)",
-      "Bash(echo \"exit:$?\")"
+      "Bash(echo \"exit:$?\")",
+      "Bash(xargs -I{} echo {})"
     ]
   }
 }

@@ -3,7 +3,6 @@ import { useState } from "react";
 import type { CenarioModel } from "../../model/Cenario.Model";
 import type { ObstaclesModel } from "../../model/Obstacles.Model";
 import type { MapModel } from "../../model/Map.Model";
-import { DEFAULT_COLS, DEFAULT_ROWS } from "../../Consts/MapConsts";
 import { MapCanvas } from "../../components/MapCanvas/MapCanvas";
 import { MapMenuLayout } from "../../components/MapMenuLayout/MapMenuLayout";
 import { Menu } from "../../components/Menu/Menu";
@@ -11,28 +10,17 @@ import { Obstacle } from "../../components/Obstacle/Obstacle";
 import { MapToolButton } from "../../components/MapToolButton/MapToolButton";
 import { ObstacleIcon } from "../../components/MapToolButton/icons";
 import { SelectMapModal } from "../../components/SelectMapModal/SelectMapModal";
+import { Button } from "../../components/Button/Button";
+import { CenarioService } from "../../services/Cenario.Service";
 import { useObstacleEditor } from "./useObstacleEditor";
 import styles from "./CenarioBuilder.module.css";
 
 type Tool = "move" | "select" | "obstacle";
 
-function createBlankMap(): MapModel {
-    return {
-        cenario: {
-            sizeX: DEFAULT_COLS,
-            sizeY: DEFAULT_ROWS,
-            name: "",
-            description: "",
-            Obstacles: []
-        },
-        robots: []
-    };
-}
-
 export function CenarioBuilder() {
 
     const [isSelectMapOpen, setIsSelectMapOpen] = useState(true);
-    const [mapConfig, setMapConfig] = useState<MapModel>(createBlankMap);
+    const [mapConfig, setMapConfig] = useState<MapModel>(CenarioService.createBlankMap);
 
     function updateCenario<K extends keyof CenarioModel>(field: K, value: CenarioModel[K]) {
         setMapConfig((prev) => ({ ...prev, cenario: { ...prev.cenario, [field]: value } }));
@@ -62,8 +50,12 @@ export function CenarioBuilder() {
     });
 
     function handleCreateBlank() {
-        setMapConfig(createBlankMap());
+        setMapConfig(CenarioService.createBlankMap());
         setIsSelectMapOpen(false);
+    }
+
+    function handleSave() {
+        // TODO: persistir mapConfig quando o backend de cenários existir.
     }
 
     return (
@@ -114,6 +106,10 @@ export function CenarioBuilder() {
                             />
                         </label>
                     </div>
+
+                    <Button variant="accent" onClick={handleSave}>
+                        Salvar
+                    </Button>
                 </Menu>
             }
         >
