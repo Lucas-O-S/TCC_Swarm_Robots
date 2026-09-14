@@ -29,6 +29,12 @@
   transform-origin: 0 0;
 }
 
+.areaSelect {
+  border: 1px dashed var(--color-orange);
+  background: rgba(255, 140, 0, 0.12);
+  pointer-events: none;
+}
+
 .controls {
   position: absolute;
   right: 8px;

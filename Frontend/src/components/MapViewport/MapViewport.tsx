@@ -13,6 +13,14 @@ import styles from './MapViewport.module.css';
 
 export type BaseTool = 'move' | 'select';
 
+/** Retângulo em px "de conteúdo" (unidade do mapa antes do pan/zoom) — mesma unidade de `width`/`height`. */
+export interface AreaSelectRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 interface MapViewportProps extends PropsWithChildren {
   width?: number;
   height?: number;
@@ -32,6 +40,15 @@ interface MapViewportProps extends PropsWithChildren {
   tool?: string;
   /** Chamado quando o usuário clica Mover ou Selecionar (os botões que o próprio MapViewport renderiza). Obrigatório junto com `tool`. */
   onToolChange?: (tool: BaseTool) => void;
+  /**
+   * Ferramenta "Selecionar": arrastar sobre uma área vazia do mapa desenha
+   * esse retângulo (o componente já cuida do desenho/pan/zoom) e, ao
+   * soltar, chama com o retângulo final — genérico, não sabe o que tem
+   * dentro dele (quem chama decide o que fazer, ex.: selecionar
+   * obstáculos que intersectam). Sem essa prop, arrastar em área vazia com
+   * "Selecionar" não faz nada (mesmo comportamento de sempre).
+   */
+  onAreaSelect?: (rect: AreaSelectRect, meta: { additive: boolean }) => void;
 }
 
 interface DragState {
@@ -39,6 +56,14 @@ interface DragState {
   startY: number;
   panX: number;
   panY: number;
+}
+
+interface AreaSelectState {
+  startX: number;
+  startY: number;
+  x: number;
+  y: number;
+  additive: boolean;
 }
 
 // Quadro com recorte fixo (overflow: hidden) pra ver só uma parte do mapa
@@ -54,11 +79,14 @@ export function MapViewport({
   tools,
   tool,
   onToolChange,
+  onAreaSelect,
   children,
 }: MapViewportProps) {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const drag = useRef<DragState | null>(null);
+  const [areaSelect, setAreaSelect] = useState<AreaSelectState | null>(null);
+  const surfaceRef = useRef<HTMLDivElement>(null);
   // Ferramenta base de todo mapa (mover/pan vs. só clicar/selecionar) — vem
   // pronta em qualquer tela que use <MapCanvas>/<MapViewport>, sem precisar
   // de nada de fora (estado interno). Quando a tela tem uma ferramenta
@@ -84,22 +112,64 @@ export function MapViewport({
     setZoom((z) => clampZoom(z + delta));
   }
 
+  // Ponto do evento em px "de conteúdo" — desfaz o translate/scale atual,
+  // então quem recebe (onAreaSelect) não precisa saber de pan/zoom.
+  function contentPointFromClient(clientX: number, clientY: number) {
+    const rect = surfaceRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    return { x: (clientX - rect.left - pan.x) / zoom, y: (clientY - rect.top - pan.y) / zoom };
+  }
+
   function handlePointerDown(e: PointerEvent<HTMLDivElement>) {
-    if (activeTool !== 'move') return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    drag.current = { startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y };
+    if (activeTool === 'move') {
+      e.currentTarget.setPointerCapture(e.pointerId);
+      drag.current = { startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y };
+      return;
+    }
+
+    if (activeTool === 'select') {
+      // Caixa de seleção é comportamento padrão da ferramenta "Selecionar"
+      // em qualquer tela, mesmo sem `onAreaSelect` — sem callback, ela só
+      // aparece e some ao soltar, sem efeito (nada consome o retângulo).
+      e.currentTarget.setPointerCapture(e.pointerId);
+      const { x, y } = contentPointFromClient(e.clientX, e.clientY);
+      setAreaSelect({ startX: x, startY: y, x, y, additive: e.ctrlKey || e.metaKey });
+    }
   }
 
   function handlePointerMove(e: PointerEvent<HTMLDivElement>) {
-    if (!drag.current) return;
-    setPan({
-      x: drag.current.panX + (e.clientX - drag.current.startX),
-      y: drag.current.panY + (e.clientY - drag.current.startY),
-    });
+    if (drag.current) {
+      setPan({
+        x: drag.current.panX + (e.clientX - drag.current.startX),
+        y: drag.current.panY + (e.clientY - drag.current.startY),
+      });
+      return;
+    }
+
+    if (areaSelect) {
+      const { x, y } = contentPointFromClient(e.clientX, e.clientY);
+      setAreaSelect((prev) => (prev ? { ...prev, x, y } : prev));
+    }
   }
 
   function handlePointerUp() {
-    drag.current = null;
+    if (drag.current) {
+      drag.current = null;
+      return;
+    }
+
+    if (areaSelect) {
+      onAreaSelect?.(
+        {
+          x: Math.min(areaSelect.startX, areaSelect.x),
+          y: Math.min(areaSelect.startY, areaSelect.y),
+          width: Math.abs(areaSelect.x - areaSelect.startX),
+          height: Math.abs(areaSelect.y - areaSelect.startY),
+        },
+        { additive: areaSelect.additive },
+      );
+      setAreaSelect(null);
+    }
   }
 
   function reset() {
@@ -110,6 +180,7 @@ export function MapViewport({
   return (
     <div className={styles.frame} style={{ width, height }}>
       <div
+        ref={surfaceRef}
         className={`${styles.surface} ${activeTool === 'move' ? styles.grabCursor : ''}`.trim()}
         onWheel={handleWheel}
         onPointerDown={handlePointerDown}
@@ -122,6 +193,19 @@ export function MapViewport({
           style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
         >
           {children}
+
+          {areaSelect && (
+            <div
+              className={styles.areaSelect}
+              style={{
+                position: 'absolute',
+                left: Math.min(areaSelect.startX, areaSelect.x),
+                top: Math.min(areaSelect.startY, areaSelect.y),
+                width: Math.abs(areaSelect.x - areaSelect.startX),
+                height: Math.abs(areaSelect.y - areaSelect.startY),
+              }}
+            />
+          )}
         </div>
       </div>
 

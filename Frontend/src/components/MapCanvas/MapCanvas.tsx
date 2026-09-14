@@ -4,8 +4,16 @@ import type { MapModel } from '../../model/Map.Model';
 import { BLOCK_AREA_CM2, BLOCK_SIDE_M, DEFAULT_CELL, DEFAULT_COLS, DEFAULT_ROWS } from '../../Consts/MapConsts';
 import { Map } from '../Map/Map';
 import { MapViewport } from '../MapViewport/MapViewport';
-import type { BaseTool } from '../MapViewport/MapViewport';
+import type { AreaSelectRect, BaseTool } from '../MapViewport/MapViewport';
 import styles from './MapCanvas.module.css';
+
+/** Retângulo em unidade de célula (fracionária — não alinhado à grade), já convertido a partir do px de `AreaSelectRect`. */
+export interface CellSelectRect {
+  startPointX: number;
+  startPointY: number;
+  sizeX: number;
+  sizeY: number;
+}
 
 interface MapCanvasProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'> {
   cols?: number;
@@ -31,6 +39,8 @@ interface MapCanvasProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'
   tool?: string;
   /** Vem sempre junto com `tool` (ver MapViewport). */
   onToolChange?: (tool: BaseTool) => void;
+  /** Ferramenta "Selecionar": mesmo retângulo do MapViewport, já convertido de px pra célula (ver CellSelectRect). */
+  onAreaSelect?: (rect: CellSelectRect, meta: { additive: boolean }) => void;
 }
 
 // <Map> (grid puro) dentro de <MapViewport> (quadro com zoom/arraste). O
@@ -50,6 +60,7 @@ export function MapCanvas({
   tools,
   tool,
   onToolChange,
+  onAreaSelect,
   ...rest
 }: MapCanvasProps) {
   const effectiveCols = Math.max(1, mapModel?.cenario.sizeX ?? cols);
@@ -76,6 +87,18 @@ export function MapCanvas({
 
   const content = typeof children === 'function' ? children(effectiveCellWidth, effectiveCellHeight) : children;
 
+  function handleAreaSelect(pixelRect: AreaSelectRect, meta: { additive: boolean }) {
+    onAreaSelect?.(
+      {
+        startPointX: pixelRect.x / effectiveCellWidth,
+        startPointY: pixelRect.y / effectiveCellHeight,
+        sizeX: pixelRect.width / effectiveCellWidth,
+        sizeY: pixelRect.height / effectiveCellHeight,
+      },
+      meta,
+    );
+  }
+
   return (
     <div ref={containerRef} className={fitWidth ? styles.fluid : undefined}>
       <MapViewport
@@ -91,6 +114,7 @@ export function MapCanvas({
         tools={tools}
         tool={tool}
         onToolChange={onToolChange}
+        onAreaSelect={onAreaSelect ? handleAreaSelect : undefined}
       >
         <Map
           cols={effectiveCols}

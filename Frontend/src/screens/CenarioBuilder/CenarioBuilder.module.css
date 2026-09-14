@@ -15,17 +15,6 @@
   pointer-events: none;
 }
 
-.selectedObstacle {
-  outline: 2px solid var(--color-orange);
-  outline-offset: 1px;
-}
-
-.marqueeSelection {
-  border: 1px dashed var(--color-orange);
-  background: rgba(255, 140, 0, 0.12);
-  pointer-events: none;
-}
-
 .field {
   display: flex;
   flex-direction: column;

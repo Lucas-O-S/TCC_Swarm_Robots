@@ -4,6 +4,7 @@ import type { CenarioModel } from "../../model/Cenario.Model";
 import type { ObstaclesModel } from "../../model/Obstacles.Model";
 import type { MapModel } from "../../model/Map.Model";
 import { MapCanvas } from "../../components/MapCanvas/MapCanvas";
+import type { CellSelectRect } from "../../components/MapCanvas/MapCanvas";
 import { MapMenuLayout } from "../../components/MapMenuLayout/MapMenuLayout";
 import { Menu } from "../../components/Menu/Menu";
 import { Obstacle } from "../../components/Obstacle/Obstacle";
@@ -48,7 +49,7 @@ export function CenarioBuilder() {
     const obstacleTool = tool === "obstacle";
     const canMoveObstacle = tool === "select" || tool === "obstacle";
 
-    const { rectFor, previewRect, marqueeRect, removeObstacle, removeSelected, selectedIndices, clearSelection, gridHandlers } =
+    const { rectFor, previewRect, removeObstacle, removeSelected, selectedIndices, selectInRect, clearSelection, gridHandlers } =
         useObstacleEditor({
             tool,
             sizeX: mapConfig.cenario.sizeX,
@@ -56,6 +57,10 @@ export function CenarioBuilder() {
             obstacles: mapConfig.cenario.Obstacles,
             onChange: handleObstaclesChange,
         });
+
+    function handleAreaSelect(rect: CellSelectRect, meta: { additive: boolean }) {
+        selectInRect(rect, meta.additive);
+    }
 
     const selectedObstacles = Array.from(selectedIndices)
         .sort((a, b) => a - b)
@@ -144,6 +149,7 @@ export function CenarioBuilder() {
                     className={obstacleTool ? styles.editableGrid : undefined}
                     tool={tool}
                     onToolChange={setTool}
+                    onAreaSelect={handleAreaSelect}
                     tools={
                         <MapToolButton
                             active={obstacleTool}
@@ -166,12 +172,8 @@ export function CenarioBuilder() {
                                         title={obstacleTool ? `${obstacle.name} (duplo clique remove)` : obstacle.name}
                                         width={rect.sizeX * cellWidth}
                                         height={rect.sizeY * cellHeight}
-                                        className={[
-                                            canMoveObstacle ? styles.placedObstacle : undefined,
-                                            selectedIndices.has(index) ? styles.selectedObstacle : undefined,
-                                        ]
-                                            .filter(Boolean)
-                                            .join(" ") || undefined}
+                                        selected={selectedIndices.has(index)}
+                                        className={canMoveObstacle ? styles.placedObstacle : undefined}
                                         onDoubleClick={obstacleTool ? () => removeObstacle(index) : undefined}
                                         style={{
                                             position: "absolute",
@@ -191,19 +193,6 @@ export function CenarioBuilder() {
                                         position: "absolute",
                                         left: previewRect.startPointX * cellWidth,
                                         top: previewRect.startPointY * cellHeight,
-                                    }}
-                                />
-                            )}
-
-                            {marqueeRect && (
-                                <div
-                                    className={styles.marqueeSelection}
-                                    style={{
-                                        position: "absolute",
-                                        left: marqueeRect.startPointX * cellWidth,
-                                        top: marqueeRect.startPointY * cellHeight,
-                                        width: marqueeRect.sizeX * cellWidth,
-                                        height: marqueeRect.sizeY * cellHeight,
                                     }}
                                 />
                             )}

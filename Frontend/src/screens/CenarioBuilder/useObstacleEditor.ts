@@ -27,15 +27,6 @@ type DragState =
       grabRow: number;
       col: number;
       row: number;
-    }
-  | {
-      mode: 'marquee';
-      startCol: number;
-      startRow: number;
-      col: number;
-      row: number;
-      /** Ctrl/Cmd segurado: soma à seleção existente em vez de substituí-la. */
-      additive: boolean;
     };
 
 // Maior deslocamento (num eixo) que dá pra aplicar em todo o grupo de uma
@@ -149,22 +140,14 @@ export function useObstacleEditor({ tool, sizeX, sizeY, obstacles, onChange }: U
         col,
         row,
       });
-    } else if (canMove && !canDraw) {
-      // Ferramenta "Selecionar": arrastar a partir de uma célula vazia faz
-      // seleção em área (marquee) — o retângulo final decide quem entra na
-      // seleção (ver handlePointerUp/marqueeRect).
-      const additive = e.ctrlKey || e.metaKey;
-      if (!additive) setSelectedIndices(new Set());
-      e.currentTarget.setPointerCapture(e.pointerId);
-      e.stopPropagation();
-      setDrag({ mode: 'marquee', startCol: col, startRow: row, col, row, additive });
-    } else {
-      setSelectedIndices(new Set());
-      if (!canDraw) return;
+    } else if (canDraw) {
       e.currentTarget.setPointerCapture(e.pointerId);
       e.stopPropagation();
       setDrag({ mode: 'draw', startCol: col, startRow: row, col, row });
     }
+    // Ferramenta "Selecionar" + célula vazia: não faz nada aqui — o evento
+    // sobe até o MapViewport, que trata o arraste em área (ver
+    // onAreaSelect/selectInRect, chamado pela tela a partir desse retorno).
   }
 
   function handlePointerMove(e: ReactPointerEvent<HTMLDivElement>) {
@@ -198,7 +181,7 @@ export function useObstacleEditor({ tool, sizeX, sizeY, obstacles, onChange }: U
           cenarioId: '',
         },
       ]);
-    } else if (drag.mode === 'move') {
+    } else {
       if (drag.col === drag.grabCol && drag.row === drag.grabRow) {
         // Sem arrasto real (clique simples) — seleciona só esse obstáculo em
         // vez de "mover" o grupo pro mesmo lugar, senão nunca dava pra clicar
@@ -224,29 +207,6 @@ export function useObstacleEditor({ tool, sizeX, sizeY, obstacles, onChange }: U
             return { ...o, startPointX: origin.originX + deltaCol, startPointY: origin.originY + deltaRow };
           }),
         );
-      }
-    } else {
-      // marquee: seleciona todo obstáculo que intersecta o retângulo final.
-      const rectStartX = Math.min(drag.startCol, drag.col);
-      const rectStartY = Math.min(drag.startRow, drag.row);
-      const rectEndX = Math.max(drag.startCol, drag.col);
-      const rectEndY = Math.max(drag.startRow, drag.row);
-
-      const hitIndices = obstacles.reduce<number[]>((acc, o, i) => {
-        const oEndX = o.startPointX + o.sizeX - 1;
-        const oEndY = o.startPointY + o.sizeY - 1;
-        const intersects =
-          o.startPointX <= rectEndX && oEndX >= rectStartX && o.startPointY <= rectEndY && oEndY >= rectStartY;
-        if (intersects) acc.push(i);
-        return acc;
-      }, []);
-
-      if (hitIndices.length > 0) {
-        setSelectedIndices((prev) => {
-          const next = drag.additive ? new Set(prev) : new Set<number>();
-          for (const i of hitIndices) next.add(i);
-          return next;
-        });
       }
     }
 
@@ -333,23 +293,44 @@ export function useObstacleEditor({ tool, sizeX, sizeY, obstacles, onChange }: U
         }
       : null;
 
-  const marqueeRect: Rect | null =
-    drag?.mode === 'marquee'
-      ? {
-          startPointX: Math.min(drag.startCol, drag.col),
-          startPointY: Math.min(drag.startRow, drag.row),
-          sizeX: Math.abs(drag.col - drag.startCol) + 1,
-          sizeY: Math.abs(drag.row - drag.startRow) + 1,
-        }
-      : null;
+  // Seleciona obstáculos que intersectam `rect` (unidade de célula,
+  // fracionária — vem do onAreaSelect do MapViewport/MapCanvas, ver
+  // CenarioBuilder). `additive`: soma à seleção existente em vez de
+  // substituí-la (Ctrl/Cmd segurado). Um retângulo sem área (clique sem
+  // arrasto em célula vazia) não intersecta nada, então cai no "limpar
+  // seleção" quando não aditivo — mesmo fluxo do clique simples de sempre.
+  function selectInRect(rect: Rect, additive: boolean) {
+    const rectEndX = rect.startPointX + rect.sizeX;
+    const rectEndY = rect.startPointY + rect.sizeY;
+
+    const hitIndices = obstacles.reduce<number[]>((acc, o, i) => {
+      const oEndX = o.startPointX + o.sizeX;
+      const oEndY = o.startPointY + o.sizeY;
+      const intersects =
+        o.startPointX < rectEndX && oEndX > rect.startPointX && o.startPointY < rectEndY && oEndY > rect.startPointY;
+      if (intersects) acc.push(i);
+      return acc;
+    }, []);
+
+    if (hitIndices.length === 0) {
+      if (!additive) setSelectedIndices(new Set());
+      return;
+    }
+
+    setSelectedIndices((prev) => {
+      const next = additive ? new Set(prev) : new Set<number>();
+      for (const i of hitIndices) next.add(i);
+      return next;
+    });
+  }
 
   return {
     rectFor,
     previewRect,
-    marqueeRect,
     removeObstacle,
     removeSelected,
     selectedIndices,
+    selectInRect,
     clearSelection,
     gridHandlers: {
       onPointerDown: handlePointerDown,
