@@ -10,6 +10,7 @@ import { Obstacle } from "../../components/Obstacle/Obstacle";
 import { MapToolButton } from "../../components/MapToolButton/MapToolButton";
 import { ObstacleIcon } from "../../components/MapToolButton/icons";
 import { SelectMapModal } from "../../components/SelectMapModal/SelectMapModal";
+import { ObstacleDrawer } from "../../components/ObstacleDrawer/ObstacleDrawer";
 import { Button } from "../../components/Button/Button";
 import { CenarioService } from "../../services/Cenario.Service";
 import { useObstacleEditor } from "./useObstacleEditor";
@@ -37,17 +38,33 @@ export function CenarioBuilder() {
         updateCenario("Obstacles", obstacles);
     }
 
+    function updateObstacle(index: number, patch: Partial<ObstaclesModel>) {
+        handleObstaclesChange(
+            mapConfig.cenario.Obstacles.map((o, i) => (i === index ? { ...o, ...patch } : o))
+        );
+    }
+
     const [tool, setTool] = useState<Tool>("move");
     const obstacleTool = tool === "obstacle";
     const canMoveObstacle = tool === "select" || tool === "obstacle";
 
-    const { rectFor, previewRect, removeObstacle, gridHandlers } = useObstacleEditor({
-        tool,
-        sizeX: mapConfig.cenario.sizeX,
-        sizeY: mapConfig.cenario.sizeY,
-        obstacles: mapConfig.cenario.Obstacles,
-        onChange: handleObstaclesChange,
-    });
+    const { rectFor, previewRect, marqueeRect, removeObstacle, removeSelected, selectedIndices, clearSelection, gridHandlers } =
+        useObstacleEditor({
+            tool,
+            sizeX: mapConfig.cenario.sizeX,
+            sizeY: mapConfig.cenario.sizeY,
+            obstacles: mapConfig.cenario.Obstacles,
+            onChange: handleObstaclesChange,
+        });
+
+    const selectedObstacles = Array.from(selectedIndices)
+        .sort((a, b) => a - b)
+        .map((index) => mapConfig.cenario.Obstacles[index]);
+
+    function handleObstacleDrawerChange(patch: Partial<ObstaclesModel>) {
+        const [onlyIndex] = selectedIndices;
+        if (selectedIndices.size === 1 && onlyIndex !== undefined) updateObstacle(onlyIndex, patch);
+    }
 
     function handleCreateBlank() {
         setMapConfig(CenarioService.createBlankMap());
@@ -64,6 +81,12 @@ export function CenarioBuilder() {
             open={isSelectMapOpen}
             onClose={() => setIsSelectMapOpen(false)}
             onCreateBlank={handleCreateBlank}
+        />
+        <ObstacleDrawer
+            obstacles={selectedObstacles}
+            onChangeSingle={handleObstacleDrawerChange}
+            onRemove={removeSelected}
+            onClose={clearSelection}
         />
         <MapMenuLayout
             menu={
@@ -143,7 +166,12 @@ export function CenarioBuilder() {
                                         title={obstacleTool ? `${obstacle.name} (duplo clique remove)` : obstacle.name}
                                         width={rect.sizeX * cellWidth}
                                         height={rect.sizeY * cellHeight}
-                                        className={canMoveObstacle ? styles.placedObstacle : undefined}
+                                        className={[
+                                            canMoveObstacle ? styles.placedObstacle : undefined,
+                                            selectedIndices.has(index) ? styles.selectedObstacle : undefined,
+                                        ]
+                                            .filter(Boolean)
+                                            .join(" ") || undefined}
                                         onDoubleClick={obstacleTool ? () => removeObstacle(index) : undefined}
                                         style={{
                                             position: "absolute",
@@ -163,6 +191,19 @@ export function CenarioBuilder() {
                                         position: "absolute",
                                         left: previewRect.startPointX * cellWidth,
                                         top: previewRect.startPointY * cellHeight,
+                                    }}
+                                />
+                            )}
+
+                            {marqueeRect && (
+                                <div
+                                    className={styles.marqueeSelection}
+                                    style={{
+                                        position: "absolute",
+                                        left: marqueeRect.startPointX * cellWidth,
+                                        top: marqueeRect.startPointY * cellHeight,
+                                        width: marqueeRect.sizeX * cellWidth,
+                                        height: marqueeRect.sizeY * cellHeight,
                                     }}
                                 />
                             )}
