@@ -10,14 +10,14 @@ import { Menu } from "../../components/Menu/Menu";
 import { Obstacle } from "../../components/Obstacle/Obstacle";
 import { MapToolButton } from "../../components/MapToolButton/MapToolButton";
 import { ObstacleIcon } from "../../components/MapToolButton/icons";
+import { SelectMapModal } from "../../components/SelectMapModal/SelectMapModal";
 import { useObstacleEditor } from "./useObstacleEditor";
 import styles from "./CenarioBuilder.module.css";
 
 type Tool = "move" | "select" | "obstacle";
 
-export function CenarioBuilder() {
-
-    const [mapConfig, setMapConfig] = useState<MapModel>({
+function createBlankMap(): MapModel {
+    return {
         cenario: {
             sizeX: DEFAULT_COLS,
             sizeY: DEFAULT_ROWS,
@@ -26,7 +26,13 @@ export function CenarioBuilder() {
             Obstacles: []
         },
         robots: []
-    });
+    };
+}
+
+export function CenarioBuilder() {
+
+    const [isSelectMapOpen, setIsSelectMapOpen] = useState(true);
+    const [mapConfig, setMapConfig] = useState<MapModel>(createBlankMap);
 
     function updateCenario<K extends keyof CenarioModel>(field: K, value: CenarioModel[K]) {
         setMapConfig((prev) => ({ ...prev, cenario: { ...prev.cenario, [field]: value } }));
@@ -55,7 +61,18 @@ export function CenarioBuilder() {
         onChange: handleObstaclesChange,
     });
 
+    function handleCreateBlank() {
+        setMapConfig(createBlankMap());
+        setIsSelectMapOpen(false);
+    }
+
     return (
+        <>
+        <SelectMapModal
+            open={isSelectMapOpen}
+            onClose={() => setIsSelectMapOpen(false)}
+            onCreateBlank={handleCreateBlank}
+        />
         <MapMenuLayout
             menu={
                 <Menu title="Configuração do mapa">
@@ -158,6 +175,7 @@ export function CenarioBuilder() {
                 </MapCanvas>
             )}
         </MapMenuLayout>
+        </>
     )
 
 }
