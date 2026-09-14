@@ -279,6 +279,25 @@ export function useObstacleEditor({ tool, sizeX, sizeY, obstacles, onChange }: U
     setSelectedIndices(new Set());
   }
 
+  // Backspace/Delete apaga a seleção — exceto com o foco num campo de
+  // texto (nome/descrição do obstáculo ou do mapa), senão editar o texto
+  // vira sinônimo de apagar o obstáculo.
+  useEffect(() => {
+    if (selectedIndices.size === 0) return;
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Backspace' && e.key !== 'Delete') return;
+      const target = e.target as HTMLElement | null;
+      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) return;
+
+      e.preventDefault();
+      removeSelected();
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedIndices, removeSelected]);
+
   function rectFor(obstacle: ObstaclesModel, index: number): Rect {
     if (drag?.mode === 'move') {
       const origin = drag.origins.find((entry) => entry.index === index);
