@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { MapCanvas } from '../../../../components/MapCanvas/MapCanvas';
+import { useMapElement } from '../../../../hooks/useMapElements';
+import type { MapElementsController } from '../../../../hooks/useMapElements';
 import type { Arena, Obstacle, SimRobotState } from '../../core/types';
 import styles from './SimulationMap.module.css';
 
@@ -7,12 +9,13 @@ interface SimulationMapProps {
   arena: Arena;
   robots: SimRobotState[];
   obstacles: Obstacle[];
-  selectedAddress: string | null;
-  onSelect: (address: string | null) => void;
+  /** Estado de seleção compartilhado com o resto da tela (ver SimulationScreen — o RobotTelemetryPanel lê a mesma seleção). */
+  elements: MapElementsController;
 }
 
 const VIEW_PX = 520;
 const TRAIL_LENGTH = 50;
+const ROBOT_SIZE = 14;
 
 // Paleta simples e determinística por endereço, só pra diferenciar os
 // rastros de cada robô no mapa (não tem significado além disso).
@@ -23,9 +26,38 @@ function colorFor(address: string): string {
   return TRAIL_COLORS[sum % TRAIL_COLORS.length];
 }
 
+// Marcador de um robô — "deriva" da mesma entidade de seleção que o resto
+// do mapa usa (ver src/hooks/useMapElements.tsx): clique seleciona,
+// Ctrl/Cmd+clique soma à seleção, arrastar em área seleciona vários. Sem
+// `movable` — posição vem da física simulada, não é algo pra arrastar.
+function RobotMarker({ robot, scale }: { robot: SimRobotState; scale: number }) {
+  const centerX = robot.posX * scale;
+  const centerY = robot.posY * scale;
+  const { selected } = useMapElement({
+    id: robot.address,
+    x: centerX - ROBOT_SIZE / 2,
+    y: centerY - ROBOT_SIZE / 2,
+    width: ROBOT_SIZE,
+    height: ROBOT_SIZE,
+  });
+
+  return (
+    <button
+      type="button"
+      className={`${styles.robot} ${robot.online ? styles.online : styles.offline} ${selected ? styles.selected : ''}`}
+      style={{
+        left: centerX,
+        top: centerY,
+        transform: `translate(-50%, -50%) rotate(${robot.theta}deg)`,
+      }}
+      title={robot.label}
+    />
+  );
+}
+
 // Mapa 2D (topo) da simulação: robôs, obstáculos e o rastro recente de cada
 // robô. Escala o espaço em milímetros do World para pixels da tela.
-export function SimulationMap({ arena, robots, obstacles, selectedAddress, onSelect }: SimulationMapProps) {
+export function SimulationMap({ arena, robots, obstacles, elements }: SimulationMapProps) {
   const trails = useRef<Map<string, { x: number; y: number }[]>>(new Map());
   const scale = VIEW_PX / Math.max(arena.widthMm, arena.heightMm);
   const heightPx = arena.heightMm * scale;
@@ -40,13 +72,7 @@ export function SimulationMap({ arena, robots, obstacles, selectedAddress, onSel
   }, [robots]);
 
   return (
-    <MapCanvas
-      cols={VIEW_PX / 26}
-      rows={heightPx / 26}
-      cellSize={26}
-      className={styles.map}
-      onClick={() => onSelect(null)}
-    >
+    <MapCanvas cols={VIEW_PX / 26} rows={heightPx / 26} cellSize={26} className={styles.map} elements={elements}>
       <svg className={styles.trails} width={VIEW_PX} height={heightPx}>
         {robots.map((robot) => {
           const history = trails.current.get(robot.address) ?? [];
@@ -78,23 +104,7 @@ export function SimulationMap({ arena, robots, obstacles, selectedAddress, onSel
       ))}
 
       {robots.map((robot) => (
-        <button
-          key={robot.address}
-          type="button"
-          className={`${styles.robot} ${robot.online ? styles.online : styles.offline} ${
-            robot.address === selectedAddress ? styles.selected : ''
-          }`}
-          style={{
-            left: robot.posX * scale,
-            top: robot.posY * scale,
-            transform: `translate(-50%, -50%) rotate(${robot.theta}deg)`,
-          }}
-          onClick={(e) => {
-            e.stopPropagation();
-            onSelect(robot.address === selectedAddress ? null : robot.address);
-          }}
-          title={robot.label}
-        />
+        <RobotMarker key={robot.address} robot={robot} scale={scale} />
       ))}
     </MapCanvas>
   );

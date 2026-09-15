@@ -4,7 +4,6 @@ import type { CenarioModel } from "../../model/Cenario.Model";
 import type { ObstaclesModel } from "../../model/Obstacles.Model";
 import type { MapModel } from "../../model/Map.Model";
 import { MapCanvas } from "../../components/MapCanvas/MapCanvas";
-import type { CellSelectRect } from "../../components/MapCanvas/MapCanvas";
 import { MapMenuLayout } from "../../components/MapMenuLayout/MapMenuLayout";
 import { Menu } from "../../components/Menu/Menu";
 import { Obstacle } from "../../components/Obstacle/Obstacle";
@@ -14,7 +13,7 @@ import { SelectMapModal } from "../../components/SelectMapModal/SelectMapModal";
 import { ObstacleDrawer } from "../../components/ObstacleDrawer/ObstacleDrawer";
 import { Button } from "../../components/Button/Button";
 import { CenarioService } from "../../services/Cenario.Service";
-import { useObstacleEditor } from "./useObstacleEditor";
+import { createObstacleFromRect } from "./useObstacleEditor";
 import styles from "./CenarioBuilder.module.css";
 
 type Tool = "move" | "select" | "obstacle";
@@ -39,37 +38,17 @@ export function CenarioBuilder() {
         updateCenario("Obstacles", obstacles);
     }
 
-    function updateObstacle(index: number, patch: Partial<ObstaclesModel>) {
-        handleObstaclesChange(
-            mapConfig.cenario.Obstacles.map((o, i) => (i === index ? { ...o, ...patch } : o))
-        );
+    function updateObstacle(id: string, patch: Partial<ObstaclesModel>) {
+        handleObstaclesChange(mapConfig.cenario.Obstacles.map((o) => (o.id === id ? { ...o, ...patch } : o)));
+    }
+
+    function removeObstacle(id: string) {
+        handleObstaclesChange(mapConfig.cenario.Obstacles.filter((o) => o.id !== id));
     }
 
     const [tool, setTool] = useState<Tool>("move");
     const obstacleTool = tool === "obstacle";
     const canMoveObstacle = tool === "select" || tool === "obstacle";
-
-    const { rectFor, previewRect, removeObstacle, removeSelected, selectedIndices, selectInRect, clearSelection, gridHandlers } =
-        useObstacleEditor({
-            tool,
-            sizeX: mapConfig.cenario.sizeX,
-            sizeY: mapConfig.cenario.sizeY,
-            obstacles: mapConfig.cenario.Obstacles,
-            onChange: handleObstaclesChange,
-        });
-
-    function handleAreaSelect(rect: CellSelectRect, meta: { additive: boolean }) {
-        selectInRect(rect, meta.additive);
-    }
-
-    const selectedObstacles = Array.from(selectedIndices)
-        .sort((a, b) => a - b)
-        .map((index) => mapConfig.cenario.Obstacles[index]);
-
-    function handleObstacleDrawerChange(patch: Partial<ObstaclesModel>) {
-        const [onlyIndex] = selectedIndices;
-        if (selectedIndices.size === 1 && onlyIndex !== undefined) updateObstacle(onlyIndex, patch);
-    }
 
     function handleCreateBlank() {
         setMapConfig(CenarioService.createBlankMap());
@@ -86,12 +65,6 @@ export function CenarioBuilder() {
             open={isSelectMapOpen}
             onClose={() => setIsSelectMapOpen(false)}
             onCreateBlank={handleCreateBlank}
-        />
-        <ObstacleDrawer
-            obstacles={selectedObstacles}
-            onChangeSingle={handleObstacleDrawerChange}
-            onRemove={removeSelected}
-            onClose={clearSelection}
         />
         <MapMenuLayout
             menu={
@@ -149,7 +122,19 @@ export function CenarioBuilder() {
                     className={obstacleTool ? styles.editableGrid : undefined}
                     tool={tool}
                     onToolChange={setTool}
-                    onAreaSelect={handleAreaSelect}
+                    createTool="obstacle"
+                    onCreateElement={(rect) =>
+                        handleObstaclesChange([...mapConfig.cenario.Obstacles, createObstacleFromRect(rect, mapConfig.cenario.Obstacles)])
+                    }
+                    renderCreatePreview={(rect) => (
+                        <Obstacle
+                            x={rect.x}
+                            y={rect.y}
+                            width={rect.width}
+                            height={rect.height}
+                            className={styles.obstaclePreview}
+                        />
+                    )}
                     tools={
                         <MapToolButton
                             active={obstacleTool}
@@ -159,43 +144,32 @@ export function CenarioBuilder() {
                             <ObstacleIcon />
                         </MapToolButton>
                     }
-                    {...gridHandlers}
+                    panel={<ObstacleDrawer allObstacles={mapConfig.cenario.Obstacles} onChange={updateObstacle} />}
                 >
                     {(cellWidth, cellHeight) => (
                         <>
-                            {mapConfig.cenario.Obstacles.map((obstacle, index) => {
-                                const rect = rectFor(obstacle, index);
-                                return (
-                                    <Obstacle
-                                        key={index}
-                                        label={obstacle.name}
-                                        title={obstacleTool ? `${obstacle.name} (duplo clique remove)` : obstacle.name}
-                                        width={rect.sizeX * cellWidth}
-                                        height={rect.sizeY * cellHeight}
-                                        selected={selectedIndices.has(index)}
-                                        className={canMoveObstacle ? styles.placedObstacle : undefined}
-                                        onDoubleClick={obstacleTool ? () => removeObstacle(index) : undefined}
-                                        style={{
-                                            position: "absolute",
-                                            left: rect.startPointX * cellWidth,
-                                            top: rect.startPointY * cellHeight,
-                                        }}
-                                    />
-                                );
-                            })}
-
-                            {previewRect && (
+                            {mapConfig.cenario.Obstacles.map((obstacle) => (
                                 <Obstacle
-                                    width={previewRect.sizeX * cellWidth}
-                                    height={previewRect.sizeY * cellHeight}
-                                    className={styles.obstaclePreview}
-                                    style={{
-                                        position: "absolute",
-                                        left: previewRect.startPointX * cellWidth,
-                                        top: previewRect.startPointY * cellHeight,
-                                    }}
+                                    key={obstacle.id}
+                                    id={obstacle.id}
+                                    label={obstacle.name}
+                                    title={obstacleTool ? `${obstacle.name} (Backspace remove)` : obstacle.name}
+                                    x={obstacle.startPointX * cellWidth}
+                                    y={obstacle.startPointY * cellHeight}
+                                    width={obstacle.sizeX * cellWidth}
+                                    height={obstacle.sizeY * cellHeight}
+                                    movable
+                                    onMove={(next) =>
+                                        updateObstacle(obstacle.id, {
+                                            startPointX: Math.round(next.x / cellWidth),
+                                            startPointY: Math.round(next.y / cellHeight),
+                                        })
+                                    }
+                                    removable
+                                    onRemove={() => removeObstacle(obstacle.id)}
+                                    className={canMoveObstacle ? styles.placedObstacle : undefined}
                                 />
-                            )}
+                            ))}
                         </>
                     )}
                 </MapCanvas>
