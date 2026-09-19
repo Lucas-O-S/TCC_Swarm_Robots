@@ -18,14 +18,17 @@ const SimulationScreen = lazy(() =>
 const MapTestScreen = lazy(() =>
   import('../screens/map-test/MapTestScreen').then((m) => ({ default: m.MapTestScreen })),
 );
+const TaskBuilder = lazy(() =>
+  import('../screens/TaskBuilder/TaskBuilder').then((m) => ({ default: m.TaskBuilder })),
+);
 
 // Mapa de rotas do app. /login fica fora da casca de navegação; todas as
 // telas autenticadas são filhas de <AppLayout /> (barra MARI + menu + Sair).
 //
-// /robos e /tarefas removidas a pedido (2026-09-01): só a estrutura de
-// integração com o backend (src/dto, src/model, src/mapper,
-// src/services/{RobotService,TaskService}) deveria existir nesta rodada,
-// sem telas ainda — ver STATUS.md.
+// /robos removida a pedido (2026-09-01): só a estrutura de integração com o
+// backend (src/dto, src/model, src/mapper, src/services/RobotService)
+// deveria existir nesta rodada, sem tela ainda. /tarefas voltou como
+// TaskBuilder (mesmo padrão do CenarioBuilder, ver src/screens/TaskBuilder).
 export function AppRoutes() {
   return (
     <BrowserRouter>
@@ -39,6 +42,7 @@ export function AppRoutes() {
             <Route path="/simulacao" element={<SimulationScreen />} />
             <Route path="/mapa-teste" element={<MapTestScreen />} />
             <Route path="/CenarioBuilder" element={<CenarioBuilder />} />
+            <Route path="/TaskBuilder" element={<TaskBuilder />} />
           </Route>
         </Routes>
       </Suspense>

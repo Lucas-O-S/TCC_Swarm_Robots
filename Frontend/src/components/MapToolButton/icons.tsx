@@ -49,3 +49,15 @@ export function ObstacleIcon() {
     </svg>
   );
 }
+
+// Círculo com um "+" no meio — ferramenta "Waypoint" (adicionar ponto de
+// rota no mapa, ver TaskBuilder).
+export function WaypointIcon() {
+  return (
+    <svg {...ICON_PROPS} aria-hidden="true">
+      <circle cx="12" cy="12" r="8" />
+      <line x1="12" y1="8.5" x2="12" y2="15.5" />
+      <line x1="8.5" y1="12" x2="15.5" y2="12" />
+    </svg>
+  );
+}
