@@ -8,7 +8,7 @@ import { Obstacle } from "../../components/Obstacle/Obstacle";
 import { Waypoint } from "../../components/Waypoint/Waypoint";
 import { RobotPath } from "../../components/RobotPath/RobotPath";
 import { MapToolButton } from "../../components/MapToolButton/MapToolButton";
-import { WaypointIcon } from "../../components/MapToolButton/icons";
+import { WaypointIcon, AreaIcon } from "../../components/MapToolButton/icons";
 import { WaypointDrawer } from "../../components/WaypointDrawer/WaypointDrawer";
 import { SelectTaskMapModal } from "../../components/SelectTaskMapModal/SelectTaskMapModal";
 import { Button } from "../../components/Button/Button";
@@ -18,7 +18,9 @@ import { createWaypointFromRect } from "./useTaskEditor";
 import type { TaskWaypointDraft } from "./useTaskEditor";
 import styles from "./TaskBuilder.module.css";
 
-type Tool = "move" | "select" | "waypoint";
+const AREA_COLOR = "var(--color-yellow)";
+
+type Tool = "move" | "select" | "waypoint" | "area";
 type SaveState = { status: "idle" | "saving" | "error" | "success"; message?: string };
 
 // Construtor de tasks (rota de waypoints) — mesmo padrão do CenarioBuilder:
@@ -35,20 +37,27 @@ export function TaskBuilder() {
   const [name, setName] = useState("");
   const [priority, setPriority] = useState(0);
   const [waypoints, setWaypoints] = useState<TaskWaypointDraft[]>([]);
+  // Área/bloco = mesmo sistema de waypoints (mesmo tipo, mesma criação por
+  // clique), só que numa lista separada e desenhada como loop fechado em
+  // vez de rota aberta (ver <RobotPath closed /> mais abaixo).
+  const [areaPoints, setAreaPoints] = useState<TaskWaypointDraft[]>([]);
   const [tool, setTool] = useState<Tool>("move");
   const [saveState, setSaveState] = useState<SaveState>({ status: "idle" });
 
   const waypointTool = tool === "waypoint";
-  const canMoveWaypoint = tool === "select" || tool === "waypoint";
+  const areaTool = tool === "area";
+  const canMoveWaypoint = tool === "select" || tool === "waypoint" || tool === "area";
 
   function handleSelectMockMap() {
     setMapConfig(CenarioService.createMockMap());
     setWaypoints([]);
+    setAreaPoints([]);
   }
 
   function handleChangeMap() {
     setMapConfig(null);
     setWaypoints([]);
+    setAreaPoints([]);
   }
 
   function updateWaypoint(id: string, patch: Partial<Pick<TaskWaypointDraft, "x" | "y">>) {
@@ -57,6 +66,14 @@ export function TaskBuilder() {
 
   function removeWaypoint(id: string) {
     setWaypoints((prev) => prev.filter((w) => w.id !== id));
+  }
+
+  function updateAreaPoint(id: string, patch: Partial<Pick<TaskWaypointDraft, "x" | "y">>) {
+    setAreaPoints((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  }
+
+  function removeAreaPoint(id: string) {
+    setAreaPoints((prev) => prev.filter((p) => p.id !== id));
   }
 
   async function handleSave() {
@@ -79,6 +96,7 @@ export function TaskBuilder() {
   }
 
   const routePoints = waypoints.map((w, index) => ({ orderIndex: index, x: w.x, y: w.y }));
+  const areaRoutePoints = areaPoints.map((p, index) => ({ orderIndex: index, x: p.x, y: p.y }));
 
   return (
     <>
@@ -124,6 +142,12 @@ export function TaskBuilder() {
                     : `${waypoints.length} waypoint${waypoints.length > 1 ? "s" : ""} na rota.`}
                 </p>
 
+                <p className={styles.routeSummary}>
+                  {areaPoints.length === 0
+                    ? 'Nenhum ponto de área ainda — use a ferramenta "Área" e clique no mapa (fecha em loop com 3+ pontos).'
+                    : `${areaPoints.length} ponto${areaPoints.length > 1 ? "s" : ""} de área.`}
+                </p>
+
                 <Button variant="accent" onClick={handleSave} disabled={saveState.status === "saving"}>
                   {saveState.status === "saving" ? "Salvando..." : "Salvar"}
                 </Button>
@@ -150,28 +174,42 @@ export function TaskBuilder() {
               mapModel={mapConfig}
               fitWidth
               maxHeight={maxMapHeight}
-              className={waypointTool ? styles.editableGrid : undefined}
+              className={waypointTool || areaTool ? styles.editableGrid : undefined}
               tool={tool}
               onToolChange={setTool}
-              createTool="waypoint"
-              onCreateElement={(rect) =>
-                setWaypoints((prev) => [...prev, createWaypointFromRect(rect, cenario.sizeX, cenario.sizeY)])
-              }
+              createTool={waypointTool || areaTool ? tool : undefined}
+              onCreateElement={(rect) => {
+                if (waypointTool) {
+                  setWaypoints((prev) => [...prev, createWaypointFromRect(rect, cenario.sizeX, cenario.sizeY)]);
+                } else if (areaTool) {
+                  setAreaPoints((prev) => [...prev, createWaypointFromRect(rect, cenario.sizeX, cenario.sizeY)]);
+                }
+              }}
               renderCreatePreview={(rect) => (
                 <Waypoint
                   x={rect.x + rect.width / 2}
                   y={rect.y + rect.height / 2}
+                  color={areaTool ? AREA_COLOR : undefined}
                   className={styles.waypointPreview}
                 />
               )}
               tools={
-                <MapToolButton
-                  active={waypointTool}
-                  onClick={() => setTool(waypointTool ? "move" : "waypoint")}
-                  title="Adicionar waypoint (clique no mapa)"
-                >
-                  <WaypointIcon />
-                </MapToolButton>
+                <>
+                  <MapToolButton
+                    active={waypointTool}
+                    onClick={() => setTool(waypointTool ? "move" : "waypoint")}
+                    title="Adicionar waypoint (clique no mapa)"
+                  >
+                    <WaypointIcon />
+                  </MapToolButton>
+                  <MapToolButton
+                    active={areaTool}
+                    onClick={() => setTool(areaTool ? "move" : "area")}
+                    title="Desenhar área a atravessar (arraste no mapa)"
+                  >
+                    <AreaIcon />
+                  </MapToolButton>
+                </>
               }
               panel={<WaypointDrawer allWaypoints={waypoints} onChange={updateWaypoint} />}
             >
@@ -186,6 +224,29 @@ export function TaskBuilder() {
                       y={obstacle.startPointY * cellHeight}
                       width={obstacle.sizeX * cellWidth}
                       height={obstacle.sizeY * cellHeight}
+                    />
+                  ))}
+
+                  <RobotPath points={areaRoutePoints} cellSize={cellWidth} color={AREA_COLOR} closed />
+
+                  {areaPoints.map((point, index) => (
+                    <Waypoint
+                      key={point.id}
+                      id={point.id}
+                      order={index + 1}
+                      color={AREA_COLOR}
+                      x={(point.x + 0.5) * cellWidth}
+                      y={(point.y + 0.5) * cellHeight}
+                      movable
+                      onMove={(next) =>
+                        updateAreaPoint(point.id, {
+                          x: Math.max(0, Math.min(cenario.sizeX - 1, Math.round(next.x / cellWidth - 0.5))),
+                          y: Math.max(0, Math.min(cenario.sizeY - 1, Math.round(next.y / cellHeight - 0.5))),
+                        })
+                      }
+                      removable
+                      onRemove={() => removeAreaPoint(point.id)}
+                      className={canMoveWaypoint ? styles.placedWaypoint : undefined}
                     />
                   ))}
 

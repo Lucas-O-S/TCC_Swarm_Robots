@@ -12,6 +12,8 @@ interface WaypointProps extends Omit<HTMLAttributes<HTMLDivElement>, 'id'> {
   size?: number;
   /** Número de ordem da rota (1-based), exibido dentro do marcador. */
   order?: number;
+  /** Cor do marcador — default verde (rota). Ex.: amarelo pra distinguir os pontos de uma área/bloco da rota em si (mesmo sistema, cor diferente). */
+  color?: string;
   /** Participa de clique/Ctrl+clique/seleção em área. Default true (quando `id` existe). */
   selectable?: boolean;
   /** Arrastar move o waypoint (e o resto do grupo selecionado) — chama `onMove` com o centro final (px). */
@@ -33,6 +35,7 @@ export function Waypoint({
   y,
   size = DEFAULT_SIZE,
   order,
+  color,
   selectable = true,
   movable = false,
   onMove,
@@ -59,7 +62,15 @@ export function Waypoint({
   return (
     <div
       className={`${styles.waypoint} ${selected ? styles.selected : ''} ${className}`}
-      style={{ position: 'absolute', left: renderX, top: renderY, width: size, height: size, ...style }}
+      style={{
+        position: 'absolute',
+        left: renderX,
+        top: renderY,
+        width: size,
+        height: size,
+        ...(color ? { background: color } : null),
+        ...style,
+      }}
       {...rest}
     >
       {order != null && <span className={styles.order}>{order}</span>}

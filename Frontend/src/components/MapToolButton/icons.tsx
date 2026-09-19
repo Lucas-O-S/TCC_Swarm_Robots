@@ -61,3 +61,14 @@ export function WaypointIcon() {
     </svg>
   );
 }
+
+// Quadrado tracejado — ferramenta "Área" (desenhar a zona que a rota deve
+// atravessar, ver TaskArea/TaskBuilder). Tracejado em vez de sólido
+// (ObstacleIcon) porque é só o perímetro, não um bloco.
+export function AreaIcon() {
+  return (
+    <svg {...ICON_PROPS} aria-hidden="true">
+      <rect x="4" y="4" width="16" height="16" rx="2" strokeDasharray="3 2.5" />
+    </svg>
+  );
+}
