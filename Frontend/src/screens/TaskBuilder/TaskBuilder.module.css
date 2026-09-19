@@ -32,13 +32,19 @@
   background: var(--color-surface);
 }
 
-.fieldRow {
+.mapSummary {
   display: flex;
-  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text-muted);
 }
 
-.fieldRow .field {
-  flex: 1;
+.placeholder {
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
 }
 
 .routeSummary {
