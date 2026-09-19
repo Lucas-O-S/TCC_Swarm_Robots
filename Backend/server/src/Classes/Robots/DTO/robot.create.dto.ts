@@ -61,4 +61,8 @@ export class RobotCreateDto {
     @IsOptional()
     @IsUUID(undefined, { message: "taskId deve ser um UUID válido" })
     taskId?: string;
+
+    @IsOptional()
+    @IsInt ({ message: "status deve ser inteiro" })
+    status?: number;
 }

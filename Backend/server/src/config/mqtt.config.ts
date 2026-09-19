@@ -15,6 +15,6 @@ import 'dotenv/config';
  */
 export const mqttConfig = {
     url: process.env.MQTT_URL ?? 'mqtt://localhost:1883',
-    networkId: Number(process.env.MARI_NETWORK_ID ?? 0x1200),
+    networkId: Number(process.env.MARI_NETWORK_ID ?? 0x0001),
     protocolVersion: (process.env.MQTT_PROTOCOL_VERSION === '4' ? 4 : 5) as 4 | 5,
 };
