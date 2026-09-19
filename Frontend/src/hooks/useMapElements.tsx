@@ -57,7 +57,18 @@ export function useMapElementsState() {
   const registry = useRef(new Map<string, ElementDescriptor>());
   const selection = useSelectableElements();
   const [drag, setDrag] = useState<DragState | null>(null);
-  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+  const [viewportSize, setViewportSizeState] = useState({ width: 0, height: 0 });
+
+  // `useMapElementsState()` devolve um objeto novo a cada render (não é
+  // memoizado — ver comentário no fim do arquivo), então o efeito em
+  // <MapCanvas> que chama isto roda a cada render. Sem o bail-out abaixo,
+  // toda chamada cria um objeto `{ width, height }` novo, `setState` nunca
+  // vê o mesmo valor (Object.is falha em objeto), e isso dispara outro
+  // render — loop infinito. Devolvendo a MESMA referência quando o tamanho
+  // não mudou, o `setState` vira no-op e o loop para.
+  function setViewportSize(size: { width: number; height: number }) {
+    setViewportSizeState((prev) => (prev.width === size.width && prev.height === size.height ? prev : size));
+  }
 
   const dragDelta = useMemo(() => {
     if (!drag) return null;
