@@ -9,13 +9,13 @@ interface SelectTaskMapModalProps {
 
 // Passo obrigatório antes do construtor de tasks: a rota é desenhada em
 // cima de um mapa (tamanho do grid + obstáculos a evitar), então precisa de
-// um selecionado. Sem `onClose` de propósito — banco de mapas ainda não
-// existe (ver CenarioService.createMockMap), então a única saída daqui é o
-// mock; não dá pra fechar sem escolher nada (mesmo espírito do
-// SelectMapModal do CenarioBuilder, mas sem opção de sair vazio).
+// um selecionado. `closable={false}` esconde o "×"/ignora backdrop/Esc —
+// banco de mapas ainda não existe (ver CenarioService.createMockMap), então
+// a única saída daqui é o mock; não dá pra fechar sem escolher nada (mesmo
+// espírito do SelectMapModal do CenarioBuilder, mas sem opção de sair vazio).
 export function SelectTaskMapModal({ open, onSelectMock }: SelectTaskMapModalProps) {
   return (
-    <Modal open={open} onClose={() => {}} title="Selecionar mapa da task">
+    <Modal open={open} onClose={() => {}} closable={false} title="Selecionar mapa da task">
       <p className={styles.description}>
         A rota é desenhada em cima de um mapa (tamanho do grid e obstáculos a evitar) — selecione um antes de continuar.
       </p>
