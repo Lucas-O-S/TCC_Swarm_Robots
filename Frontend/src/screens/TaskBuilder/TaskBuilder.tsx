@@ -205,7 +205,7 @@ export function TaskBuilder() {
                   <MapToolButton
                     active={areaTool}
                     onClick={() => setTool(areaTool ? "move" : "area")}
-                    title="Desenhar área a atravessar (arraste no mapa)"
+                    title="Adicionar ponto de área (clique no mapa, fecha em loop com 3+ pontos)"
                   >
                     <AreaIcon />
                   </MapToolButton>
