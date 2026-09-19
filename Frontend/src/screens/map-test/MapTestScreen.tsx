@@ -22,6 +22,7 @@ const MOCK_MAP: MapModel = {
     obstacles: true,
     Obstacles: [
       {
+        id: 'mock-obstacle-1',
         name: 'Parede 1',
         description: 'Obstáculo mock',
         sizeX: 2,
@@ -32,6 +33,7 @@ const MOCK_MAP: MapModel = {
         cenarioId: 'mock-cenario',
       },
       {
+        id: 'mock-obstacle-2',
         name: 'Parede 2',
         description: 'Obstáculo mock',
         sizeX: 1,
@@ -92,15 +94,14 @@ export function MapTestScreen() {
       <MapCanvas cols={MOCK_MAP.cenario.sizeX} rows={MOCK_MAP.cenario.sizeY} cellSize={CELL_SIZE}>
         {MOCK_MAP.cenario.Obstacles.map((obstacle) => (
           <Obstacle
-            key={obstacle.name}
+            key={obstacle.id}
+            id={obstacle.id}
+            selectable={false}
             label={obstacle.name}
             width={obstacle.sizeX * CELL_SIZE}
             height={obstacle.sizeY * CELL_SIZE}
-            style={{
-              position: 'absolute',
-              left: obstacle.startPointX * CELL_SIZE,
-              top: obstacle.startPointY * CELL_SIZE,
-            }}
+            x={obstacle.startPointX * CELL_SIZE}
+            y={obstacle.startPointY * CELL_SIZE}
           />
         ))}
         {MOCK_ROBOTS.filter((robot) => robot.path).map((robot) => (

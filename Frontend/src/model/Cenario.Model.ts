@@ -6,7 +6,6 @@ export interface CenarioModel {
     description : string;
     sizeY : number;
     sizeX : number;
-    obstacles : boolean;
     Obstacles : ObstaclesModel[];
 
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { MapElementsProvider, useMapElementsState } from '../../../hooks/useMapElements';
 import { useSimulation } from './hooks/useSimulation';
 import { SimulationToolbar } from './components/SimulationToolbar';
 import { SimulationMap } from './components/SimulationMap';
@@ -21,7 +21,12 @@ function downloadJson(filename: string, content: string): void {
 // controle, mapa 2D e painel de telemetria por robô — na paleta visual MARI.
 export function SimulationScreen() {
   const sim = useSimulation();
-  const [selectedAddress, setSelectedAddress] = useState<string | null>(null);
+  // Criado aqui (não dentro do <SimulationMap>) porque o
+  // RobotTelemetryPanel — uma lista normal no layout da tela, não um drawer
+  // flutuante — também precisa ler/escrever a mesma seleção (ver
+  // useMapSelection). Envolvendo os dois no mesmo Provider, ambos enxergam
+  // o mesmo estado.
+  const mapElements = useMapElementsState();
 
   const brokerUrl = import.meta.env.VITE_MQTT_WS_URL || 'ws://localhost:9001';
 
@@ -30,42 +35,32 @@ export function SimulationScreen() {
   }
 
   return (
-    <div className={styles.screen}>
-      <SimulationToolbar
-        scenarioName={sim.scenarioName}
-        arena={sim.arena}
-        connected={sim.connected}
-        connecting={sim.connecting}
-        paused={sim.paused}
-        elapsedSeconds={sim.elapsedSeconds}
-        tickHz={sim.tickHz}
-        brokerUrl={brokerUrl}
-        error={sim.error}
-        onTogglePause={sim.togglePause}
-        onReset={() => sim.reset()}
-        onConnect={sim.connect}
-        onDisconnect={sim.disconnect}
-        onExport={handleExport}
-        onImport={sim.importScenario}
-      />
-
-      <div className={styles.body}>
-        <SimulationMap
+    <MapElementsProvider value={mapElements.contextValue}>
+      <div className={styles.screen}>
+        <SimulationToolbar
+          scenarioName={sim.scenarioName}
           arena={sim.arena}
-          robots={sim.robots}
-          obstacles={sim.obstacles}
-          selectedAddress={selectedAddress}
-          onSelect={setSelectedAddress}
+          connected={sim.connected}
+          connecting={sim.connecting}
+          paused={sim.paused}
+          elapsedSeconds={sim.elapsedSeconds}
+          tickHz={sim.tickHz}
+          brokerUrl={brokerUrl}
+          error={sim.error}
+          onTogglePause={sim.togglePause}
+          onReset={() => sim.reset()}
+          onConnect={sim.connect}
+          onDisconnect={sim.disconnect}
+          onExport={handleExport}
+          onImport={sim.importScenario}
         />
 
-        <RobotTelemetryPanel
-          robots={sim.robots}
-          selectedAddress={selectedAddress}
-          onSelect={setSelectedAddress}
-          onDropFailure={sim.dropRobot}
-          onReconnect={sim.reconnectRobot}
-        />
+        <div className={styles.body}>
+          <SimulationMap arena={sim.arena} robots={sim.robots} obstacles={sim.obstacles} elements={mapElements} />
+
+          <RobotTelemetryPanel robots={sim.robots} onDropFailure={sim.dropRobot} onReconnect={sim.reconnectRobot} />
+        </div>
       </div>
-    </div>
+    </MapElementsProvider>
   );
 }

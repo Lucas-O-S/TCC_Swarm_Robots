@@ -32,12 +32,7 @@ export function useSwarmGrid() {
   const [robots] = useState<RobotConnection[]>(INITIAL_ROBOTS);
   const [obstacles, setObstacles] = useState<Obstacle[]>(INITIAL_OBSTACLES);
   const [chargePoint, setChargePoint] = useState<ChargePoint>(INITIAL_CHARGE_POINT);
-  const [selectedId, setSelectedId] = useState<string | null>('R08');
   const [placingCharge, setPlacingCharge] = useState(false);
-
-  const selectRobot = useCallback((id: string | null) => {
-    setSelectedId(id);
-  }, []);
 
   const toggleChargePlacement = useCallback(() => {
     setPlacingCharge((prev) => !prev);
@@ -79,7 +74,6 @@ export function useSwarmGrid() {
   const reloadScenario = useCallback(() => {
     setObstacles(INITIAL_OBSTACLES);
     setChargePoint(INITIAL_CHARGE_POINT);
-    setSelectedId(null);
     setPlacingCharge(false);
   }, []);
 
@@ -87,9 +81,7 @@ export function useSwarmGrid() {
     robots,
     obstacles,
     chargePoint,
-    selectedId,
     placingCharge,
-    selectRobot,
     toggleChargePlacement,
     handleCellClick,
     addObstacle,

@@ -7,13 +7,15 @@ interface NavItem {
   label: string;
 }
 
-// "Robôs" e "Tarefas" removidas a pedido (2026-09-01): as telas saíram do
-// projeto por enquanto (só a estrutura de integração com o backend
-// ficou) — ver STATUS.md. Devolver aqui quando as telas voltarem.
+// "Robôs" removida a pedido (2026-09-01): a tela saiu do projeto por
+// enquanto (só a estrutura de integração com o backend ficou). Devolver
+// aqui quando a tela voltar. "Tarefas" voltou como TaskBuilder.
 const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Mapa & Conexão' },
   { to: '/simulacao', label: 'Simulação' },
   { to: '/mapa-teste', label: 'Teste Mapa' },
+  { to: '/CenarioBuilder', label: 'Construtor de Cenários' },
+  { to: '/TaskBuilder', label: 'Tarefas' },
 ];
 
 // Casca compartilhada por todas as telas autenticadas: marca MARI, menu de
