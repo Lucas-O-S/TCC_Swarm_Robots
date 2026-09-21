@@ -1,18 +1,10 @@
 import type { SimRobotState } from '../../core/types';
-<<<<<<< HEAD
-=======
 import { useMapSelection } from '../../../../hooks/useMapElements';
->>>>>>> origin/dev-Front
 import { RobotTelemetryCard } from './RobotTelemetryCard';
 import styles from './RobotTelemetryPanel.module.css';
 
 interface RobotTelemetryPanelProps {
   robots: SimRobotState[];
-<<<<<<< HEAD
-  selectedAddress: string | null;
-  onSelect: (address: string | null) => void;
-=======
->>>>>>> origin/dev-Front
   onDropFailure: (address: string) => void;
   onReconnect: (address: string) => void;
 }
