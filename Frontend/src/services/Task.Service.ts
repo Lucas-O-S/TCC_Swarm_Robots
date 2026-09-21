@@ -5,7 +5,7 @@ import type { TaskCreateRequest } from '../dto/task.create.dto';
 import type { TaskWaypointInput } from '../dto/taskWaypoint.dto';
 import { TaskMapper } from '../mapper/Task.Mapper';
 import type { TaskModel } from '../model/Task.Model';
-import type { ServiceResult } from './RobotService';
+import type { ServiceResult } from './Robot.Service';
 
 /**
  * SUPOSIÇÃO (rotas e `TaskCreateDto`/`TaskUpdateDto` reais não confirmados

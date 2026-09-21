@@ -1,0 +1,44 @@
+.frame {
+  position: relative;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-surface-alt);
+}
+
+.surface {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  touch-action: none;
+}
+
+/* Só mostra a mãozinha de arrastar quando a ferramenta "Mover" está ativa
+   — nas outras (Selecionar, Obstáculo...) o arraste não faz pan, então o
+   cursor fica no padrão em vez de sugerir que dá pra arrastar o mapa. */
+.surface.grabCursor {
+  cursor: grab;
+}
+
+.surface.grabCursor:active {
+  cursor: grabbing;
+}
+
+.content {
+  width: max-content;
+  transform-origin: 0 0;
+}
+
+.areaSelect {
+  border: 1px dashed var(--color-orange);
+  background: rgba(255, 140, 0, 0.12);
+  pointer-events: none;
+}
+
+.controls {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  gap: 4px;
+}

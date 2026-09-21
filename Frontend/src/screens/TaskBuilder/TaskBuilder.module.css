@@ -1,0 +1,66 @@
+.editableGrid {
+  touch-action: none;
+}
+
+.placedWaypoint {
+  cursor: grab;
+}
+
+.placedWaypoint:active {
+  cursor: grabbing;
+}
+
+.waypointPreview {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.field input {
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: inherit;
+  background: var(--color-surface);
+}
+
+.mapSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.placeholder {
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
+}
+
+.routeSummary {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.errorMessage {
+  font-size: 13px;
+  color: var(--color-red);
+  margin: 0;
+}
+
+.successMessage {
+  font-size: 13px;
+  color: var(--color-green);
+  margin: 0;
+}

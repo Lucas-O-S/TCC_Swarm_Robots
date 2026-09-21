@@ -1,0 +1,23 @@
+.screen {
+  padding: 28px 32px;
+  font-family: var(--font-mono);
+}
+
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.mapColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (max-width: 780px) {
+  .body {
+    grid-template-columns: 1fr;
+  }
+}

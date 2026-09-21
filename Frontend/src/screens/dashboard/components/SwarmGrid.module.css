@@ -1,14 +1,3 @@
-.grid {
-  position: relative;
-  background-color: var(--color-surface-alt);
-  background-image:
-    linear-gradient(rgba(0, 0, 0, 0.12) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.12) 1px, transparent 1px);
-  background-size: 32px 32px;
-  border-radius: var(--radius-sm);
-  cursor: default;
-}
-
 .placing {
   cursor: crosshair;
 }
