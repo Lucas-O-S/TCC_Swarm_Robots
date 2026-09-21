@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import { useState } from 'react';
-=======
 import { MapElementsProvider, useMapElementsState } from '../../../hooks/useMapElements';
->>>>>>> origin/dev-Front
 import { useSimulation } from './hooks/useSimulation';
 import { SimulationToolbar } from './components/SimulationToolbar';
 import { SimulationMap } from './components/SimulationMap';
