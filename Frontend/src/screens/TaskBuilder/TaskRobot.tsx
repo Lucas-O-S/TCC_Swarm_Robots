@@ -14,6 +14,8 @@ interface TaskRobotProps {
   y: number;
   /** Graus, 0° = pra cima, sentido horário (ver <Robot direction>). Sem, não desenha a seta. */
   direction?: number;
+  /** Bateu numa parede — marcador fica vermelho (RobotStatus.Lost) até a ida continuar ou acabar. */
+  blocked?: boolean;
   onMove: (next: { x: number; y: number }) => void;
   onRemove: () => void;
   className?: string;
@@ -26,7 +28,7 @@ interface TaskRobotProps {
 // (`solo`) e, quando está em cima de um ponto (ex.: parou no último da
 // rota), o clique vai pro ponto (`hitPriority` menor) — arrastar o waypoint
 // não arrasta o robô.
-export function TaskRobot({ x, y, direction, onMove, onRemove, className }: TaskRobotProps) {
+export function TaskRobot({ x, y, direction, blocked = false, onMove, onRemove, className }: TaskRobotProps) {
   const half = SIZE / 2;
   const { selected, x: renderX, y: renderY } = useMapElement({
     id: TASK_ROBOT_ID,
@@ -45,7 +47,7 @@ export function TaskRobot({ x, y, direction, onMove, onRemove, className }: Task
   return (
     <Robot
       label="R"
-      status={RobotStatus.Active}
+      status={blocked ? RobotStatus.Lost : RobotStatus.Active}
       direction={direction}
       selected={selected}
       className={className}

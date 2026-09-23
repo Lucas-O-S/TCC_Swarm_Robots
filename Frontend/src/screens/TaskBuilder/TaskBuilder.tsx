@@ -27,6 +27,7 @@ import {
 } from "./useTaskEditor";
 import type { AreaCorner, AreaTraversalSettings, TaskStopDraft, TaskWaypointDraft } from "./useTaskEditor";
 import { useTaskRobot } from "./useTaskRobot";
+import type { PathPoint, Wall } from "./useTaskRobot";
 import { TaskRobot } from "./TaskRobot";
 import styles from "./TaskBuilder.module.css";
 
@@ -58,6 +59,8 @@ export function TaskBuilder() {
   const [stops, setStops] = useState<TaskStopDraft[]>([]);
   const [tool, setTool] = useState<Tool>("move");
   const [saveState, setSaveState] = useState<SaveState>({ status: "idle" });
+  /** Aviso de posicionamento recusado (robô dentro de parede) — some no próximo posicionamento válido ou ▶. */
+  const [robotNotice, setRobotNotice] = useState<string | null>(null);
 
   const waypointTool = tool === "waypoint";
   const areaTool = tool === "area";
@@ -68,13 +71,31 @@ export function TaskBuilder() {
   function handleSelectMockMap() {
     setMapConfig(CenarioService.createMockMap());
     setStops([]);
-    placeRobot(null);
+    removeRobot();
   }
 
   function handleChangeMap() {
     setMapConfig(null);
     setStops([]);
+    removeRobot();
+  }
+
+  // Reposicionar à mão (ferramenta ou arrasto): dentro de parede o robô não
+  // cabe — fica onde estava e o menu avisa.
+  function moveRobotTo(position: PathPoint) {
+    const placed = placeRobot(position);
+    setRobotNotice(placed ? null : "O robô não cabe aí — tem parede. Escolha uma célula livre.");
+    return placed;
+  }
+
+  function removeRobot() {
     placeRobot(null);
+    setRobotNotice(null);
+  }
+
+  function handlePlay() {
+    setRobotNotice(null);
+    play();
   }
 
   function updateWaypoint(id: string, patch: Partial<Pick<TaskWaypointDraft, "x" | "y">>) {
@@ -120,12 +141,23 @@ export function TaskBuilder() {
   // nos drawers.
   const { order: orderById, points } = flattenRoute(stops);
   const routePoints = points.map((p, index) => ({ orderIndex: index, x: p.x, y: p.y }));
+  // Paredes = obstáculos do mapa escolhido, no formato da colisão do robô.
+  const walls: Wall[] = (mapConfig?.cenario.Obstacles ?? []).map((o) => ({
+    id: o.id,
+    name: o.name,
+    x: o.startPointX,
+    y: o.startPointY,
+    width: o.sizeX,
+    height: o.sizeY,
+  }));
   // Robô da prévia — no máximo 1 nesta tela (posicionar de novo só move o
   // mesmo). Sem dependência nenhuma da rota: tem posição própria, não entra
   // na linha, na numeração nem nos blocos, e mexer nos pontos não o move. O
-  // ▶ só manda ele ir até os pontos, na ordem (ver useTaskRobot).
-  const { robot, playing, place: placeRobot, play, pause, stop } = useTaskRobot(points, PLAYBACK_SPEED);
+  // ▶ só manda ele ir até os pontos, na ordem, batendo nas paredes (ver
+  // useTaskRobot).
+  const { robot, playing, place: placeRobot, play, pause, stop } = useTaskRobot(points, walls, PLAYBACK_SPEED);
   const canPlay = robot !== null && points.length > 0;
+  const blockedBy = robot?.mission?.blockedBy ?? null;
 
   return (
     <>
@@ -165,30 +197,19 @@ export function TaskBuilder() {
                   />
                 </label>
 
-                <p className={styles.routeSummary}>
-                  {waypoints.length === 0
-                    ? 'Nenhum waypoint ainda — use a ferramenta "Waypoint" e clique no mapa.'
-                    : `${waypoints.length} waypoint${waypoints.length > 1 ? "s" : ""} na rota.`}
-                </p>
 
-                <p className={styles.routeSummary}>
-                  {areas.length === 0
-                    ? 'Nenhum bloco ainda — use a ferramenta "Área" e arraste no mapa pra desenhar um retângulo.'
-                    : `${areas.length} bloco${areas.length > 1 ? "s" : ""} na rota.`}
-                </p>
 
                 <div className={styles.mapSummary}>
-                  <span>
-                    {robot === null
-                      ? 'Nenhum robô — use a ferramenta "Robô" e clique no mapa (1 por task).'
-                      : `Robô em (${Math.round(robot.position.x)}, ${Math.round(robot.position.y)}) — ▶ no mapa pra vê-lo ir até os pontos da rota.`}
-                  </span>
+
                   {robot && (
-                    <Button variant="outline" onClick={() => placeRobot(null)}>
+                    <Button variant="outline" onClick={removeRobot}>
                       Remover
                     </Button>
                   )}
                 </div>
+
+
+                {robotNotice && <p className={styles.errorMessage}>{robotNotice}</p>}
 
                 <Button variant="accent" onClick={handleSave} disabled={saveState.status === "saving"}>
                   {saveState.status === "saving" ? "Salvando..." : "Salvar"}
@@ -229,12 +250,13 @@ export function TaskBuilder() {
                 } else if (robotTool) {
                   // Célula sob o clique (floor, não round) travada no grid.
                   // Só 1 robô: posicionar de novo move o mesmo, e a
-                  // ferramenta desliga sozinha depois de posicionar.
-                  placeRobot({
+                  // ferramenta desliga sozinha depois de posicionar (numa
+                  // parede não posiciona e continua ligada).
+                  const placed = moveRobotTo({
                     x: Math.max(0, Math.min(cenario.sizeX - 1, Math.floor(rect.startPointX))),
                     y: Math.max(0, Math.min(cenario.sizeY - 1, Math.floor(rect.startPointY))),
                   });
-                  setTool("move");
+                  if (placed) setTool("move");
                 }
               }}
               renderCreatePreview={(rect) => {
@@ -285,7 +307,7 @@ export function TaskBuilder() {
                   </MapToolButton>
                   <MapToolButton
                     variant="click"
-                    onClick={playing ? pause : play}
+                    onClick={playing ? pause : handlePlay}
                     disabled={!canPlay}
                     title={
                       !canPlay
@@ -426,13 +448,14 @@ export function TaskBuilder() {
                       x={(robot.position.x + 0.5) * cellWidth}
                       y={(robot.position.y + 0.5) * cellHeight}
                       direction={robot.heading ?? undefined}
+                      blocked={blockedBy !== null}
                       onMove={(next) =>
-                        placeRobot({
+                        moveRobotTo({
                           x: Math.max(0, Math.min(cenario.sizeX - 1, Math.round(next.x / cellWidth - 0.5))),
                           y: Math.max(0, Math.min(cenario.sizeY - 1, Math.round(next.y / cellHeight - 0.5))),
                         })
                       }
-                      onRemove={() => placeRobot(null)}
+                      onRemove={removeRobot}
                       className={canMoveWaypoint ? styles.placedWaypoint : undefined}
                     />
                   )}
