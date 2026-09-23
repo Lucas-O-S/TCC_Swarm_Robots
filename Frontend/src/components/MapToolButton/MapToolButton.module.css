@@ -23,6 +23,15 @@
   background: var(--color-border);
 }
 
+.button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.button:disabled:active {
+  background: var(--color-surface);
+}
+
 .active {
   background: var(--color-orange);
   border-color: var(--color-orange);

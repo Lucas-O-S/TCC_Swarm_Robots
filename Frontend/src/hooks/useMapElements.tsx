@@ -6,6 +6,8 @@ import type { ElementBounds } from './useSelectableElements';
 interface ElementDescriptor {
   bounds: ElementBounds;
   selectable: boolean;
+  solo: boolean;
+  hitPriority: number;
   movable: boolean;
   onMove?: (next: { x: number; y: number }) => void;
   removable: boolean;
@@ -103,16 +105,44 @@ export function useMapElementsState() {
     };
   }
 
-  // Último elemento registrado que bate no ponto "ganha" (ordem de registro
-  // segue ordem de render, então empate favorece quem está visualmente por cima).
+  // Entre os elementos que batem no ponto, ganha o de maior `hitPriority`;
+  // empate → o último registrado (ordem de registro segue ordem de render,
+  // então favorece quem está visualmente por cima).
   function hitTest(x: number, y: number): string | null {
     let hit: string | null = null;
+    let hitPriority = -Infinity;
     registry.current.forEach((d, id) => {
       if (!d.selectable) return;
       const { bounds } = d;
-      if (x >= bounds.x && x < bounds.x + bounds.width && y >= bounds.y && y < bounds.y + bounds.height) hit = id;
+      const inside = x >= bounds.x && x < bounds.x + bounds.width && y >= bounds.y && y < bounds.y + bounds.height;
+      if (inside && d.hitPriority >= hitPriority) {
+        hit = id;
+        hitPriority = d.hitPriority;
+      }
     });
     return hit;
+  }
+
+  // Tira da seleção todo elemento `solo` — chamado depois de algo ser SOMADO
+  // à seleção, pra ele nunca ficar junto com outros. Sem nenhum `solo`
+  // registrado (caso comum), não mexe no state.
+  function removeSoloFromSelection() {
+    const ids: string[] = [];
+    registry.current.forEach((d, id) => {
+      if (d.solo) ids.push(id);
+    });
+    if (ids.length > 0) selection.removeIds(ids);
+  }
+
+  // Ctrl/Cmd+clique: soma/tira da seleção — exceto elemento `solo`, que só
+  // seleciona sozinho (e sai da seleção quando outro é somado a ela).
+  function toggleSelected(id: string) {
+    if (registry.current.get(id)?.solo) {
+      selection.selectOnly(id);
+      return;
+    }
+    selection.toggle(id);
+    removeSoloFromSelection();
   }
 
   // Cada handler devolve se "tratou" o evento (achou algo registrado ali /
@@ -127,7 +157,7 @@ export function useMapElementsState() {
     e.stopPropagation();
 
     if (e.ctrlKey || e.metaKey) {
-      selection.toggle(hitId);
+      toggleSelected(hitId);
       return true;
     }
 
@@ -187,12 +217,15 @@ export function useMapElementsState() {
 
   // Seleciona todo elemento registrado que intersecta `rect` (px — vem do
   // onAreaSelect do MapViewport). `additive`: soma à seleção (Ctrl/Cmd).
+  // Elemento `solo` nunca entra (nem fica, se já estava selecionado antes
+  // de uma seleção aditiva).
   function selectInRect(rect: ElementBounds, additive: boolean) {
     const bounds = new Map<string, ElementBounds>();
     registry.current.forEach((d, id) => {
-      if (d.selectable) bounds.set(id, d.bounds);
+      if (d.selectable && !d.solo) bounds.set(id, d.bounds);
     });
     selection.selectInRect(rect, bounds, additive);
+    if (additive) removeSoloFromSelection();
   }
 
   // Chama onRemove de cada selecionado que for `removable` — usado tanto
@@ -232,7 +265,7 @@ export function useMapElementsState() {
     dragDelta,
     register,
     unregister,
-    toggleSelected: selection.toggle,
+    toggleSelected,
     selectOnly: selection.selectOnly,
     clearSelection: selection.clear,
     removeSelected,
@@ -274,6 +307,14 @@ interface UseMapElementArgs {
   height: number;
   /** Participa de clique/Ctrl+clique/seleção em área. Default true. */
   selectable?: boolean;
+  /**
+   * Só é selecionado sozinho: fica fora de seleção múltipla (Ctrl/Cmd+clique,
+   * seleção em área), então nunca é movido/removido junto com outros
+   * elementos. Default false.
+   */
+  solo?: boolean;
+  /** Desempate quando elementos se sobrepõem no clique: maior ganha. Empate → quem está por cima. Default 0. */
+  hitPriority?: number;
   /** Participa de arrastar-pra-mover (grupo, com a posição resultante em `onMove`). Default false. */
   movable?: boolean;
   onMove?: (next: { x: number; y: number }) => void;
@@ -293,6 +334,8 @@ export function useMapElement({
   width,
   height,
   selectable = true,
+  solo = false,
+  hitPriority = 0,
   movable = false,
   onMove,
   removable = false,
@@ -305,7 +348,16 @@ export function useMapElement({
 
   useLayoutEffect(() => {
     if (!id) return;
-    ctx.register(id, { bounds: { x, y, width, height }, selectable, movable, onMove, removable, onRemove });
+    ctx.register(id, {
+      bounds: { x, y, width, height },
+      selectable,
+      solo,
+      hitPriority,
+      movable,
+      onMove,
+      removable,
+      onRemove,
+    });
   });
 
   useLayoutEffect(() => {

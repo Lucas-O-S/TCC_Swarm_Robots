@@ -72,3 +72,45 @@ export function AreaIcon() {
     </svg>
   );
 }
+
+// Cabeça de robô (antena + dois olhos) — ferramenta "Robô" (posicionar o
+// robô que vai percorrer a rota, ver TaskBuilder).
+export function RobotIcon() {
+  return (
+    <svg {...ICON_PROPS} aria-hidden="true">
+      <rect x="5" y="8" width="14" height="11" rx="2.5" />
+      <line x1="12" y1="4.5" x2="12" y2="8" />
+      <circle cx="12" cy="3.8" r="0.9" />
+      <circle cx="9.5" cy="13" r="1" fill="currentColor" />
+      <circle cx="14.5" cy="13" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+// Triângulo cheio — tocar a prévia do percurso.
+export function PlayIcon() {
+  return (
+    <svg width={14} height={14} viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M7 4.5 L19.5 12 L7 19.5 Z" fill="currentColor" />
+    </svg>
+  );
+}
+
+// Duas barras — pausar a prévia do percurso.
+export function PauseIcon() {
+  return (
+    <svg width={14} height={14} viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor" />
+      <rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+// Quadrado cheio — parar a prévia e voltar o robô pro início.
+export function StopIcon() {
+  return (
+    <svg width={14} height={14} viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" />
+    </svg>
+  );
+}

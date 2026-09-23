@@ -135,28 +135,26 @@ function perimeterTraversal(area: TaskAreaDraft): AreaPoint[] {
   return [at(i), ...rest.filter((c) => c.corner !== area.exit), ...rest.filter((c) => c.corner === area.exit)];
 }
 
+/** Ponto da rota achatada — `id` do waypoint, do canto ou do ponto de zigzag (estável enquanto o ponto existir). */
+export interface RoutePoint {
+  id: string;
+  x: number;
+  y: number;
+}
+
 // Rota inteira achatada em pontos, na ordem de percurso — waypoint = 1
-// ponto; bloco = seus pontos na ordem de `areaTraversal`. `order` numera
-// cada ponto (id do waypoint, do canto ou do ponto de zigzag) na rota
-// inteira, 1-based; `line` é a polyline que liga tudo em sequência.
+// ponto; bloco = seus pontos na ordem de `areaTraversal`. `points` é a
+// sequência (a polyline da rota, e os alvos do robô na prévia); `order`
+// numera cada ponto pelo id na rota inteira, 1-based.
 export function flattenRoute(stops: TaskStopDraft[]) {
-  const order = new Map<string, number>();
-  const line: { x: number; y: number }[] = [];
+  const points: RoutePoint[] = stops.flatMap((stop) =>
+    stop.kind === "waypoint"
+      ? [{ id: stop.id, x: stop.x, y: stop.y }]
+      : areaTraversal(stop).map((p) => ({ id: p.id, x: p.x, y: p.y })),
+  );
+  const order = new Map(points.map((p, index) => [p.id, index + 1]));
 
-  for (const stop of stops) {
-    if (stop.kind === "waypoint") {
-      order.set(stop.id, order.size + 1);
-      line.push({ x: stop.x, y: stop.y });
-      continue;
-    }
-
-    for (const c of areaTraversal(stop)) {
-      order.set(c.id, order.size + 1);
-      line.push({ x: c.x, y: c.y });
-    }
-  }
-
-  return { order, line };
+  return { order, points };
 }
 
 // Arrastar um canto move só os eixos que ele controla — os dois cantos
