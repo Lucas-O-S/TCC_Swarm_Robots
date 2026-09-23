@@ -1,0 +1,98 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-bottom: 14px;
+}
+
+.fieldRow {
+  display: flex;
+  gap: 12px;
+}
+
+.fieldRow .field {
+  flex: 1;
+}
+
+.summary {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 0 0 14px;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin: 0 0 14px;
+}
+
+.cornerGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 40px);
+  grid-template-rows: repeat(2, 40px);
+  gap: 6px;
+}
+
+.field .hint {
+  margin: 0;
+}
+
+.segmented {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 6px;
+}
+
+.segmented .cornerButton {
+  padding: 8px 10px;
+}
+
+.stepper {
+  display: grid;
+  grid-template-columns: 40px 1fr 40px;
+  align-items: center;
+  height: 40px;
+  gap: 6px;
+}
+
+.stepper .cornerButton {
+  height: 100%;
+}
+
+.stepperValue {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--color-text);
+}
+
+.cornerButton {
+  font: inherit;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.cornerButton:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.cornerButtonActive {
+  background: var(--color-yellow);
+  border-color: var(--color-dark);
+  color: var(--color-dark);
+}
+
+/* Saída calculada do zigzag — só indicação, não é escolhida por clique. */
+.cornerButtonMarked {
+  border: 2px dashed var(--color-yellow);
+}
