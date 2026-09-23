@@ -4,6 +4,8 @@ import styles from './RobotPath.module.css';
 interface RobotPathProps {
   points: TaskWaypointModel[];
   cellSize: number;
+  /** Altura da célula (px) quando ela não é quadrada (MapCanvas com `fitWidth` + `maxHeight`) — default `cellSize`. */
+  cellHeight?: number;
   color?: string;
   className?: string;
   /** Fecha a linha de volta pro primeiro ponto — mesma rota, só que virando um bloco/área em vez de um trajeto aberto. Default false. */
@@ -17,13 +19,20 @@ interface RobotPathProps {
 // cellSize igual <Obstacle>/<Robot>. É um overlay do tamanho do mapa
 // inteiro, por isso não recebe left/top como os outros — quem posiciona
 // cada ponto é a lista `points`, não quem usa o componente.
-export function RobotPath({ points, cellSize, color = 'var(--color-orange)', className = '', closed = false }: RobotPathProps) {
+export function RobotPath({
+  points,
+  cellSize,
+  cellHeight = cellSize,
+  color = 'var(--color-orange)',
+  className = '',
+  closed = false,
+}: RobotPathProps) {
   if (points.length === 0) return null;
 
   const ordered = [...points].sort((a, b) => a.orderIndex - b.orderIndex);
   const pixelPoints = ordered.map((p) => ({
     x: p.x * cellSize + cellSize / 2,
-    y: p.y * cellSize + cellSize / 2,
+    y: p.y * cellHeight + cellHeight / 2,
   }));
   const linePoints = closed && pixelPoints.length > 1 ? [...pixelPoints, pixelPoints[0]] : pixelPoints;
 

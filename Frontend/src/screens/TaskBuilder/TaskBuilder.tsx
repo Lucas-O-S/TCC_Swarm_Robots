@@ -10,12 +10,20 @@ import { RobotPath } from "../../components/RobotPath/RobotPath";
 import { MapToolButton } from "../../components/MapToolButton/MapToolButton";
 import { WaypointIcon, AreaIcon } from "../../components/MapToolButton/icons";
 import { WaypointDrawer } from "../../components/WaypointDrawer/WaypointDrawer";
+import { AreaDrawer } from "../../components/AreaDrawer/AreaDrawer";
 import { SelectTaskMapModal } from "../../components/SelectTaskMapModal/SelectTaskMapModal";
 import { Button } from "../../components/Button/Button";
 import { TaskService } from "../../services/Task.Service";
 import { CenarioService } from "../../services/Cenario.Service";
-import { createWaypointFromRect } from "./useTaskEditor";
-import type { TaskWaypointDraft } from "./useTaskEditor";
+import {
+  areaCorners,
+  areaTraversal,
+  createAreaFromRect,
+  createWaypointFromRect,
+  flattenRoute,
+  moveAreaCorner,
+} from "./useTaskEditor";
+import type { AreaCorner, AreaTraversalSettings, TaskStopDraft, TaskWaypointDraft } from "./useTaskEditor";
 import styles from "./TaskBuilder.module.css";
 
 const AREA_COLOR = "var(--color-yellow)";
@@ -36,11 +44,11 @@ export function TaskBuilder() {
   const [mapConfig, setMapConfig] = useState<MapModel | null>(null);
   const [name, setName] = useState("");
   const [priority, setPriority] = useState(0);
-  const [waypoints, setWaypoints] = useState<TaskWaypointDraft[]>([]);
-  // Área/bloco = mesmo sistema de waypoints (mesmo tipo, mesma criação por
-  // clique), só que numa lista separada e desenhada como loop fechado em
-  // vez de rota aberta (ver <RobotPath closed /> mais abaixo).
-  const [areaPoints, setAreaPoints] = useState<TaskWaypointDraft[]>([]);
+  // Rota = uma lista só de paradas, waypoint unitário OU bloco (sempre um
+  // retângulo de 4 waypoints, um por canto, criado arrastando no mapa — ver
+  // useTaskEditor/TaskAreaDraft). A ordem de criação é a ordem da rota, e a
+  // linha liga todas as paradas em sequência (ver flattenRoute).
+  const [stops, setStops] = useState<TaskStopDraft[]>([]);
   const [tool, setTool] = useState<Tool>("move");
   const [saveState, setSaveState] = useState<SaveState>({ status: "idle" });
 
@@ -50,31 +58,32 @@ export function TaskBuilder() {
 
   function handleSelectMockMap() {
     setMapConfig(CenarioService.createMockMap());
-    setWaypoints([]);
-    setAreaPoints([]);
+    setStops([]);
   }
 
   function handleChangeMap() {
     setMapConfig(null);
-    setWaypoints([]);
-    setAreaPoints([]);
+    setStops([]);
   }
 
   function updateWaypoint(id: string, patch: Partial<Pick<TaskWaypointDraft, "x" | "y">>) {
-    setWaypoints((prev) => prev.map((w) => (w.id === id ? { ...w, ...patch } : w)));
+    setStops((prev) => prev.map((s) => (s.kind === "waypoint" && s.id === id ? { ...s, ...patch } : s)));
   }
 
-  function removeWaypoint(id: string) {
-    setWaypoints((prev) => prev.filter((w) => w.id !== id));
+  function updateAreaCorner(areaId: string, corner: AreaCorner, x: number, y: number) {
+    setStops((prev) => prev.map((s) => (s.kind === "area" && s.id === areaId ? moveAreaCorner(s, corner, x, y) : s)));
   }
 
-  function updateAreaPoint(id: string, patch: Partial<Pick<TaskWaypointDraft, "x" | "y">>) {
-    setAreaPoints((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  function updateAreaTraversal(areaId: string, patch: Partial<AreaTraversalSettings>) {
+    setStops((prev) => prev.map((s) => (s.kind === "area" && s.id === areaId ? { ...s, ...patch } : s)));
   }
 
-  function removeAreaPoint(id: string) {
-    setAreaPoints((prev) => prev.filter((p) => p.id !== id));
+  function removeStop(id: string) {
+    setStops((prev) => prev.filter((s) => s.id !== id));
   }
+
+  const waypoints = stops.filter((s) => s.kind === "waypoint");
+  const areas = stops.filter((s) => s.kind === "area");
 
   async function handleSave() {
     if (!name.trim()) {
@@ -95,8 +104,11 @@ export function TaskBuilder() {
     );
   }
 
-  const routePoints = waypoints.map((w, index) => ({ orderIndex: index, x: w.x, y: w.y }));
-  const areaRoutePoints = areaPoints.map((p, index) => ({ orderIndex: index, x: p.x, y: p.y }));
+  // `orderById` numera todo ponto da rota (waypoint, canto de bloco e ponto
+  // de zigzag) na ordem de percurso — é o número exibido em cada marcador e
+  // nos drawers.
+  const { order: orderById, line } = flattenRoute(stops);
+  const routePoints = line.map((p, index) => ({ orderIndex: index, x: p.x, y: p.y }));
 
   return (
     <>
@@ -143,9 +155,9 @@ export function TaskBuilder() {
                 </p>
 
                 <p className={styles.routeSummary}>
-                  {areaPoints.length === 0
-                    ? 'Nenhum ponto de área ainda — use a ferramenta "Área" e clique no mapa (fecha em loop com 3+ pontos).'
-                    : `${areaPoints.length} ponto${areaPoints.length > 1 ? "s" : ""} de área.`}
+                  {areas.length === 0
+                    ? 'Nenhum bloco ainda — use a ferramenta "Área" e arraste no mapa pra desenhar um retângulo.'
+                    : `${areas.length} bloco${areas.length > 1 ? "s" : ""} na rota.`}
                 </p>
 
                 <Button variant="accent" onClick={handleSave} disabled={saveState.status === "saving"}>
@@ -180,19 +192,26 @@ export function TaskBuilder() {
               createTool={waypointTool || areaTool ? tool : undefined}
               onCreateElement={(rect) => {
                 if (waypointTool) {
-                  setWaypoints((prev) => [...prev, createWaypointFromRect(rect, cenario.sizeX, cenario.sizeY)]);
+                  setStops((prev) => [...prev, createWaypointFromRect(rect, cenario.sizeX, cenario.sizeY)]);
                 } else if (areaTool) {
-                  setAreaPoints((prev) => [...prev, createWaypointFromRect(rect, cenario.sizeX, cenario.sizeY)]);
+                  const next = createAreaFromRect(rect, cenario.sizeX, cenario.sizeY, line.at(-1));
+                  if (next) setStops((prev) => [...prev, next]);
                 }
               }}
-              renderCreatePreview={(rect) => (
-                <Waypoint
-                  x={rect.x + rect.width / 2}
-                  y={rect.y + rect.height / 2}
-                  color={areaTool ? AREA_COLOR : undefined}
-                  className={styles.waypointPreview}
-                />
-              )}
+              renderCreatePreview={(rect) =>
+                areaTool ? (
+                  <div
+                    className={`${styles.areaOutline} ${styles.waypointPreview}`}
+                    style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height, borderColor: AREA_COLOR }}
+                  />
+                ) : (
+                  <Waypoint
+                    x={rect.x + rect.width / 2}
+                    y={rect.y + rect.height / 2}
+                    className={styles.waypointPreview}
+                  />
+                )
+              }
               tools={
                 <>
                   <MapToolButton
@@ -205,13 +224,18 @@ export function TaskBuilder() {
                   <MapToolButton
                     active={areaTool}
                     onClick={() => setTool(areaTool ? "move" : "area")}
-                    title="Adicionar ponto de área (clique no mapa, fecha em loop com 3+ pontos)"
+                    title="Desenhar bloco (arraste no mapa pra formar um retângulo)"
                   >
                     <AreaIcon />
                   </MapToolButton>
                 </>
               }
-              panel={<WaypointDrawer allWaypoints={waypoints} onChange={updateWaypoint} />}
+              panel={
+                <>
+                  <WaypointDrawer allWaypoints={waypoints} onChange={updateWaypoint} orderById={orderById} />
+                  <AreaDrawer allAreas={areas} orderById={orderById} onChange={updateAreaTraversal} />
+                </>
+              }
             >
               {(cellWidth, cellHeight) => (
                 <>
@@ -227,36 +251,77 @@ export function TaskBuilder() {
                     />
                   ))}
 
-                  <RobotPath points={areaRoutePoints} cellSize={cellWidth} color={AREA_COLOR} closed />
-
-                  {areaPoints.map((point, index) => (
-                    <Waypoint
-                      key={point.id}
-                      id={point.id}
-                      order={index + 1}
-                      color={AREA_COLOR}
-                      x={(point.x + 0.5) * cellWidth}
-                      y={(point.y + 0.5) * cellHeight}
-                      movable
-                      onMove={(next) =>
-                        updateAreaPoint(point.id, {
-                          x: Math.max(0, Math.min(cenario.sizeX - 1, Math.round(next.x / cellWidth - 0.5))),
-                          y: Math.max(0, Math.min(cenario.sizeY - 1, Math.round(next.y / cellHeight - 0.5))),
-                        })
-                      }
-                      removable
-                      onRemove={() => removeAreaPoint(point.id)}
-                      className={canMoveWaypoint ? styles.placedWaypoint : undefined}
+                  {/*
+                    Contorno/área de cada bloco ligando os centros dos 4
+                    cantos — a linha da rota (abaixo) já passa pelos 4 cantos
+                    na ordem de percurso; isto só marca a área em si.
+                  */}
+                  {areas.map((area) => (
+                    <div
+                      key={area.id}
+                      className={styles.areaOutline}
+                      style={{
+                        left: (Math.min(area.x1, area.x2) + 0.5) * cellWidth,
+                        top: (Math.min(area.y1, area.y2) + 0.5) * cellHeight,
+                        width: Math.abs(area.x2 - area.x1) * cellWidth,
+                        height: Math.abs(area.y2 - area.y1) * cellHeight,
+                        borderColor: AREA_COLOR,
+                      }}
                     />
                   ))}
 
-                  <RobotPath points={routePoints} cellSize={cellWidth} />
+                  <RobotPath points={routePoints} cellSize={cellWidth} cellHeight={cellHeight} />
 
-                  {waypoints.map((waypoint, index) => (
+                  {/*
+                    Pontos de dentro do zigzag — derivados do bloco (padrão +
+                    passadas), então só exibem o número: sem id, não entram em
+                    seleção/arrasto. Quem redimensiona o bloco são os cantos.
+                  */}
+                  {areas.flatMap((area) =>
+                    areaTraversal(area)
+                      .filter((point) => !point.corner)
+                      .map((point) => (
+                        <Waypoint
+                          key={point.id}
+                          order={orderById.get(point.id)}
+                          color={AREA_COLOR}
+                          x={(point.x + 0.5) * cellWidth}
+                          y={(point.y + 0.5) * cellHeight}
+                          className={styles.innerAreaPoint}
+                        />
+                      )),
+                  )}
+
+                  {areas.flatMap((area) =>
+                    areaCorners(area).map((point) => (
+                      <Waypoint
+                        key={point.id}
+                        id={point.id}
+                        order={orderById.get(point.id)}
+                        color={AREA_COLOR}
+                        x={(point.x + 0.5) * cellWidth}
+                        y={(point.y + 0.5) * cellHeight}
+                        movable
+                        onMove={(next) =>
+                          updateAreaCorner(
+                            area.id,
+                            point.corner,
+                            Math.max(0, Math.min(cenario.sizeX - 1, Math.round(next.x / cellWidth - 0.5))),
+                            Math.max(0, Math.min(cenario.sizeY - 1, Math.round(next.y / cellHeight - 0.5))),
+                          )
+                        }
+                        removable
+                        onRemove={() => removeStop(area.id)}
+                        className={canMoveWaypoint ? styles.placedWaypoint : undefined}
+                      />
+                    )),
+                  )}
+
+                  {waypoints.map((waypoint) => (
                     <Waypoint
                       key={waypoint.id}
                       id={waypoint.id}
-                      order={index + 1}
+                      order={orderById.get(waypoint.id)}
                       x={(waypoint.x + 0.5) * cellWidth}
                       y={(waypoint.y + 0.5) * cellHeight}
                       movable
@@ -267,7 +332,7 @@ export function TaskBuilder() {
                         })
                       }
                       removable
-                      onRemove={() => removeWaypoint(waypoint.id)}
+                      onRemove={() => removeStop(waypoint.id)}
                       className={canMoveWaypoint ? styles.placedWaypoint : undefined}
                     />
                   ))}
