@@ -23,8 +23,9 @@
 .areaOutline {
   position: absolute;
   box-sizing: border-box;
-  border: 2px dashed;
-  background: color-mix(in srgb, var(--color-yellow) 12%, transparent);
+  border: 1px solid;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--color-yellow) 22%, transparent);
   pointer-events: none;
 }
 

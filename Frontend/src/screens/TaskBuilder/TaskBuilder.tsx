@@ -252,9 +252,10 @@ export function TaskBuilder() {
                   ))}
 
                   {/*
-                    Contorno/área de cada bloco ligando os centros dos 4
-                    cantos — a linha da rota (abaixo) já passa pelos 4 cantos
-                    na ordem de percurso; isto só marca a área em si.
+                    Área de cada bloco ligando os centros dos 4 cantos — é
+                    região (preenchimento + borda fina sólida), não linha: a
+                    rota (abaixo) passa por cima pelos mesmos lados, e duas
+                    linhas tracejadas sobrepostas ficavam ilegíveis.
                   */}
                   {areas.map((area) => (
                     <div
@@ -270,7 +271,7 @@ export function TaskBuilder() {
                     />
                   ))}
 
-                  <RobotPath points={routePoints} cellSize={cellWidth} cellHeight={cellHeight} />
+                  <RobotPath points={routePoints} cellSize={cellWidth} cellHeight={cellHeight} variant="arrows" />
 
                   {/*
                     Pontos de dentro do zigzag — derivados do bloco (padrão +
