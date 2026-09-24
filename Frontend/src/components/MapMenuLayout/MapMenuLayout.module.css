@@ -3,6 +3,10 @@
   font-family: var(--font-mono);
 }
 
+.header {
+  margin-bottom: 24px;
+}
+
 .body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

@@ -39,17 +39,6 @@
   margin: 0;
 }
 
-.segmented {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 1fr;
-  gap: 6px;
-}
-
-.segmented .cornerButton {
-  padding: 8px 10px;
-}
-
 .stepper {
   display: grid;
   grid-template-columns: 40px 1fr 40px;

@@ -1,0 +1,77 @@
+.base {
+  position: relative;
+  flex-shrink: 0;
+  margin: 0 auto;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  background:
+    linear-gradient(var(--color-border), var(--color-border)) center / 1px 70% no-repeat,
+    linear-gradient(var(--color-border), var(--color-border)) center / 70% 1px no-repeat,
+    radial-gradient(circle, var(--color-surface) 0%, var(--color-surface-alt) 70%);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.08);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.dragging {
+  cursor: grabbing;
+  border-color: var(--color-orange);
+}
+
+.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffb14d, var(--color-orange) 60%, #d97400);
+  box-shadow:
+    0 3px 8px rgba(0, 0, 0, 0.25),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  /* volta pro centro com "mola" ao soltar; durante o arrasto segue o dedo sem atraso */
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.dragging .knob {
+  transition: none;
+}
+
+.arrow {
+  position: absolute;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--color-text-muted);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.up {
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.down {
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.left {
+  left: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.right {
+  right: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+}

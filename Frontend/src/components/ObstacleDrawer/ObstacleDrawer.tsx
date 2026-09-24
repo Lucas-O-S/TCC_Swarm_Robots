@@ -1,7 +1,6 @@
 import type { ChangeEvent } from 'react';
 import type { ObstaclesModel } from '../../model/Obstacles.Model';
-import { useMapSelection } from '../../hooks/useMapElements';
-import { Drawer } from '../Drawer/Drawer';
+import { ObstacleDrawerBase } from './ObstacleDrawerBase';
 import { Button } from '../Button/Button';
 import styles from './ObstacleDrawer.module.css';
 
@@ -20,65 +19,62 @@ interface ObstacleDrawerProps {
 // some junto. Precisa ser passado via <MapCanvas panel={...}> — é onde
 // useMapSelection() consegue enxergar o contexto de seleção do mapa.
 export function ObstacleDrawer({ allObstacles, onChange }: ObstacleDrawerProps) {
-  const { selectedIds, clear, removeSelected } = useMapSelection();
-  const obstacles = allObstacles.filter((o) => selectedIds.has(o.id));
-  const single = obstacles.length === 1 ? obstacles[0] : null;
+  return (
+    <ObstacleDrawerBase
+      allObstacles={allObstacles}
+      selectionId={(o) => o.id}
+      nameOf={(o) => o.name}
+      labels={{ one: 'Obstáculo', many: 'obstáculos', removeMany: 'Remover selecionados' }}
+      renderSingle={(single, remove) => (
+        <ObstacleFields obstacle={single} onChange={(patch) => onChange(single.id, patch)} onRemove={remove} />
+      )}
+    />
+  );
+}
 
-  function handleSingleChange(patch: Partial<ObstaclesModel>) {
-    if (single) onChange(single.id, patch);
-  }
-
+function ObstacleFields({
+  obstacle,
+  onChange,
+  onRemove,
+}: {
+  obstacle: ObstaclesModel;
+  onChange: (patch: Partial<ObstaclesModel>) => void;
+  onRemove: () => void;
+}) {
   function handleNumberChange(field: 'sizeX' | 'sizeY') {
     return (e: ChangeEvent<HTMLInputElement>) => {
       const value = Number(e.target.value);
-      if (!Number.isNaN(value)) handleSingleChange({ [field]: value });
+      if (!Number.isNaN(value)) onChange({ [field]: value });
     };
   }
 
-  const title = obstacles.length > 1 ? `${obstacles.length} obstáculos` : 'Obstáculo';
-
   return (
-    <Drawer open={obstacles.length > 0} onClose={clear} title={title}>
-      {single && (
-        <>
-          <label className={styles.field}>
-            Nome
-            <input type="text" value={single.name} onChange={(e) => handleSingleChange({ name: e.target.value })} />
-          </label>
+    <>
+      <label className={styles.field}>
+        Nome
+        <input type="text" value={obstacle.name} onChange={(e) => onChange({ name: e.target.value })} />
+      </label>
 
-          <label className={styles.field}>
-            Descrição
-            <textarea value={single.description} onChange={(e) => handleSingleChange({ description: e.target.value })} />
-          </label>
+      <label className={styles.field}>
+        Descrição
+        <textarea value={obstacle.description} onChange={(e) => onChange({ description: e.target.value })} />
+      </label>
 
-          <div className={styles.fieldRow}>
-            <label className={styles.field}>
-              Largura (colunas)
-              <input type="number" min={1} value={single.sizeX} onChange={handleNumberChange('sizeX')} />
-            </label>
+      <div className={styles.fieldRow}>
+        <label className={styles.field}>
+          Largura (colunas)
+          <input type="number" min={1} value={obstacle.sizeX} onChange={handleNumberChange('sizeX')} />
+        </label>
 
-            <label className={styles.field}>
-              Altura (linhas)
-              <input type="number" min={1} value={single.sizeY} onChange={handleNumberChange('sizeY')} />
-            </label>
-          </div>
+        <label className={styles.field}>
+          Altura (linhas)
+          <input type="number" min={1} value={obstacle.sizeY} onChange={handleNumberChange('sizeY')} />
+        </label>
+      </div>
 
-          <Button variant="outline" onClick={removeSelected}>
-            Remover obstáculo
-          </Button>
-        </>
-      )}
-
-      {obstacles.length > 1 && (
-        <>
-          <p className={styles.summary}>
-            {obstacles.map((o) => o.name).join(', ')}
-          </p>
-          <Button variant="outline" onClick={removeSelected}>
-            Remover selecionados
-          </Button>
-        </>
-      )}
-    </Drawer>
+      <Button variant="outline" onClick={onRemove}>
+        Remover obstáculo
+      </Button>
+    </>
   );
 }

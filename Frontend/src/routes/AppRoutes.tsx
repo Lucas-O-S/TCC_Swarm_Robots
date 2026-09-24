@@ -12,8 +12,8 @@ const LoginScreen = lazy(() =>
 const DashboardScreen = lazy(() =>
   import('../screens/dashboard/DashboardScreen').then((m) => ({ default: m.DashboardScreen })),
 );
-const SimulationScreen = lazy(() =>
-  import('../screens/simulator/ui/SimulationScreen').then((m) => ({ default: m.SimulationScreen })),
+const Simulation = lazy(() =>
+  import('../screens/Simulation/Simulation').then((m) => ({ default: m.Simulation })),
 );
 const MapTestScreen = lazy(() =>
   import('../screens/map-test/MapTestScreen').then((m) => ({ default: m.MapTestScreen })),
@@ -39,7 +39,7 @@ export function AppRoutes() {
 
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<DashboardScreen />} />
-            <Route path="/simulacao" element={<SimulationScreen />} />
+            <Route path="/simulacao" element={<Simulation />} />
             <Route path="/mapa-teste" element={<MapTestScreen />} />
             <Route path="/CenarioBuilder" element={<CenarioBuilder />} />
             <Route path="/TaskBuilder" element={<TaskBuilder />} />

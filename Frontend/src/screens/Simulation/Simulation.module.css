@@ -1,0 +1,15 @@
+/* Menu lateral da Simulação: vários <Menu> (cartões) — em duas colunas
+   quando a coluna do menu tem espaço, pra tela não ficar comprida demais. */
+.menuColumn {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  align-items: start;
+  min-width: 0;
+}
+
+.placeholder {
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
+}

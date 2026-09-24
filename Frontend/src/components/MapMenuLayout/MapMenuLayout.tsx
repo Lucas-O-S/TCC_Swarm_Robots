@@ -8,6 +8,8 @@ const SCREEN_BOTTOM_GAP = 28;
 
 interface MapMenuLayoutProps {
   menu: ReactNode;
+  /** Faixa opcional no topo, acima do mapa e do menu (ex.: header da Simulação). */
+  header?: ReactNode;
   /** Conteúdo do mapa — recebe a altura máxima calculada (px) pra caber na tela sem rolagem. */
   children: (maxMapHeight: number | undefined) => ReactNode;
   className?: string;
@@ -17,9 +19,13 @@ interface MapMenuLayoutProps {
 // combinam um <MapCanvas> com um painel de configuração/controle ao lado
 // (ex.: CenarioBuilder). Mede a altura disponível da coluna do mapa e
 // repassa pro conteúdo, pra ele preencher a tela sem estourar o rodapé.
-export function MapMenuLayout({ menu, children, className = '' }: MapMenuLayoutProps) {
+// Com `header`, a faixa fica em cima das duas colunas; se ela mudar de
+// altura (quebra de linha, aviso aparecendo), a altura do mapa é recalculada.
+export function MapMenuLayout({ menu, header, children, className = '' }: MapMenuLayoutProps) {
   const mapColumnRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
   const [maxMapHeight, setMaxMapHeight] = useState<number>();
+  const hasHeader = header !== undefined && header !== null;
 
   useEffect(() => {
     function updateMaxHeight() {
@@ -30,11 +36,21 @@ export function MapMenuLayout({ menu, children, className = '' }: MapMenuLayoutP
 
     updateMaxHeight();
     window.addEventListener('resize', updateMaxHeight);
-    return () => window.removeEventListener('resize', updateMaxHeight);
-  }, []);
+    const observer = headerRef.current && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateMaxHeight) : null;
+    if (observer && headerRef.current) observer.observe(headerRef.current);
+    return () => {
+      window.removeEventListener('resize', updateMaxHeight);
+      observer?.disconnect();
+    };
+  }, [hasHeader]);
 
   return (
     <div className={`${styles.screen} ${className}`}>
+      {hasHeader && (
+        <div className={styles.header} ref={headerRef}>
+          {header}
+        </div>
+      )}
       <div className={styles.body}>
         <div className={styles.mapColumn} ref={mapColumnRef}>
           {children(maxMapHeight)}

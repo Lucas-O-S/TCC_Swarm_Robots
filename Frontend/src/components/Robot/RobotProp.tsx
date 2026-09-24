@@ -11,12 +11,15 @@ interface RobotProps extends HTMLAttributes<HTMLDivElement> {
   selected?: boolean;
   /**
    * Orientação do robô em graus (0° = apontando pra cima, sentido horário) —
-   * mesmo `theta` usado em screens/simulator/ui/components/SimulationMap.tsx.
+   * o `theta` do simulador vira esta direção em screens/Simulation/useMapGeometry.ts (thetaToDirection).
    * Desenha uma seta indicando pra onde o robô está apontando, sem girar o
    * label (ao contrário do robô do simulador, este tem texto dentro).
    */
   direction?: number;
 }
+
+/** Diâmetro do marcador em px (o mesmo de Robot.module.css) — área clicável/arrastável de quem põe o <Robot> no mapa. */
+export const ROBOT_SIZE = 20;
 
 const STATUS_CLASS: Record<RobotStatus, string> = {
   [RobotStatus.Active]: 'active',

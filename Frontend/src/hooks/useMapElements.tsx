@@ -390,7 +390,7 @@ export function useMapElement({
 //   lateral): a tela chama `useMapElementsState()` ela mesma, envolve
 //   tanto o <MapCanvas> quanto esse painel num <MapElementsProvider>
 //   próprio, e passa o mesmo objeto pro <MapCanvas> via prop `elements`
-//   (ver DashboardScreen/SimulationScreen).
+//   (ver DashboardScreen/Simulation).
 export function useMapSelection() {
   const ctx = useContext(MapElementsContext);
   if (!ctx) {

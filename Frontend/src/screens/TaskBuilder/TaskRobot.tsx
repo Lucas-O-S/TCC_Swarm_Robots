@@ -1,12 +1,9 @@
 import { useMapElement } from "../../hooks/useMapElements";
-import { Robot } from "../../components/Robot/RobotProp";
+import { Robot, ROBOT_SIZE } from "../../components/Robot/RobotProp";
 import { RobotStatus } from "../../enums/RobotStatus.enum";
 
 /** Id fixo no registro de seleção do mapa — só existe 1 robô nesta tela. */
 export const TASK_ROBOT_ID = "task-robot";
-
-/** Mesmo diâmetro do marcador em Robot.module.css — área clicável/arrastável. */
-const SIZE = 20;
 
 interface TaskRobotProps {
   /** Centro do robô (px) dentro do mapa. */
@@ -29,13 +26,13 @@ interface TaskRobotProps {
 // rota), o clique vai pro ponto (`hitPriority` menor) — arrastar o waypoint
 // não arrasta o robô.
 export function TaskRobot({ x, y, direction, blocked = false, onMove, onRemove, className }: TaskRobotProps) {
-  const half = SIZE / 2;
+  const half = ROBOT_SIZE / 2;
   const { selected, x: renderX, y: renderY } = useMapElement({
     id: TASK_ROBOT_ID,
     x: x - half,
     y: y - half,
-    width: SIZE,
-    height: SIZE,
+    width: ROBOT_SIZE,
+    height: ROBOT_SIZE,
     solo: true,
     hitPriority: -1,
     movable: true,
