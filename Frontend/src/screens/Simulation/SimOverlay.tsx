@@ -1,4 +1,8 @@
+import { Fragment } from 'react';
+import { RobotPath } from '../../components/RobotPath/RobotPath';
+import { Waypoint } from '../../components/Waypoint/Waypoint';
 import { DotBotControlMode } from '../../enums/DotBotControlMode.enum';
+import { SimRobotMapper } from '../../mapper/SimRobot.Mapper';
 import type { SimMapRobotModel } from '../../model/SimRobot.Model';
 import type { Vec2Model } from '../../model/SimWorld.Model';
 import type { MapScale } from './useMapGeometry';
@@ -20,92 +24,115 @@ interface SimOverlayProps {
 }
 
 const PREVIEW_COLOR = '#d63384'; // fora da paleta dos robôs e do laranja do rascunho
+const REACHED_COLOR = 'var(--color-text-muted)';
 
-// Camada SVG (sem clique) com o que é "desenho" e não elemento de mapa:
-// rastro recente de cada robô, rota do modo AUTO (tracejada, alvo atual
-// destacado, fecha o circuito quando em loop) e a rota em montagem —
-// mesmas informações do MapView do RobotSwarmSimulator.
+// Desenhos (sem clique) por cima do mapa: rastro recente de cada robô (SVG
+// próprio) e as rotas pelo <RobotPath>, em px:
+//   - Simular: rota de cada robô em AUTO no mesmo desenho da tela de Tarefas
+//     (linha com setas + <Waypoint> numerado), na cor do robô, saindo da
+//     posição dele; ponto já alcançado em cinza; fecha o circuito em loop;
+//   - Editar: rota tracejada com círculos numerados (a do robô em foco só a
+//     linha — os pontos dela são <Waypoint> arrastáveis no SimulationMap);
+//   - rota em montagem (laranja) e preview de tarefa (rosa).
 export function SimOverlay({ scale, robots, trails, editable, focusAddress, routeDraft, taskPreview = null }: SimOverlayProps) {
   const px = (p: Vec2Model) => toPx(scale, p);
   const pts = (list: Vec2Model[]) => list.map((p) => { const q = px(p); return `${q.x},${q.y}`; }).join(' ');
+  const path = (list: Vec2Model[]) => list.map((p, orderIndex) => ({ orderIndex, ...px(p) }));
+
+  const draftOwner = routeDraft ? robots.find((r) => r.address === routeDraft.address) : undefined;
 
   return (
-    <svg className={styles.overlay}>
-      {!editable &&
-        robots.map((r) => {
-          const trail = trails?.get(r.address);
-          if (!trail || trail.length < 2) return null;
-          return (
-            <polyline
-              key={`trail-${r.address}`}
-              points={pts([...trail, { x: r.x, y: r.y }])}
-              fill="none"
-              stroke={r.color}
-              strokeWidth={1.5}
-              opacity={0.4}
-            />
-          );
-        })}
+    <>
+      <svg className={styles.overlay}>
+        {!editable &&
+          robots.map((r) => {
+            const trail = trails?.get(r.address);
+            if (!trail || trail.length < 2) return null;
+            return (
+              <polyline
+                key={`trail-${r.address}`}
+                points={pts([...trail, { x: r.x, y: r.y }])}
+                fill="none"
+                stroke={r.color}
+                strokeWidth={1.5}
+                opacity={0.4}
+              />
+            );
+          })}
+      </svg>
 
       {robots.map((r) => {
         if (r.waypoints.length === 0) return null;
         const auto = r.mode === DotBotControlMode.Auto;
         if (!editable && !auto) return null;
-
-        const from = editable ? 0 : Math.min(r.waypointIdx, r.waypoints.length - 1);
-        const line = [{ x: r.x, y: r.y }, ...r.waypoints.slice(from)];
-        if (r.loop) line.push(r.waypoints[0]);
-        const isFocus = r.address === focusAddress && editable;
-
-        return (
-          <g key={`route-${r.address}`} opacity={auto ? 1 : 0.35}>
-            <polyline points={pts(line)} fill="none" stroke={r.color} strokeWidth={1.5} strokeDasharray="6 4" opacity={0.7} />
-            {!isFocus &&
-              r.waypoints.map((wp, k) => {
+        const routeColor = SimRobotMapper.displayColor(r); // mesma cor do círculo do robô (LED quando aceso)
+        if (!editable) {
+          return (
+            <Fragment key={`route-${r.address}`}>
+              <RobotPath
+                units="px"
+                cellSize={1}
+                variant="arrows"
+                points={path(r.waypoints)}
+                from={px({ x: r.x, y: r.y })}
+                reachedCount={r.waypointIdx}
+                closed={r.loop}
+                color={routeColor}
+              />
+              {r.waypoints.map((wp, k) => {
                 const q = px(wp);
-                const reached = !editable && k < r.waypointIdx;
-                const current = !editable && k === r.waypointIdx;
                 return (
-                  <g key={k}>
-                    <circle cx={q.x} cy={q.y} r={current ? 5 : 3.5} fill={reached ? 'var(--color-text-muted)' : r.color} opacity={current ? 1 : 0.6} />
-                    <text x={q.x + 6} y={q.y - 5} className={styles.waypointLabel}>
-                      {k + 1}
-                    </text>
-                  </g>
+                  <Waypoint
+                    key={k}
+                    x={q.x}
+                    y={q.y}
+                    order={k + 1}
+                    color={k < r.waypointIdx ? REACHED_COLOR : routeColor}
+                    selectable={false}
+                    className={styles.routeMarker}
+                  />
                 );
               })}
-          </g>
+            </Fragment>
+          );
+        }
+        return (
+          <RobotPath
+            key={`route-${r.address}`}
+            units="px"
+            cellSize={1}
+            points={path(r.waypoints)}
+            from={px({ x: r.x, y: r.y })}
+            reachedCount={editable ? 0 : r.waypointIdx}
+            closed={r.loop}
+            color={routeColor}
+            // Editar: o robô em foco já tem os <Waypoint> interativos — aqui só a linha.
+            markers={!(editable && r.address === focusAddress)}
+            className={auto ? undefined : styles.routeFaded}
+          />
         );
       })}
 
-      {routeDraft && routeDraft.points.length > 0 && (() => {
-        const owner = robots.find((r) => r.address === routeDraft.address);
-        const line = owner ? [{ x: owner.x, y: owner.y }, ...routeDraft.points] : routeDraft.points;
-        return <polyline points={pts(line)} fill="none" stroke="var(--color-orange)" strokeWidth={2} strokeDasharray="4 3" />;
-      })()}
-      {taskPreview && taskPreview.points.length > 0 && (
-        <g>
-          <polyline
-            points={pts(taskPreview.from ? [taskPreview.from, ...taskPreview.points] : taskPreview.points)}
-            fill="none"
-            stroke={PREVIEW_COLOR}
-            strokeWidth={2.5}
-            strokeDasharray="8 4"
-            opacity={0.85}
-          />
-          {taskPreview.points.map((wp, k) => {
-            const q = px(wp);
-            return (
-              <g key={`preview-${k}`}>
-                <circle cx={q.x} cy={q.y} r={4.5} fill={PREVIEW_COLOR} />
-                <text x={q.x + 6} y={q.y - 5} className={styles.waypointLabel}>
-                  {k + 1}
-                </text>
-              </g>
-            );
-          })}
-        </g>
+      {routeDraft && routeDraft.points.length > 0 && (
+        // Os pontos do rascunho já são <Waypoint> arrastáveis (SimulationMap) — aqui só a linha.
+        <RobotPath
+          units="px"
+          cellSize={1}
+          points={path(routeDraft.points)}
+          from={draftOwner ? px({ x: draftOwner.x, y: draftOwner.y }) : undefined}
+          markers={false}
+        />
       )}
-    </svg>
+
+      {taskPreview && taskPreview.points.length > 0 && (
+        <RobotPath
+          units="px"
+          cellSize={1}
+          points={path(taskPreview.points)}
+          from={taskPreview.from ? px(taskPreview.from) : undefined}
+          color={PREVIEW_COLOR}
+        />
+      )}
+    </>
   );
 }

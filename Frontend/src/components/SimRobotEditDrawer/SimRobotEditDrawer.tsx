@@ -1,5 +1,3 @@
-import { useState } from 'react';
-import type { ChangeEvent } from 'react';
 import { Button } from '../Button/Button';
 import { Drawer } from '../Drawer/Drawer';
 import { Segmented } from '../Segmented/Segmented';
@@ -7,19 +5,14 @@ import { DEFAULT_WAYPOINT_THRESHOLD_MM } from '../../Consts/SimulationConsts';
 import { DotBotControlMode } from '../../enums/DotBotControlMode.enum';
 import { SimRobotMapper } from '../../mapper/SimRobot.Mapper';
 import type { ScenarioRobotModel } from '../../model/Scenario.Model';
+import { useCommitField } from '../../screens/Simulation/useCommitField';
+import { num } from '../SimRobotDrawer/numInput';
 import styles from './SimRobotEditDrawer.module.css';
 
 const MODE_OPTIONS: { value: DotBotControlMode; label: string; title: string }[] = [
   { value: DotBotControlMode.Manual, label: 'Manual', title: 'Obedece CMD_MOVE_RAW (joystick)' },
   { value: DotBotControlMode.Auto, label: 'Auto', title: 'Segue a rota de waypoints (LH2_WAYPOINTS)' },
 ];
-
-function num(handler: (v: number) => void) {
-  return (e: ChangeEvent<HTMLInputElement>) => {
-    const v = Number(e.target.value);
-    if (Number.isFinite(v)) handler(v);
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Modo Editar — propriedades do robô no estado INICIAL do cenário
@@ -48,17 +41,9 @@ export function SimRobotEditDrawer(props: SimRobotEditDrawerProps) {
 }
 
 function EditRobotForm({ robot, onRename, onPatch, onStart, onRemoveWaypoint, onRemove }: SimRobotEditDrawerProps & { robot: ScenarioRobotModel }) {
-  const [address, setAddress] = useState(robot.address);
-  const [addressError, setAddressError] = useState<string | null>(null);
+  const address = useCommitField(robot.address, onRename);
   const waypoints = robot.waypoints ?? [];
   const rgb = robot.rgb ?? { r: 0, g: 0, b: 0 };
-
-  function commitAddress() {
-    if (address === robot.address) return;
-    const error = onRename(address);
-    setAddressError(error);
-    if (error) setAddress(robot.address);
-  }
 
   return (
     <div className={styles.section}>
@@ -66,14 +51,14 @@ function EditRobotForm({ robot, onRename, onPatch, onStart, onRemoveWaypoint, on
         Endereço (16 hex)
         <input
           type="text"
-          value={address}
+          value={address.value}
           maxLength={16}
-          onChange={(e) => setAddress(e.target.value.toUpperCase())}
-          onBlur={commitAddress}
-          onKeyDown={(e) => e.key === 'Enter' && commitAddress()}
+          onChange={(e) => address.setValue(e.target.value.toUpperCase())}
+          onBlur={address.onBlur}
+          onKeyDown={address.onKeyDown}
         />
       </label>
-      {addressError && <p className={styles.error}>{addressError}</p>}
+      {address.error && <p className={styles.error}>{address.error}</p>}
 
       <div className={styles.field}>
         Modo inicial

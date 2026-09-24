@@ -18,6 +18,9 @@ interface RobotProps extends HTMLAttributes<HTMLDivElement> {
   direction?: number;
 }
 
+/** Diâmetro do marcador em px (o mesmo de Robot.module.css) — área clicável/arrastável de quem põe o <Robot> no mapa. */
+export const ROBOT_SIZE = 20;
+
 const STATUS_CLASS: Record<RobotStatus, string> = {
   [RobotStatus.Active]: 'active',
   [RobotStatus.Inactive]: 'inactive',

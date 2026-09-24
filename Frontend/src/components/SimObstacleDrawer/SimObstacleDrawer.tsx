@@ -1,9 +1,8 @@
-import { useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Button } from '../Button/Button';
-import { Drawer } from '../Drawer/Drawer';
-import { useMapSelection } from '../../hooks/useMapElements';
+import { ObstacleDrawerBase } from '../ObstacleDrawer/ObstacleDrawerBase';
 import type { ScenarioObstacleModel } from '../../model/Scenario.Model';
+import { useCommitField } from '../../screens/Simulation/useCommitField';
 import { obstacleSelId } from '../../screens/Simulation/useSimSelection';
 import styles from './SimObstacleDrawer.module.css';
 
@@ -19,23 +18,16 @@ interface SimObstacleDrawerProps {
 // ObstacleDrawer do CenarioBuilder, só que em mm (o cenário do simulador).
 // Precisa ser passado via <MapCanvas panel={...}> pra enxergar a seleção.
 export function SimObstacleDrawer({ obstacles, onPatch, onRename }: SimObstacleDrawerProps) {
-  const { selectedIds, clear, removeSelected } = useMapSelection();
-  const selected = obstacles.filter((o) => selectedIds.has(obstacleSelId(o.id)));
-  const single = selected.length === 1 ? selected[0] : null;
-  const title = selected.length > 1 ? `${selected.length} barreiras` : 'Barreira';
-
   return (
-    <Drawer open={selected.length > 0} onClose={clear} title={title}>
-      {single && <ObstacleForm key={single.id} obstacle={single} onPatch={onPatch} onRename={onRename} onRemove={removeSelected} />}
-      {selected.length > 1 && (
-        <div className={styles.section}>
-          <p className={styles.hint}>{selected.map((o) => o.id).join(', ')}</p>
-          <Button variant="outline" onClick={removeSelected}>
-            Remover selecionadas
-          </Button>
-        </div>
+    <ObstacleDrawerBase
+      allObstacles={obstacles}
+      selectionId={(o) => obstacleSelId(o.id)}
+      nameOf={(o) => o.id}
+      labels={{ one: 'Barreira', many: 'barreiras', removeMany: 'Remover selecionadas' }}
+      renderSingle={(single, remove) => (
+        <ObstacleForm key={single.id} obstacle={single} onPatch={onPatch} onRename={onRename} onRemove={remove} />
       )}
-    </Drawer>
+    />
   );
 }
 
@@ -50,15 +42,7 @@ function ObstacleForm({
   onRename: SimObstacleDrawerProps['onRename'];
   onRemove: () => void;
 }) {
-  const [id, setId] = useState(obstacle.id);
-  const [error, setError] = useState<string | null>(null);
-
-  function commitId() {
-    if (id === obstacle.id) return;
-    const err = onRename(obstacle.id, id.trim());
-    setError(err);
-    if (err) setId(obstacle.id);
-  }
+  const name = useCommitField(obstacle.id, (next) => onRename(obstacle.id, next.trim()));
 
   function field(key: 'x_mm' | 'y_mm' | 'w_mm' | 'h_mm', min: number) {
     return (e: ChangeEvent<HTMLInputElement>) => {
@@ -71,9 +55,9 @@ function ObstacleForm({
     <div className={styles.section}>
       <label className={styles.field}>
         Nome (id)
-        <input type="text" value={id} onChange={(e) => setId(e.target.value)} onBlur={commitId} onKeyDown={(e) => e.key === 'Enter' && commitId()} />
+        <input type="text" value={name.value} onChange={(e) => name.setValue(e.target.value)} onBlur={name.onBlur} onKeyDown={name.onKeyDown} />
       </label>
-      {error && <p className={styles.error}>{error}</p>}
+      {name.error && <p className={styles.error}>{name.error}</p>}
 
       <div className={styles.fieldRow}>
         <label className={styles.field}>

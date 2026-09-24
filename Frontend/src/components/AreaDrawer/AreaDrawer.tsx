@@ -9,6 +9,7 @@ import { areaCorners, areaTraversal, zigzagLanes, zigzagMaxLanes } from '../../s
 import { useMapSelection } from '../../hooks/useMapElements';
 import { Drawer } from '../Drawer/Drawer';
 import { Button } from '../Button/Button';
+import { Segmented } from '../Segmented/Segmented';
 import styles from './AreaDrawer.module.css';
 
 interface AreaDrawerProps {
@@ -47,24 +48,6 @@ export function AreaDrawer({ allAreas, orderById, onChange }: AreaDrawerProps) {
   );
   const selectedAreas = new Set([...selectedIds].map((id) => areaByCornerId.get(id)));
   const area = selectedAreas.size === 1 ? [...selectedAreas][0] : undefined;
-
-  function renderSegmented<T extends string>(options: { value: T; label: string }[], value: T, onPick: (v: T) => void) {
-    return (
-      <div className={styles.segmented}>
-        {options.map((o) => (
-          <button
-            key={o.value}
-            type="button"
-            className={`${styles.cornerButton} ${value === o.value ? styles.cornerButtonActive : ''}`}
-            onClick={() => onPick(o.value)}
-            aria-pressed={value === o.value}
-          >
-            {o.label}
-          </button>
-        ))}
-      </div>
-    );
-  }
 
   if (!area) {
     return (
@@ -118,7 +101,7 @@ export function AreaDrawer({ allAreas, orderById, onChange }: AreaDrawerProps) {
 
       <div className={styles.field}>
         Padrão
-        {renderSegmented(PATTERNS, current.pattern, (pattern) => onChange(current.id, { pattern }))}
+        <Segmented options={PATTERNS} value={current.pattern} onChange={(pattern) => onChange(current.id, { pattern })} ariaLabel="Padrão" />
       </div>
 
       {!isZigzag && (
@@ -142,7 +125,12 @@ export function AreaDrawer({ allAreas, orderById, onChange }: AreaDrawerProps) {
 
           <div className={styles.field}>
             Sentido
-            {renderSegmented(DIRECTIONS, current.direction, (direction) => onChange(current.id, { direction }))}
+            <Segmented
+              options={DIRECTIONS}
+              value={current.direction}
+              onChange={(direction) => onChange(current.id, { direction })}
+              ariaLabel="Sentido"
+            />
           </div>
 
           <p className={styles.hint}>

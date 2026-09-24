@@ -8,10 +8,14 @@
   overflow: visible;
 }
 
-.waypointLabel {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  fill: var(--color-text-muted);
+/* Marcador numerado da rota no modo Simular — só desenho: o clique passa pro mapa. */
+.routeMarker {
+  pointer-events: none;
+}
+
+/* Rota de robô em MANUAL no modo Editar: fica no mapa, mas esmaecida. */
+.routeFaded {
+  opacity: 0.35;
 }
 
 .draggable {

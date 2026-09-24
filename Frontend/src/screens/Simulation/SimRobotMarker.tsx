@@ -1,14 +1,12 @@
 import { useMapElement } from '../../hooks/useMapElements';
-import { Robot } from '../../components/Robot/RobotProp';
+import { Robot, ROBOT_SIZE } from '../../components/Robot/RobotProp';
 import { RobotStatus } from '../../enums/RobotStatus.enum';
+import { SimRobotMapper } from '../../mapper/SimRobot.Mapper';
 import type { SimMapRobotModel } from '../../model/SimRobot.Model';
 import type { MapScale } from './useMapGeometry';
 import { fromPx, thetaToDirection, toPx } from './useMapGeometry';
 import { robotSelId } from './useSimSelection';
 import styles from './SimulationMap.module.css';
-
-/** Mesmo diâmetro do marcador em Robot.module.css — área clicável/arrastável. */
-const SIZE = 20;
 
 interface SimRobotMarkerProps {
   robot: SimMapRobotModel;
@@ -21,19 +19,19 @@ interface SimRobotMarkerProps {
 
 // Robô no mapa da simulação — o <Robot> (só visual, também usado em listas)
 // ganha seleção/arrasto/Delete via useMapElement, igual ao TaskRobot do
-// TaskBuilder. Cor pelo status (verde = na rede, cinza = fora dela, vermelho
-// = sem bateria), anel na cor do LED quando um CMD_RGB_LED acendeu o robô e
-// seta no rumo (theta). Quando está em cima de um waypoint o clique vai pro
+// TaskBuilder. Cor: a fixa do robô (a mesma do chip e da rota), ou a do LED
+// quando um CMD_RGB_LED está aceso; fora da rede ou sem bateria fica
+// esmaecido. Seta no rumo (theta). Quando está em cima de um waypoint o clique vai pro
 // ponto (`hitPriority` menor), pra dar pra arrastar a rota sem pegar o robô.
 export function SimRobotMarker({ robot, scale, editable, onMove, onRemove }: SimRobotMarkerProps) {
-  const half = SIZE / 2;
+  const half = ROBOT_SIZE / 2;
   const center = toPx(scale, { x: robot.x, y: robot.y });
   const { selected, x: renderX, y: renderY } = useMapElement({
     id: robotSelId(robot.address),
     x: center.x - half,
     y: center.y - half,
-    width: SIZE,
-    height: SIZE,
+    width: ROBOT_SIZE,
+    height: ROBOT_SIZE,
     hitPriority: -1,
     movable: editable,
     onMove: (next) => onMove(robot.address, fromPx(scale, { x: next.x + half, y: next.y + half })),
@@ -41,7 +39,8 @@ export function SimRobotMarker({ robot, scale, editable, onMove, onRemove }: Sim
     onRemove: () => onRemove(robot.address),
   });
 
-  const led = robot.rgb && (robot.rgb.r || robot.rgb.g || robot.rgb.b) ? `rgb(${robot.rgb.r}, ${robot.rgb.g}, ${robot.rgb.b})` : null;
+
+  const fill = SimRobotMapper.displayColor(robot);
 
   return (
     <Robot
@@ -55,7 +54,8 @@ export function SimRobotMarker({ robot, scale, editable, onMove, onRemove }: Sim
         position: 'absolute',
         left: renderX + half,
         top: renderY + half,
-        ...(led ? { boxShadow: `0 0 0 3px ${led}, 0 0 8px 2px ${led}` } : null),
+        background: fill,
+        borderColor: fill,
       }}
     />
   );

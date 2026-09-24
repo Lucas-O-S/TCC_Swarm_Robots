@@ -1,5 +1,6 @@
 import { INACTIVE_AFTER_S, LOST_AFTER_S } from '../Consts/SimulationConsts';
 import { RobotStatus } from '../enums/RobotStatus.enum';
+import { SimRobotMapper } from '../mapper/SimRobot.Mapper';
 import type { SwarmitDeviceStatus } from '../enums/SwarmitDeviceStatus.enum';
 import { SwarmitPayloadType } from '../enums/SwarmitPayloadType.enum';
 import type { DotBotAdvertisement } from './Protocols/DotBot.Payload';
@@ -216,9 +217,8 @@ export class LocalFleetLink implements FleetLink {
       if (status === null) continue;
       const prev = this.lastStatus.get(v.address);
       if (prev !== undefined && prev !== status) {
-        const label = status === RobotStatus.Active ? 'Active' : status === RobotStatus.Inactive ? 'Inactive' : 'Lost';
         const why = status === RobotStatus.Active ? 'telemetria voltou' : `${status === RobotStatus.Inactive ? INACTIVE_AFTER_S : LOST_AFTER_S} s sem telemetria`;
-        this.log('backend', `${status === RobotStatus.Active ? '✓' : '⚠'} ${v.address} → ${label} (${why})`);
+        this.log('backend', `${status === RobotStatus.Active ? '✓' : '⚠'} ${v.address} → ${SimRobotMapper.statusLabel(status)} (${why})`);
         if (status === RobotStatus.Lost) this.orchestrator.onLost(v.address);
       }
       this.lastStatus.set(v.address, status);

@@ -7,21 +7,23 @@ import { controlModeLabel } from '../Integration/LocalOrchestrator';
 import type { ScenarioRobotModel } from '../model/Scenario.Model';
 import type { RgbColorModel, SimMapRobotModel, SimRobotModel, SimRobotRowModel } from '../model/SimRobot.Model';
 
-// Paleta determinística por posição do robô na frota (só pra diferenciar
-// rastros/rotas) — a mesma ideia do FALLBACK_COLORS do RobotSwarmSimulator,
-// nas cores do tema. LED aceso (CMD_RGB_LED ≠ 0,0,0) ganha prioridade.
+// Paleta determinística por posição do robô na frota (a cor fixa do robô:
+// chip, rastro, e círculo/rota enquanto o LED está apagado) — a mesma ideia
+// do FALLBACK_COLORS do RobotSwarmSimulator, nas cores do tema.
 const PALETTE = ['#2f6fed', '#c0392b', '#1a9e45', '#b8860b', '#8e44ad', '#16a085', '#d35400', '#2c3e50'];
-
-function isLit(rgb?: RgbColorModel | null): rgb is RgbColorModel {
-  return !!rgb && (rgb.r !== 0 || rgb.g !== 0 || rgb.b !== 0);
-}
 
 function label(index: number): string {
   return `R${index + 1}`;
 }
 
-function color(index: number, rgb?: RgbColorModel | null): string {
-  return isLit(rgb) ? `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})` : PALETTE[index % PALETTE.length];
+function color(index: number): string {
+  return PALETTE[index % PALETTE.length];
+}
+
+/** Cor em que o robô aparece no mapa (círculo e rota): a do LED quando aceso (CMD_RGB_LED ≠ 0,0,0), senão a cor fixa dele. */
+function displayColor(robot: { color: string; rgb: RgbColorModel | null }): string {
+  const { rgb } = robot;
+  return rgb && (rgb.r || rgb.g || rgb.b) ? `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})` : robot.color;
 }
 
 /** Final curto do address (mesmo rótulo do mapa do RobotSwarmSimulator). */
@@ -40,6 +42,17 @@ function hexToRgb(hex: string): RgbColorModel {
   return { r: (v >> 16) & 0xff, g: (v >> 8) & 0xff, b: v & 0xff };
 }
 
+const STATUS_LABEL: Record<RobotStatus, string> = {
+  [RobotStatus.Active]: 'Active',
+  [RobotStatus.Inactive]: 'Inactive',
+  [RobotStatus.Lost]: 'Lost',
+};
+
+/** Status que o backend calcula pela telemetria (Active/Inactive/Lost). */
+function statusLabel(status: RobotStatus): string {
+  return STATUS_LABEL[status];
+}
+
 function modeLabel(mode: number, loop: boolean): string {
   if (mode !== DotBotControlMode.Auto) return 'MANUAL';
   return loop ? 'AUTO (loop)' : 'AUTO';
@@ -55,8 +68,10 @@ function toMode(mode: number): DotBotControlMode {
 export const SimRobotMapper = {
   label,
   color,
+  displayColor,
   shortAddress,
   modeLabel,
+  statusLabel,
   rgbToHex,
   hexToRgb,
 
@@ -65,7 +80,7 @@ export const SimRobotMapper = {
     return {
       address: r.address,
       label: label(index),
-      color: color(index, r.rgb),
+      color: color(index),
       x: r.start.x_mm,
       y: r.start.y_mm,
       theta: r.start.theta_deg * DEG_TO_RAD,
@@ -83,7 +98,7 @@ export const SimRobotMapper = {
     return {
       address: r.address,
       label: label(index),
-      color: color(index, r.rgb),
+      color: color(index),
       x: r.pos_x,
       y: r.pos_y,
       theta: r.theta,
@@ -101,7 +116,7 @@ export const SimRobotMapper = {
     return {
       address: r.address,
       label: label(index),
-      color: color(index, r.rgb),
+      color: color(index),
       modeLabel: modeLabel(r.mode, r.loop ?? false),
       battery: r.battery,
       x: r.start.x_mm,
@@ -128,7 +143,7 @@ export const SimRobotMapper = {
     return {
       address: r.address,
       label: label(index),
-      color: color(index, r.rgb),
+      color: color(index),
       modeLabel: seen.backendMode !== null ? controlModeLabel(seen.backendMode) : modeLabel(r.mode, r.loop),
       battery: r.battery,
       x: r.pos_x,

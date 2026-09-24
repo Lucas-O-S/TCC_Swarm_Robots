@@ -8,12 +8,6 @@ import { SimRobotMapper } from '../../mapper/SimRobot.Mapper';
 import type { SimRobotRowModel } from '../../model/SimRobot.Model';
 import styles from './SimRobotCard.module.css';
 
-const BACKEND_LABEL: Record<RobotStatus, string> = {
-  [RobotStatus.Active]: 'Active',
-  [RobotStatus.Inactive]: 'Inactive',
-  [RobotStatus.Lost]: 'Lost',
-};
-
 const BACKEND_TONE: Record<RobotStatus, BadgeTone> = {
   [RobotStatus.Active]: 'green',
   [RobotStatus.Inactive]: 'yellow',
@@ -60,7 +54,7 @@ export function SimRobotCard({ robot, selected, onClick }: SimRobotCardProps) {
             tone={sim.backendStatus !== null ? BACKEND_TONE[sim.backendStatus] : 'muted'}
             title="Status que o backend calcula pelo último DOTBOT_ADVERTISEMENT (5 s → Inactive, 60 s → Lost)"
           >
-            API: {sim.backendStatus !== null ? BACKEND_LABEL[sim.backendStatus] : '—'}
+            API: {sim.backendStatus !== null ? SimRobotMapper.statusLabel(sim.backendStatus) : '—'}
           </Badge>
           {sim.taskName && (
             <Badge tone="blue" title="Task em andamento (orquestrador do backend local)">

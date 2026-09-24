@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ChangeEvent } from 'react';
 import { Button } from '../Button/Button';
 import { Drawer } from '../Drawer/Drawer';
 import { Joystick } from '../Joystick/Joystick';
@@ -7,7 +6,6 @@ import { Segmented } from '../Segmented/Segmented';
 import { DEFAULT_WAYPOINT_THRESHOLD_MM, DEG_TO_RAD, PWM_MAX, RAD_TO_DEG } from '../../Consts/SimulationConsts';
 import { DotBotControlMode } from '../../enums/DotBotControlMode.enum';
 import { RobotControlMode } from '../../enums/RobotControlMode.enum';
-import { RobotStatus } from '../../enums/RobotStatus.enum';
 import { SwarmitDeviceStatus } from '../../enums/SwarmitDeviceStatus.enum';
 import { ORCHESTRATOR_RUN_S } from '../../Integration/LocalOrchestrator';
 import { swarmitStatusName } from '../../Integration/Protocols/Swarmit/Swarmit.Protocol';
@@ -16,8 +14,10 @@ import type { RgbColorModel, SimRobotModel } from '../../model/SimRobot.Model';
 import type { Vec2Model } from '../../model/SimWorld.Model';
 import type { TaskModel } from '../../model/Task.Model';
 import type { SwarmitDeviceView } from '../../screens/Simulation/SimGateway';
+import { clamp } from '../../screens/Simulation/SimPhysics';
 import { normalizeAngle } from '../../screens/Simulation/SimRobot';
 import type { BackendRobotInfo } from '../../screens/Simulation/useSimulation';
+import { num } from './numInput';
 import styles from './SimRobotDrawer.module.css';
 
 // Modos de ORQUESTRAÇÃO do backend (RobotControlMode), não o modo do fio.
@@ -34,13 +34,6 @@ const MODE_HINT: Record<RobotControlMode, string> = {
   [RobotControlMode.Auto]: `Entra na fila: a cada ${ORCHESTRATOR_RUN_S} s o orquestrador dá a próxima tarefa pendente (menor prioridade primeiro) a um robô Auto livre.`,
 };
 
-function num(handler: (v: number) => void) {
-  return (e: ChangeEvent<HTMLInputElement>) => {
-    const v = Number(e.target.value);
-    if (Number.isFinite(v)) handler(v);
-  };
-}
-
 /** Frequência do CMD_MOVE_RAW enquanto arrasta (topo da faixa 10–20 Hz da malha manual). */
 const JOYSTICK_HZ = 20;
 /** Giro automático: PWM de diferença entre as rodas por rad de erro de rumo. */
@@ -51,10 +44,6 @@ const TURN_PWM_MAX = 50;
 const DRIVE_CONE_COS = 0.5;
 /** Perto de 180° o erro troca de sinal à toa — nessa zona mantém o lado do giro que já estava. */
 const FLIP_ZONE_RAD = 150 * DEG_TO_RAD;
-
-function clamp(v: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, v));
-}
 
 interface DriveCommand {
   left: number;
@@ -136,12 +125,6 @@ interface SimRobotDrawerProps {
   onFlash: () => void;
 }
 
-const STATUS_LABEL: Record<RobotStatus, string> = {
-  [RobotStatus.Active]: 'Active',
-  [RobotStatus.Inactive]: 'Inactive',
-  [RobotStatus.Lost]: 'Lost',
-};
-
 export function SimRobotDrawer(props: SimRobotDrawerProps) {
   return (
     <Drawer open={props.robot !== null} onClose={props.onClose} title={props.robot ? `Robô ${props.label}` : 'Robô'}>
@@ -208,7 +191,7 @@ function SimRobotPanel({
         <span className={`${styles.dot} ${robot.online ? styles.dotOn : styles.dotOff}`} />
         {robot.online ? 'na rede' : 'fora da rede'}
         <span className={styles.sep}>·</span>
-        API: {backend?.status !== null && backend?.status !== undefined ? STATUS_LABEL[backend.status] : 'não cadastrado'}
+        API: {backend?.status !== null && backend?.status !== undefined ? SimRobotMapper.statusLabel(backend.status) : 'não cadastrado'}
         {lastAdv !== null && ` (há ${(now - lastAdv).toFixed(1)} s)`}
       </div>
       <p className={styles.hint} style={{ fontFamily: 'var(--font-mono)' }}>

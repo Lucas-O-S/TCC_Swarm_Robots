@@ -1,4 +1,5 @@
 import { DotBotControlMode } from '../../enums/DotBotControlMode.enum';
+import { clamp } from './SimPhysics';
 import { normalizeAngle } from './SimRobot';
 import type { SimRobot } from './SimRobot';
 
@@ -11,10 +12,6 @@ const ANGLE_TOLERANCE_RAD = 0.15; // ~8.6° — acima disso, gira no lugar
 const TURN_PWM_MAX = 60;
 const FORWARD_PWM = 100;
 const K_TURN = 200; // ganho proporcional (pwm por rad de erro)
-
-function clamp(v: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, v));
-}
 
 /** Um passo do controlador AUTO, escrevendo direto nos PWMs. */
 export function applyWaypointController(robot: SimRobot): void {

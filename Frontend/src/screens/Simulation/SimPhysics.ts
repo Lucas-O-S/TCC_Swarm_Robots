@@ -5,7 +5,8 @@ import type { SimArenaModel, SimObstacleModel, Vec2Model } from '../../model/Sim
 // proposta no tick colide, o movimento é bloqueado (a pose volta pra
 // anterior). Sem resposta física (sem empurrão/deslize).
 
-function clamp(v: number, lo: number, hi: number): number {
+/** Limita v a [lo, hi] — usado também pelo controlador AUTO e pelo joystick. */
+export function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
 

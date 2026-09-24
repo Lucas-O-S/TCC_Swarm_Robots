@@ -3,6 +3,7 @@ import styles from './RobotPath.module.css';
 
 interface RobotPathProps {
   points: TaskWaypointModel[];
+  /** Com `units="px"` é ignorado (os pontos já vêm em px). */
   cellSize: number;
   /** Altura da célula (px) quando ela não é quadrada (MapCanvas com `fitWidth` + `maxHeight`) — default `cellSize`. */
   cellHeight?: number;
@@ -19,7 +20,25 @@ interface RobotPathProps {
    * (ex.: área de um bloco).
    */
   variant?: 'dashed' | 'arrows';
+  /**
+   * Unidade de x/y (dos pontos e de `from`): "cell" (default) = célula do
+   * grid, desenhada no centro dela; "px" = já em pixels do mapa (ex.: a
+   * Simulação, que converte mm → px antes).
+   */
+  units?: 'cell' | 'px';
+  /** Vértice inicial sem número (ex.: posição atual do robô) — a linha sai dele. */
+  from?: { x: number; y: number };
+  /**
+   * Quantos pontos do começo já foram alcançados: ficam em cinza e a linha
+   * passa a sair de `from` direto pro próximo (o último fica sempre na linha).
+   * Default 0.
+   */
+  reachedCount?: number;
+  /** Desenha os círculos numerados (variante "dashed"). false = só a linha, pra quem já desenha marcadores próprios. Default true. */
+  markers?: boolean;
 }
+
+const REACHED_COLOR = 'var(--color-text-muted)';
 
 /** Trecho mais curto (px) que ainda ganha seta — abaixo disso a seta cobriria a linha inteira. */
 const MIN_ARROW_SEGMENT = 28;
@@ -39,15 +58,20 @@ export function RobotPath({
   className = '',
   closed = false,
   variant = 'dashed',
+  units = 'cell',
+  from,
+  reachedCount = 0,
+  markers = true,
 }: RobotPathProps) {
   if (points.length === 0) return null;
 
+  const toPixel = (p: { x: number; y: number }) =>
+    units === 'px' ? { x: p.x, y: p.y } : { x: p.x * cellSize + cellSize / 2, y: p.y * cellHeight + cellHeight / 2 };
   const ordered = [...points].sort((a, b) => a.orderIndex - b.orderIndex);
-  const pixelPoints = ordered.map((p) => ({
-    x: p.x * cellSize + cellSize / 2,
-    y: p.y * cellHeight + cellHeight / 2,
-  }));
-  const linePoints = closed && pixelPoints.length > 1 ? [...pixelPoints, pixelPoints[0]] : pixelPoints;
+  const pixelPoints = ordered.map(toPixel);
+  const pending = from ? pixelPoints.slice(Math.min(reachedCount, pixelPoints.length - 1)) : pixelPoints;
+  const openLine = from ? [toPixel(from), ...pending] : pending;
+  const linePoints = closed && pixelPoints.length > 1 ? [...openLine, pixelPoints[0]] : openLine;
   const polylinePoints = linePoints.map((p) => `${p.x},${p.y}`).join(' ');
 
   if (variant === 'arrows') {
@@ -98,7 +122,7 @@ export function RobotPath({
 
   return (
     <svg className={`${styles.path} ${className}`}>
-      {pixelPoints.length > 1 && (
+      {linePoints.length > 1 && (
         <polyline
           points={polylinePoints}
           fill="none"
@@ -107,9 +131,9 @@ export function RobotPath({
           strokeDasharray="4 3"
         />
       )}
-      {pixelPoints.map((p, index) => (
+      {markers && pixelPoints.map((p, index) => (
         <g key={index}>
-          <circle cx={p.x} cy={p.y} r={7} fill={color} />
+          <circle cx={p.x} cy={p.y} r={7} fill={index < reachedCount ? REACHED_COLOR : color} />
           <text
             x={p.x}
             y={p.y}

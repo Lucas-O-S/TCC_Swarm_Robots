@@ -7,6 +7,7 @@ import { Waypoint } from '../../components/Waypoint/Waypoint';
 import { CELL_MM } from '../../Consts/SimulationConsts';
 import type { MapElementsController } from '../../hooks/useMapElements';
 import type { ElementBounds } from '../../hooks/useSelectableElements';
+import { SimRobotMapper } from '../../mapper/SimRobot.Mapper';
 import type { SimMapRobotModel } from '../../model/SimRobot.Model';
 import type { SimObstacleModel, Vec2Model } from '../../model/SimWorld.Model';
 import { fromPx, makeScale, toPx } from './useMapGeometry';
@@ -130,7 +131,7 @@ export function SimulationMap({
                 key={waypointSelId(focusRobot.address, index)}
                 id={waypointSelId(focusRobot.address, index)}
                 order={index + 1}
-                color={focusRobot.color}
+                color={SimRobotMapper.displayColor(focusRobot)}
                 x={c.x}
                 y={c.y}
                 movable
