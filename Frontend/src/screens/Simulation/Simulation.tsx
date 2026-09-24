@@ -62,7 +62,7 @@ type Tool = BaseTool | 'obstacle' | 'robot' | 'waypoint';
 const CREATE_TOOLS: Tool[] = ['obstacle', 'robot', 'waypoint'];
 
 // Tela de Simulação — recriada no padrão das outras telas (MapMenuLayout +
-// MapCanvas + Menu + ferramentas no canto do mapa + Drawer da seleção +
+// header no topo + MapCanvas + Menu + ferramentas no canto do mapa + Drawer da seleção +
 // modal de escolha no início, como CenarioBuilder/TaskBuilder) seguindo a
 // lógica e o modelo de funcionamento do RobotSwarmSimulator:
 //   - Editar: monta o estado inicial do cenário (barreiras, robôs, rotas,
@@ -392,34 +392,34 @@ export function Simulation() {
 
   const onlineCount = sim.robots.filter((r) => r.online).length;
 
+  const header = (
+    <SimulationControls
+      scenarioName={sim.scenarioName}
+      onRename={sim.setScenarioName}
+      mode={sim.mode}
+      onModeChange={handleModeChange}
+      playing={sim.playing}
+      onTogglePlay={sim.playing ? sim.pause : sim.play}
+      onReset={sim.reset}
+      time={sim.time}
+      tickHz={sim.tickHz}
+      arena={arena}
+      onlineCount={onlineCount}
+      robotCount={mapRobots.length}
+      obstacleCount={obstacles.length}
+      onChangeScenario={() => {
+        setPickerError(null);
+        setPickerOpen(true);
+      }}
+      onImport={(text, name) => importText(text, name, false)}
+      onExportScenario={sim.exportDraft}
+      onExportState={sim.exportState}
+      notice={notice}
+    />
+  );
+
   const menu = (
     <div className={styles.menuColumn}>
-      <Menu title="Simulação">
-        <SimulationControls
-          scenarioName={sim.scenarioName}
-          onRename={sim.setScenarioName}
-          mode={sim.mode}
-          onModeChange={handleModeChange}
-          playing={sim.playing}
-          onTogglePlay={sim.playing ? sim.pause : sim.play}
-          onReset={sim.reset}
-          time={sim.time}
-          tickHz={sim.tickHz}
-          arena={arena}
-          onlineCount={onlineCount}
-          robotCount={mapRobots.length}
-          obstacleCount={obstacles.length}
-          onChangeScenario={() => {
-            setPickerError(null);
-            setPickerOpen(true);
-          }}
-          onImport={(text, name) => importText(text, name, false)}
-          onExportScenario={sim.exportDraft}
-          onExportState={sim.exportState}
-          notice={notice}
-        />
-      </Menu>
-
       <Menu title={`Robôs (${mapRobots.length})`}>
         <SimRobotList robots={rows} editing={editing} />
       </Menu>
@@ -479,7 +479,7 @@ export function Simulation() {
         error={pickerError}
       />
 
-      <MapMenuLayout menu={menu}>
+      <MapMenuLayout header={header} menu={menu}>
         {(maxMapHeight) =>
           draft ? (
             <SimulationMap
