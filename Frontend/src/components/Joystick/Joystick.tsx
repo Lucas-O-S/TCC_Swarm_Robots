@@ -26,7 +26,8 @@ const RELEASE_REPEATS = 3;
 // Joystick virtual de arrastar (estilo controle na tela de jogo de celular):
 // encosta e arrasta a bolinha dentro da base; soltou, ela volta pro centro e
 // o manche zera. Genérico — só devolve o vetor normalizado; quem usa decide
-// o que fazer com ele (ex.: SimRobotDrawer mistura em PWM das duas rodas).
+// o que fazer com ele (ex.: SimRobotDrawer usa como rumo no mapa e gira o
+// robô sozinho até ele, mandando o PWM das rodas).
 // Pointer events com capture: funciona com mouse, toque e caneta, e o
 // arrasto continua mesmo se o dedo sair da base.
 export function Joystick({ size = 150, onChange, rateHz = 10, deadZone = 0.08, disabled = false, className = '' }: JoystickProps) {

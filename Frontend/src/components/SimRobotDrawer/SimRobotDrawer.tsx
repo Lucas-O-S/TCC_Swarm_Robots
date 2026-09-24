@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Button } from '../Button/Button';
 import { Drawer } from '../Drawer/Drawer';
 import { Joystick } from '../Joystick/Joystick';
 import { Segmented } from '../Segmented/Segmented';
-import { DEFAULT_WAYPOINT_THRESHOLD_MM, PWM_MAX, RAD_TO_DEG } from '../../Consts/SimulationConsts';
+import { DEFAULT_WAYPOINT_THRESHOLD_MM, DEG_TO_RAD, PWM_MAX, RAD_TO_DEG } from '../../Consts/SimulationConsts';
 import { DotBotControlMode } from '../../enums/DotBotControlMode.enum';
 import { RobotStatus } from '../../enums/RobotStatus.enum';
 import { SwarmitDeviceStatus } from '../../enums/SwarmitDeviceStatus.enum';
@@ -14,6 +14,7 @@ import { SimRobotMapper } from '../../mapper/SimRobot.Mapper';
 import type { RgbColorModel, SimRobotModel } from '../../model/SimRobot.Model';
 import type { Vec2Model } from '../../model/SimWorld.Model';
 import type { SwarmitDeviceView } from '../../screens/Simulation/SimGateway';
+import { normalizeAngle } from '../../screens/Simulation/SimRobot';
 import styles from './SimRobotDrawer.module.css';
 
 const MODE_OPTIONS: { value: DotBotControlMode; label: string; title: string }[] = [
@@ -28,22 +29,60 @@ function num(handler: (v: number) => void) {
   };
 }
 
-/** Quanto o eixo lateral do manche pesa na diferença entre as rodas (1 = gira no lugar a toda). */
-const TURN_GAIN = 0.5;
+/** Frequência do CMD_MOVE_RAW enquanto arrasta (topo da faixa 10–20 Hz da malha manual). */
+const JOYSTICK_HZ = 20;
+/** Giro automático: PWM de diferença entre as rodas por rad de erro de rumo. */
+const HEADING_KP = 40;
+/** Teto do PWM de giro — mais que isso o robô passa do rumo entre dois comandos (20 Hz). */
+const TURN_PWM_MAX = 50;
+/** cos(60°): com o rumo fora desse cone o robô só gira no lugar; dentro, anda e vai corrigindo. */
+const DRIVE_CONE_COS = 0.5;
+/** Perto de 180° o erro troca de sinal à toa — nessa zona mantém o lado do giro que já estava. */
+const FLIP_ZONE_RAD = 150 * DEG_TO_RAD;
+
+function clamp(v: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+interface DriveCommand {
+  left: number;
+  right: number;
+  /** Rumo pedido no mapa, em graus (0° = direita, 90° = pra cima — mesma convenção do theta). */
+  headingDeg: number;
+  /** Lado do giro (+1 anti-horário, -1 horário, 0 alinhado) — vira o `keepSide` do próximo comando. */
+  side: number;
+}
 
 /**
- * Manche (x, y ∈ [-1, 1], y pra cima) → PWM das duas rodas — mistura
- * "arcade" de tração diferencial: pra frente soma nas duas rodas, pro lado
- * soma numa e tira da outra (direita = roda esquerda mais rápida = gira no
- * sentido horário). Normaliza pra nenhuma roda passar de ±1 e escala pela
- * velocidade máxima escolhida (int8 do CMD_MOVE_RAW, ±127).
+ * Manche → CMD_MOVE_RAW com giro AUTOMÁTICO (joystick "de jogo"): a direção
+ * do manche é a direção no MAPA pra onde o robô deve ir (pra cima = +Y do
+ * mundo), não frente/giro do robô. A partir do theta atual o controlador
+ * calcula o erro de rumo, gira as rodas em sentidos opostos até apontar pra
+ * lá e, dentro do cone de 60°, soma o avanço — proporcional a quanto a
+ * bolinha foi arrastada e a quão alinhado já está. Saída: PWM das duas rodas
+ * (int8 do CMD_MOVE_RAW, ±127), com o giro preservado se somar passar de 127.
  */
-function joystickToWheels(x: number, y: number, maxPwm: number): { left: number; right: number } {
-  const left = y + TURN_GAIN * x;
-  const right = y - TURN_GAIN * x;
-  const scale = Math.max(1, Math.abs(left), Math.abs(right));
-  const clamp = (v: number) => Math.max(-PWM_MAX, Math.min(PWM_MAX, Math.round((v / scale) * maxPwm)));
-  return { left: clamp(left), right: clamp(right) };
+function joystickToWheels(x: number, y: number, theta: number, maxPwm: number, keepSide: number): DriveCommand {
+  const mag = Math.min(1, Math.hypot(x, y));
+  const heading = Math.atan2(y, x);
+  if (mag === 0) return { left: 0, right: 0, headingDeg: 0, side: 0 };
+
+  let err = normalizeAngle(heading - theta);
+  if (keepSide !== 0 && Math.abs(err) > FLIP_ZONE_RAD && Math.sign(err) !== keepSide) {
+    err -= Math.sign(err) * 2 * Math.PI; // mesmo rumo, pelo lado que já estava girando
+  }
+
+  const turnMax = Math.min(TURN_PWM_MAX, maxPwm);
+  const turn = clamp(HEADING_KP * err, -turnMax, turnMax); // > 0 = anti-horário = roda direita mais rápida
+  const aligned = clamp((Math.cos(err) - DRIVE_CONE_COS) / (1 - DRIVE_CONE_COS), 0, 1);
+  const forward = Math.min(mag * maxPwm * aligned, PWM_MAX - Math.abs(turn));
+
+  return {
+    left: Math.round(forward - turn),
+    right: Math.round(forward + turn),
+    headingDeg: ((heading * RAD_TO_DEG) % 360 + 360) % 360,
+    side: turn === 0 ? keepSide : Math.sign(turn),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -109,12 +148,17 @@ function SimRobotPanel({
 
   const auto = robot.mode === DotBotControlMode.Auto;
   const lastAdv = backend?.view?.lastAdvertisementAt ?? null;
-  const [sending, setSending] = useState<{ left: number; right: number } | null>(null);
+  const [sending, setSending] = useState<DriveCommand | null>(null);
+  const turnSide = useRef(0);
 
+  // Chamado a JOYSTICK_HZ pelo Joystick (e com (0, 0) ao soltar). O theta é o
+  // da pose que o mapa mostra — com a API real, vira o `direction` do
+  // DOTBOT_ADVERTISEMENT (e aí o advertise_hz precisa acompanhar essa malha).
   function handleJoystick(x: number, y: number) {
-    const wheels = joystickToWheels(x, y, speed);
-    setSending(x === 0 && y === 0 ? null : wheels);
-    onMoveRaw(wheels.left, wheels.right);
+    const cmd = joystickToWheels(x, y, robot.theta, speed, turnSide.current);
+    turnSide.current = cmd.side;
+    setSending(x === 0 && y === 0 ? null : cmd);
+    onMoveRaw(cmd.left, cmd.right);
   }
   const canCommand = robot.online && robot.appRunning;
 
@@ -194,13 +238,14 @@ function SimRobotPanel({
         </span>
         <input type="range" min={10} max={PWM_MAX} value={speed} onChange={num(setSpeed)} />
       </label>
-      <Joystick onChange={handleJoystick} />
+      <Joystick onChange={handleJoystick} rateHz={JOYSTICK_HZ} />
       <p className={styles.joystickReadout}>
-        {sending ? `enviando L=${sending.left} R=${sending.right}` : 'solto — robô parado'}
+        {sending ? `rumo ${sending.headingDeg.toFixed(0)}° · enviando L=${sending.left} R=${sending.right}` : 'solto — robô parado'}
       </p>
       <p className={styles.hint}>
-        Arraste a bolinha: pra cima anda, pra baixo dá ré, pros lados gira. Enquanto arrasta, manda CMD_MOVE_RAW a
-        10 Hz (põe o robô em MANUAL); ao soltar, ela volta pro centro e manda a parada.
+        Arraste pra direção do mapa em que o robô deve ir: ele gira sozinho até apontar pra lá e anda — quanto mais
+        longe do centro, mais rápido. Enquanto arrasta, manda CMD_MOVE_RAW a {JOYSTICK_HZ} Hz (põe o robô em MANUAL);
+        ao soltar, a bolinha volta pro centro e manda a parada.
       </p>
 
       <div className={styles.field}>
