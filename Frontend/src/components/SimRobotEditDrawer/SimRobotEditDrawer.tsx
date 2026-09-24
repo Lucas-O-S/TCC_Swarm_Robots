@@ -131,50 +131,61 @@ function EditRobotForm({ robot, onRename, onPatch, onStart, onRemoveWaypoint, on
       </div>
 
       <hr className={styles.divider} />
-      <p className={styles.subtitle}>Rota (modo Auto)</p>
-      <p className={styles.hint}>
-        Com o robô selecionado, a ferramenta Waypoint adiciona pontos clicando no mapa (e põe o robô em Auto). Arraste os
-        pontos numerados pra ajustar; Backspace apaga o selecionado.
-      </p>
+      {robot.mode === DotBotControlMode.Auto ? (
+        <>
+          <p className={styles.subtitle}>Rota (modo Auto)</p>
+          <p className={styles.hint}>
+            Com o robô selecionado, a ferramenta Waypoint adiciona pontos clicando no mapa (e põe o robô em Auto). Arraste os
+            pontos numerados pra ajustar; Backspace apaga o selecionado.
+          </p>
 
-      <div className={styles.fieldRow}>
-        <label className={styles.field}>
-          Raio de chegada (mm)
-          <input
-            type="number"
-            min={5}
-            step={5}
-            value={robot.waypoint_threshold_mm ?? DEFAULT_WAYPOINT_THRESHOLD_MM}
-            onChange={num((v) => v > 0 && onPatch({ waypoint_threshold_mm: v }))}
-          />
-        </label>
-        <label className={styles.checkbox} style={{ alignSelf: 'flex-end', paddingBottom: 8 }}>
-          <input type="checkbox" checked={robot.loop ?? false} onChange={(e) => onPatch({ loop: e.target.checked })} />
-          Loop
-        </label>
-      </div>
+          <div className={styles.fieldRow}>
+            <label className={styles.field}>
+              Raio de chegada (mm)
+              <input
+                type="number"
+                min={5}
+                step={5}
+                value={robot.waypoint_threshold_mm ?? DEFAULT_WAYPOINT_THRESHOLD_MM}
+                onChange={num((v) => v > 0 && onPatch({ waypoint_threshold_mm: v }))}
+              />
+            </label>
+            <label className={styles.checkbox} style={{ alignSelf: 'flex-end', paddingBottom: 8 }}>
+              <input type="checkbox" checked={robot.loop ?? false} onChange={(e) => onPatch({ loop: e.target.checked })} />
+              Loop
+            </label>
+          </div>
 
-      {waypoints.length > 0 ? (
-        <ul className={styles.pointList}>
-          {waypoints.map((wp, i) => (
-            <li key={i}>
-              <span>
-                {i + 1}. x={Math.round(wp.x_mm)} y={Math.round(wp.y_mm)}
-              </span>
-              <button type="button" className={styles.iconButton} onClick={() => onRemoveWaypoint(i)} aria-label={`Remover ponto ${i + 1}`}>
-                ×
-              </button>
-            </li>
-          ))}
-        </ul>
+          {waypoints.length > 0 ? (
+            <ul className={styles.pointList}>
+              {waypoints.map((wp, i) => (
+                <li key={i}>
+                  <span>
+                    {i + 1}. x={Math.round(wp.x_mm)} y={Math.round(wp.y_mm)}
+                  </span>
+                  <button type="button" className={styles.iconButton} onClick={() => onRemoveWaypoint(i)} aria-label={`Remover ponto ${i + 1}`}>
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className={styles.hint}>Sem rota.</p>
+          )}
+          <div className={styles.actions}>
+            <Button variant="outline" onClick={() => onPatch({ waypoints: [] })} disabled={waypoints.length === 0}>
+              Limpar rota
+            </Button>
+          </div>
+        </>
       ) : (
-        <p className={styles.hint}>Sem rota.</p>
+        <p className={styles.hint}>
+          Em Manual o robô começa parado, esperando o joystick. Pra ele já começar seguindo uma rota, mude o modo inicial
+          pra Auto (ou use a ferramenta Waypoint no mapa, que já faz isso).
+        </p>
       )}
 
       <div className={styles.actions}>
-        <Button variant="outline" onClick={() => onPatch({ waypoints: [] })} disabled={waypoints.length === 0}>
-          Limpar rota
-        </Button>
         <Button variant="solid" onClick={onRemove}>
           Remover robô
         </Button>

@@ -74,5 +74,7 @@ export interface SimRobotRowModel {
     /** Status que o backend calcula pelo último DOTBOT_ADVERTISEMENT — null = não cadastrado. */
     backendStatus: RobotStatus | null;
     swarmitStatus: SwarmitDeviceStatus | null;
+    /** Task em andamento no orquestrador do backend local, se houver. */
+    taskName: string | null;
   };
 }

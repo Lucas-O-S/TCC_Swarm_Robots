@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { DotBotControlMode } from '../../enums/DotBotControlMode.enum';
+import type { RobotControlMode } from '../../enums/RobotControlMode.enum';
 import type { RobotStatus } from '../../enums/RobotStatus.enum';
 import { SwarmitPayloadType } from '../../enums/SwarmitPayloadType.enum';
 import type { FleetCommand } from '../../Integration/FleetLink';
 import { LocalFleetLink } from '../../Integration/LocalFleetLink';
 import type { BackendRobotView, LinkLogEntry } from '../../Integration/LocalFleetLink';
+import type { OrchestratorRobotRecord } from '../../Integration/LocalOrchestrator';
 import { ScenarioMapper } from '../../mapper/Scenario.Mapper';
+import { SimulationService } from '../../services/Simulation.Service';
 import type { ScenarioModel, SimConfigModel } from '../../model/Scenario.Model';
 import type { SimRobotModel } from '../../model/SimRobot.Model';
+import type { TaskModel } from '../../model/Task.Model';
 import type { Vec2Model } from '../../model/SimWorld.Model';
 import { SimGateway } from './SimGateway';
 import type { SwarmitDeviceView } from './SimGateway';
@@ -36,6 +39,15 @@ export interface NetConfigValues {
   pdr_percent: number;
   slot_latency_ms: number;
   jitter_ms: number;
+}
+
+/** O que o backend local sabe de um robô: visão do link + registro do orquestrador. */
+export interface BackendRobotInfo {
+  view: BackendRobotView | null;
+  status: RobotStatus | null;
+  /** Colunas mode/taskId — null = ainda não cadastrado (nenhum advertisement). */
+  record: OrchestratorRobotRecord | null;
+  task: TaskModel | null;
 }
 
 interface Runtime {
@@ -103,6 +115,9 @@ export function useSimulation() {
       stopRuntime();
       const world = ScenarioMapper.toWorld(scenario);
       const link = new LocalFleetLink({ clock: () => world.time });
+      // A tela não cria task: puxa a lista do backend. Offline = mock, sempre
+      // do zero (todas Pending) a cada início/Reiniciar.
+      link.orchestrator.loadTasks(SimulationService.createMockTasks(scenario));
       const gateway = new SimGateway({
         world,
         link,
@@ -227,18 +242,42 @@ export function useSimulation() {
       send({ kind: 'move-raw', destination: address, left_x: 0, left_y: left, right_x: 0, right_y: right }),
     [send],
   );
-  const setControlMode = useCallback(
-    (address: string, value: DotBotControlMode) => send({ kind: 'control-mode', destination: address, mode: value }),
+  /** LH2_WAYPOINTS avulso (rota do modo Manual) — o comando `waypoints` do backend, fora do orquestrador. */
+  const sendWaypoints = useCallback(
+    (address: string, waypoints: Vec2Model[], threshold: number) =>
+      send({ kind: 'waypoints', destination: address, threshold, waypoints }),
     [send],
   );
   const setRgb = useCallback(
     (address: string, red: number, green: number, blue: number) => send({ kind: 'rgb', destination: address, red, green, blue }),
     [send],
   );
-  const sendWaypoints = useCallback(
-    (address: string, waypoints: Vec2Model[], threshold: number) =>
-      send({ kind: 'waypoints', destination: address, threshold, waypoints }),
-    [send],
+
+  // ---- orquestrador (tasks e modos Manual/SemiAuto/Auto) --------------------------
+  // Cada ação devolve a mensagem de erro do backend (ou null), pra tela mostrar.
+
+  const withOrchestrator = useCallback(
+    <T,>(fn: (o: LocalFleetLink['orchestrator']) => T, fallback: T): T => {
+      const o = runtimeRef.current?.link.orchestrator;
+      const out = o ? fn(o) : fallback;
+      rerender();
+      return out;
+    },
+    [rerender],
+  );
+
+  const setRobotMode = useCallback(
+    (address: string, value: RobotControlMode) => withOrchestrator((o) => o.setMode(address, value), 'Simulação parada.'),
+    [withOrchestrator],
+  );
+  
+  const assignTask = useCallback(
+    (address: string, taskId: string) => withOrchestrator((o) => o.assign(address, taskId), 'Simulação parada.'),
+    [withOrchestrator],
+  );
+  const setWaypointThreshold = useCallback(
+    (address: string, mm: number) => withOrchestrator((o) => o.setThreshold(address, mm), undefined),
+    [withOrchestrator],
   );
 
   /** Injeção de falha: derruba/religa o robô na rede (não é comando — é o "mundo físico"). */
@@ -305,11 +344,17 @@ export function useSimulation() {
   const rt = mode === 'sim' ? runtimeRef.current : null;
   const world = rt?.world ?? null;
   const robots: SimRobotModel[] = world ? world.robots.map((r) => r.snapshot()) : [];
-  const backend = new Map<string, { view: BackendRobotView | null; status: RobotStatus | null }>();
+  const backend = new Map<string, BackendRobotInfo>();
   const swarmit = new Map<string, SwarmitDeviceView | null>();
   if (rt) {
+    const o = rt.link.orchestrator;
     for (const r of robots) {
-      backend.set(r.address, { view: rt.link.getView(r.address), status: rt.link.statusOf(r.address) });
+      backend.set(r.address, {
+        view: rt.link.getView(r.address),
+        status: rt.link.statusOf(r.address),
+        record: o.robot(r.address),
+        task: o.taskOf(r.address),
+      });
       swarmit.set(r.address, rt.gateway.swarmitView(r.address));
     }
   }
@@ -317,6 +362,13 @@ export function useSimulation() {
   const netStats: { uplink: NetChannelStats; downlink: NetChannelStats } | null = rt ? rt.gateway.netStats : null;
   const logEntries: readonly LinkLogEntry[] = rt ? rt.link.entries : [];
   const netConfig = world ? netConfigOf(world.sim) : draft ? netConfigOf(draft.sim) : null;
+  const orchestrator = rt
+    ? {
+        tasks: rt.link.orchestrator.tasks,
+        nextRunIn: rt.link.orchestrator.secondsToNextRun(),
+        freeAuto: rt.link.orchestrator.freeAutoRobots().length,
+      }
+    : null;
 
   return {
     draft,
@@ -336,6 +388,7 @@ export function useSimulation() {
     netStats,
     received: rt?.link.received ?? null,
     logEntries,
+    orchestrator,
     load,
     enterSim,
     enterEdit,
@@ -346,9 +399,11 @@ export function useSimulation() {
     setNetConfig,
     setSimParams,
     moveRaw,
-    setControlMode,
-    setRgb,
     sendWaypoints,
+    setRgb,
+    setRobotMode,
+    assignTask,
+    setWaypointThreshold,
     setRobotOnline,
     setSwarmitEnabled,
     swarmitCommand,

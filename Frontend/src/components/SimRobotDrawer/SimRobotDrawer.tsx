@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Button } from '../Button/Button';
 import { Drawer } from '../Drawer/Drawer';
@@ -6,21 +6,33 @@ import { Joystick } from '../Joystick/Joystick';
 import { Segmented } from '../Segmented/Segmented';
 import { DEFAULT_WAYPOINT_THRESHOLD_MM, DEG_TO_RAD, PWM_MAX, RAD_TO_DEG } from '../../Consts/SimulationConsts';
 import { DotBotControlMode } from '../../enums/DotBotControlMode.enum';
+import { RobotControlMode } from '../../enums/RobotControlMode.enum';
 import { RobotStatus } from '../../enums/RobotStatus.enum';
 import { SwarmitDeviceStatus } from '../../enums/SwarmitDeviceStatus.enum';
-import type { BackendRobotView } from '../../Integration/LocalFleetLink';
+import { ORCHESTRATOR_RUN_S } from '../../Integration/LocalOrchestrator';
 import { swarmitStatusName } from '../../Integration/Protocols/Swarmit/Swarmit.Protocol';
 import { SimRobotMapper } from '../../mapper/SimRobot.Mapper';
 import type { RgbColorModel, SimRobotModel } from '../../model/SimRobot.Model';
 import type { Vec2Model } from '../../model/SimWorld.Model';
+import type { TaskModel } from '../../model/Task.Model';
 import type { SwarmitDeviceView } from '../../screens/Simulation/SimGateway';
 import { normalizeAngle } from '../../screens/Simulation/SimRobot';
+import type { BackendRobotInfo } from '../../screens/Simulation/useSimulation';
 import styles from './SimRobotDrawer.module.css';
 
-const MODE_OPTIONS: { value: DotBotControlMode; label: string; title: string }[] = [
-  { value: DotBotControlMode.Manual, label: 'Manual', title: 'Obedece CMD_MOVE_RAW (joystick)' },
-  { value: DotBotControlMode.Auto, label: 'Auto', title: 'Segue a rota de waypoints (LH2_WAYPOINTS)' },
+// Modos de ORQUESTRAÇÃO do backend (RobotControlMode), não o modo do fio.
+const MODE_OPTIONS: { value: RobotControlMode; label: string; title: string }[] = [
+  { value: RobotControlMode.Manual, label: 'Manual', title: 'Dirigido no joystick (CMD_MOVE_RAW); o orquestrador não mexe' },
+  { value: RobotControlMode.SemiAuto, label: 'Semi-auto', title: 'Executa tarefas sozinho, mas só as que você atribui' },
+  { value: RobotControlMode.Auto, label: 'Auto', title: `Pega sozinho a próxima tarefa da fila (rodada a cada ${ORCHESTRATOR_RUN_S} s)` },
 ];
+
+const MODE_HINT: Record<RobotControlMode, string> = {
+  [RobotControlMode.Manual]: 'Você dirige: joystick ou uma rota avulsa (LH2_WAYPOINTS) — o orquestrador não mexe neste robô.',
+  [RobotControlMode.SemiAuto]:
+    'Executa tarefas sozinho (segue os waypoints), mas só recebe tarefa atribuída por você — fica fora da fila do orquestrador.',
+  [RobotControlMode.Auto]: `Entra na fila: a cada ${ORCHESTRATOR_RUN_S} s o orquestrador dá a próxima tarefa pendente (menor prioridade primeiro) a um robô Auto livre.`,
+};
 
 function num(handler: (v: number) => void) {
   return (e: ChangeEvent<HTMLInputElement>) => {
@@ -95,15 +107,24 @@ interface SimRobotDrawerProps {
   robot: SimRobotModel | null;
   label: string;
   onClose: () => void;
-  backend: { view: BackendRobotView | null; status: RobotStatus | null } | null;
+  backend: BackendRobotInfo | null;
   now: number;
   swarmitOn: boolean;
   device: SwarmitDeviceView | null;
+  /** Pontos montados no mapa (ferramenta Waypoint) pra rota avulsa do modo Manual. */
   routeDraft: Vec2Model[];
+  /** Tasks pendentes da fila (pra atribuir no Semi-auto). */
+  pendingTasks: readonly TaskModel[];
+  /** Segundos até a próxima rodada do orquestrador. */
+  nextRunIn: number;
   onSetOnline: (online: boolean) => void;
   onMoveRaw: (left: number, right: number) => void;
-  onMode: (mode: DotBotControlMode) => void;
+  onMode: (mode: RobotControlMode) => string | null;
   onRgb: (rgb: RgbColorModel) => void;
+  onAssign: (taskId: string) => string | null;
+  /** Task escolhida no seletor do Semi-auto — o mapa mostra a rota dela antes de atribuir. */
+  onPreviewTask: (taskId: string | null) => void;
+  onThreshold: (mm: number) => void;
   onSendRoute: (threshold: number) => void;
   onClearRoute: () => void;
   onResendRoute: () => void;
@@ -132,10 +153,15 @@ function SimRobotPanel({
   swarmitOn,
   device,
   routeDraft,
+  pendingTasks,
+  nextRunIn,
   onSetOnline,
   onMoveRaw,
   onMode,
   onRgb,
+  onAssign,
+  onPreviewTask,
+  onThreshold,
   onSendRoute,
   onClearRoute,
   onResendRoute,
@@ -143,11 +169,14 @@ function SimRobotPanel({
   onFlash,
 }: SimRobotDrawerProps & { robot: SimRobotModel }) {
   const [speed, setSpeed] = useState(80);
-  const [threshold, setThreshold] = useState(DEFAULT_WAYPOINT_THRESHOLD_MM);
+  const [routeThreshold, setRouteThreshold] = useState(DEFAULT_WAYPOINT_THRESHOLD_MM);
   const [color, setColor] = useState(() => SimRobotMapper.rgbToHex(robot.rgb.r || robot.rgb.g || robot.rgb.b ? robot.rgb : { r: 255, g: 140, b: 0 }));
+  const [error, setError] = useState<string | null>(null);
 
-  const auto = robot.mode === DotBotControlMode.Auto;
+  const wireAuto = robot.mode === DotBotControlMode.Auto;
   const lastAdv = backend?.view?.lastAdvertisementAt ?? null;
+  const record = backend?.record ?? null;
+  const mode = record?.mode ?? null;
   const [sending, setSending] = useState<DriveCommand | null>(null);
   const turnSide = useRef(0);
 
@@ -160,6 +189,11 @@ function SimRobotPanel({
     setSending(x === 0 && y === 0 ? null : cmd);
     onMoveRaw(cmd.left, cmd.right);
   }
+
+  function handleMode(next: RobotControlMode) {
+    setError(onMode(next));
+  }
+
   const canCommand = robot.online && robot.appRunning;
 
   return (
@@ -182,8 +216,8 @@ function SimRobotPanel({
         </dd>
         <dt>theta</dt>
         <dd>{(robot.theta * RAD_TO_DEG).toFixed(1)}°</dd>
-        <dt>modo</dt>
-        <dd>{auto ? (robot.loop ? 'AUTO (loop)' : 'AUTO') : 'MANUAL'}</dd>
+        <dt>modo (fio)</dt>
+        <dd>{wireAuto ? (robot.loop ? 'AUTO (loop)' : 'AUTO') : 'MANUAL'}</dd>
         <dt>bateria</dt>
         <dd>{robot.battery.toFixed(1)}%</dd>
         <dt>pwm L/R</dt>
@@ -228,52 +262,81 @@ function SimRobotPanel({
       )}
 
       <div className={styles.field}>
-        Modo (CONTROL_MODE)
-        <Segmented options={MODE_OPTIONS} value={robot.mode} onChange={onMode} />
+        Modo
+        {mode !== null ? (
+          <Segmented options={MODE_OPTIONS} value={mode} onChange={handleMode} ariaLabel="Modo de controle" />
+        ) : (
+          <span className={styles.hint}>O backend ainda não cadastrou este robô — espera o primeiro DOTBOT_ADVERTISEMENT.</span>
+        )}
       </div>
+      {mode !== null && <p className={styles.hint}>{MODE_HINT[mode]}</p>}
+      {error && <p className={styles.error}>{error}</p>}
 
-      <label className={styles.field}>
-        <span>
-          Joystick (CMD_MOVE_RAW) · velocidade máx. <strong>{speed}</strong>/127
-        </span>
-        <input type="range" min={10} max={PWM_MAX} value={speed} onChange={num(setSpeed)} />
-      </label>
-      <Joystick onChange={handleJoystick} rateHz={JOYSTICK_HZ} />
-      <p className={styles.joystickReadout}>
-        {sending ? `rumo ${sending.headingDeg.toFixed(0)}° · enviando L=${sending.left} R=${sending.right}` : 'solto — robô parado'}
-      </p>
-      <p className={styles.hint}>
-        Arraste pra direção do mapa em que o robô deve ir: ele gira sozinho até apontar pra lá e anda — quanto mais
-        longe do centro, mais rápido. Enquanto arrasta, manda CMD_MOVE_RAW a {JOYSTICK_HZ} Hz (põe o robô em MANUAL);
-        ao soltar, a bolinha volta pro centro e manda a parada.
-      </p>
+      {mode === RobotControlMode.Manual && (
+        <>
+          <label className={styles.field}>
+            <span>
+              Joystick (CMD_MOVE_RAW) · velocidade máx. <strong>{speed}</strong>/127
+            </span>
+            <input type="range" min={10} max={PWM_MAX} value={speed} onChange={num(setSpeed)} />
+          </label>
+          <Joystick onChange={handleJoystick} rateHz={JOYSTICK_HZ} />
+          <p className={styles.joystickReadout}>
+            {sending ? `rumo ${sending.headingDeg.toFixed(0)}° · enviando L=${sending.left} R=${sending.right}` : 'solto — robô parado'}
+          </p>
+          <p className={styles.hint}>
+            Arraste pra direção do mapa em que o robô deve ir: ele gira sozinho até apontar pra lá e anda — quanto mais
+            longe do centro, mais rápido. Enquanto arrasta, manda CMD_MOVE_RAW a {JOYSTICK_HZ} Hz; ao soltar, a bolinha
+            volta pro centro e manda a parada.
+          </p>
 
-      <div className={styles.field}>
-        Rota (LH2_WAYPOINTS)
-        <span className={styles.hint}>
-          {routeDraft.length > 0
-            ? `${routeDraft.length} ponto(s) montado(s) — laranja no mapa.`
-            : 'Ligue a ferramenta Waypoint no mapa e clique pra montar a rota deste robô.'}
-        </span>
-      </div>
-      <div className={styles.fieldRow}>
-        <label className={styles.field}>
-          Raio (mm)
-          <input type="number" min={5} step={5} value={threshold} onChange={num((v) => v > 0 && setThreshold(v))} />
-        </label>
-      </div>
-      <div className={styles.actions}>
-        <Button variant="accent" onClick={() => onSendRoute(threshold)} disabled={routeDraft.length === 0}>
-          Enviar rota
-        </Button>
-        <Button variant="outline" onClick={onClearRoute} disabled={routeDraft.length === 0}>
-          Limpar
-        </Button>
-        <Button variant="outline" onClick={onResendRoute} disabled={robot.waypoints.length === 0} title="Reenvia a rota atual do robô (volta ao ponto 1)">
-          Reenviar atual
-        </Button>
-      </div>
+          <div className={styles.field}>
+            Rota avulsa (LH2_WAYPOINTS)
+            <span className={styles.hint}>
+              {routeDraft.length > 0
+                ? `${routeDraft.length} ponto(s) montado(s) — laranja no mapa.`
+                : 'Ligue a ferramenta Waypoint no mapa e clique pra montar a rota deste robô.'}
+            </span>
+          </div>
+          <div className={styles.fieldRow}>
+            <label className={styles.field}>
+              Raio (mm)
+              <input type="number" min={5} step={5} value={routeThreshold} onChange={num((v) => v > 0 && setRouteThreshold(v))} />
+            </label>
+          </div>
+          <div className={styles.actions}>
+            <Button variant="accent" onClick={() => onSendRoute(routeThreshold)} disabled={routeDraft.length === 0}>
+              Enviar rota
+            </Button>
+            <Button variant="outline" onClick={onClearRoute} disabled={routeDraft.length === 0}>
+              Limpar
+            </Button>
+            <Button variant="outline" onClick={onResendRoute} disabled={robot.waypoints.length === 0} title="Reenvia a rota atual do robô (volta ao ponto 1)">
+              Reenviar atual
+            </Button>
+          </div>
+          <p className={styles.hint}>
+            O robô segue a rota sozinho (entra em AUTO no fio) até você mexer no joystick de novo.
+          </p>
+        </>
+      )}
 
+      {(mode === RobotControlMode.SemiAuto || mode === RobotControlMode.Auto) && record && (
+        <TaskSection
+          key={`${robot.address}-${mode}`}
+          semiAuto={mode === RobotControlMode.SemiAuto}
+          task={backend?.task ?? null}
+          wpIdx={robot.waypoint_idx}
+          threshold={record.waypointsThreshold}
+          pendingTasks={pendingTasks}
+          nextRunIn={nextRunIn}
+          onAssign={(id) => setError(onAssign(id))}
+          onPreview={onPreviewTask}
+          onThreshold={onThreshold}
+        />
+      )}
+
+      <hr className={styles.divider} />
       <div className={styles.fieldRow}>
         <label className={styles.field}>
           LED (CMD_RGB_LED)
@@ -322,5 +385,105 @@ function SimRobotPanel({
         </>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tarefa do robô (Semi-auto e Auto). A tela NÃO cria task — só seleciona
+// entre as que o backend tem (mock enquanto não há API). Com tarefa em
+// andamento: progresso. Sem tarefa: no Semi-auto, escolher uma pendente
+// (o mapa mostra a rota dela) e Atribuir; no Auto, esperar a rodada.
+// ---------------------------------------------------------------------------
+
+interface TaskSectionProps {
+  semiAuto: boolean;
+  task: TaskModel | null;
+  wpIdx: number;
+  threshold: number;
+  pendingTasks: readonly TaskModel[];
+  nextRunIn: number;
+  onAssign: (taskId: string) => void;
+  onPreview: (taskId: string | null) => void;
+  onThreshold: (mm: number) => void;
+}
+
+function TaskSection({ semiAuto, task, wpIdx, threshold, pendingTasks, nextRunIn, onAssign, onPreview, onThreshold }: TaskSectionProps) {
+  const assignable = pendingTasks.filter((t) => t.waypoints.length > 0);
+  const [picked, setPicked] = useState('');
+  const pickedId = assignable.some((t) => t.uuid === picked) ? picked : (assignable[0]?.uuid ?? '');
+  const previewId = semiAuto && !task && pickedId ? pickedId : null;
+
+  // Mostra no mapa a rota da task escolhida; some ao sair/atribuir.
+  const onPreviewRef = useRef(onPreview);
+  useEffect(() => {
+    onPreviewRef.current = onPreview;
+  });
+  useEffect(() => {
+    onPreviewRef.current(previewId);
+  }, [previewId]);
+  useEffect(() => () => onPreviewRef.current(null), []);
+
+  return (
+    <>
+      <p className={styles.subtitle}>Tarefa</p>
+      {task ? (
+        <>
+          <div className={styles.taskCurrent}>
+            <strong>{task.name}</strong>
+            <span>
+              ponto {Math.min(wpIdx + 1, task.waypoints.length)}/{task.waypoints.length}
+            </span>
+          </div>
+          <div className={styles.progress} title="waypoint_idx do último advertisement">
+            <div className={styles.progressBar} style={{ width: `${Math.round((Math.min(wpIdx, task.waypoints.length) / task.waypoints.length) * 100)}%` }} />
+          </div>
+        </>
+      ) : semiAuto ? (
+        <>
+          <label className={styles.field}>
+            Escolher tarefa
+            {assignable.length > 0 ? (
+              <select className={styles.select} value={pickedId} onChange={(e) => setPicked(e.target.value)}>
+                {assignable.map((t) => (
+                  <option key={t.uuid} value={t.uuid}>
+                    {t.name} · prioridade {t.priority} · {t.waypoints.length} ponto(s)
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className={styles.hint}>Nenhuma tarefa pendente no backend.</span>
+            )}
+          </label>
+          {assignable.length > 0 && (
+            <>
+              <p className={styles.hint}>A rota da tarefa escolhida aparece em rosa no mapa.</p>
+              <div className={styles.actions}>
+                <Button variant="accent" onClick={() => pickedId && onAssign(pickedId)}>
+                  Atribuir
+                </Button>
+              </div>
+            </>
+          )}
+        </>
+      ) : (
+        <p className={styles.hint}>
+          Livre — esperando tarefa da fila ({assignable.length} pendente(s)); próxima rodada em {nextRunIn.toFixed(1)} s.
+        </p>
+      )}
+
+      <div className={styles.fieldRow}>
+        <label className={styles.field}>
+          Raio de chegada (mm)
+          <input
+            type="number"
+            min={5}
+            step={5}
+            value={threshold}
+            onChange={num((v) => v > 0 && onThreshold(v))}
+            title="waypointsThreshold do robô — vale a partir da próxima tarefa"
+          />
+        </label>
+      </div>
+    </>
   );
 }

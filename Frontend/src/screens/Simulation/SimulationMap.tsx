@@ -24,6 +24,8 @@ interface SimulationMapProps {
   editable: boolean;
   focusAddress: string | null;
   routeDraft: { address: string; points: Vec2Model[] } | null;
+  /** Rota de uma task em destaque (só desenho, rosa) — `from` = posição do robô que vai fazer. */
+  taskPreview?: { from: Vec2Model | null; points: Vec2Model[] } | null;
   maxHeight?: number;
   elements: MapElementsController;
   className?: string;
@@ -59,6 +61,7 @@ export function SimulationMap({
   editable,
   focusAddress,
   routeDraft,
+  taskPreview = null,
   maxHeight,
   elements,
   className,
@@ -115,6 +118,7 @@ export function SimulationMap({
           editable={editable}
           focusAddress={focusAddress}
           routeDraft={routeDraft}
+          taskPreview={taskPreview}
         />
 
         {/* Rota do robô em foco no modo Editar: marcadores numerados, arrastáveis e apagáveis (TaskBuilder). */}

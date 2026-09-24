@@ -1,9 +1,13 @@
 import { CenarioService } from './Cenario.Service';
 import { DEFAULT_COLS, DEFAULT_ROWS } from '../Consts/MapConsts';
-import { CELL_MM, DEFAULT_NETWORK, DEFAULT_SIM_CONFIG } from '../Consts/SimulationConsts';
+import { CELL_MM, DEFAULT_NETWORK, DEFAULT_SIM_CONFIG, POINT_SNAP_MM, ROBOT_RADIUS_MM } from '../Consts/SimulationConsts';
 import { DotBotControlMode } from '../enums/DotBotControlMode.enum';
+import { TaskStatus } from '../enums/TaskStatus.enum';
 import { ScenarioMapper } from '../mapper/Scenario.Mapper';
 import type { ScenarioModel, ScenarioRobotModel } from '../model/Scenario.Model';
+import type { SimObstacleModel, Vec2Model } from '../model/SimWorld.Model';
+import type { TaskModel } from '../model/Task.Model';
+import { collidesAny } from '../screens/Simulation/SimPhysics';
 
 // Cenários que a tela de Simulação oferece sem banco de dados (a conexão com
 // a API ainda não existe — mesmo espírito do CenarioService.createMockMap
@@ -176,6 +180,55 @@ const PRESETS: (ScenarioPreset & { build: () => ScenarioModel })[] = [
   },
 ];
 
+// Tasks mock — o que o GET /tasks devolveria (a tela de Simulação NÃO cria
+// task, só puxa e seleciona; criar é da tela Tarefas/API). Como o cenário
+// muda, as rotas são frações da arena; entra só a que dá pra percorrer em
+// linha reta: todo ponto livre e nenhum trecho cortando barreira (o
+// controlador AUTO não desvia de nada).
+const MOCK_TASKS: { name: string; priority: number; points: [number, number][] }[] = [
+  { name: 'Entrega doca → estoque', priority: 0, points: [[0.12, 0.12], [0.88, 0.12], [0.88, 0.5]] },
+  { name: 'Inspeção canto nordeste', priority: 1, points: [[0.75, 0.75], [0.88, 0.88], [0.7, 0.88]] },
+  { name: 'Coleta canto sudoeste', priority: 1, points: [[0.3, 0.3], [0.12, 0.3], [0.12, 0.12]] },
+  { name: 'Patrulha do perímetro', priority: 2, points: [[0.12, 0.12], [0.88, 0.12], [0.88, 0.88], [0.12, 0.88], [0.12, 0.12]] },
+  { name: 'Travessia norte', priority: 3, points: [[0.12, 0.88], [0.88, 0.88]] },
+  { name: 'Ronda central', priority: 4, points: [[0.35, 0.5], [0.5, 0.35], [0.65, 0.5], [0.5, 0.65]] },
+];
+
+const MOCK_CLEARANCE_MM = ROBOT_RADIUS_MM + 20;
+
+function segmentIsFree(a: Vec2Model, b: Vec2Model, obstacles: SimObstacleModel[]): boolean {
+  const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 20));
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    if (collidesAny({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }, MOCK_CLEARANCE_MM, obstacles)) return false;
+  }
+  return true;
+}
+
+function buildMockTasks(scenario: ScenarioModel): TaskModel[] {
+  const { width_mm: w, height_mm: h } = scenario.arena;
+  const obstacles: SimObstacleModel[] = scenario.obstacles.map((o) => ({ id: o.id, x: o.x_mm, y: o.y_mm, w: o.w_mm, h: o.h_mm }));
+  const snap = (v: number, max: number) =>
+    Math.min(max - MOCK_CLEARANCE_MM, Math.max(MOCK_CLEARANCE_MM, Math.round(v / POINT_SNAP_MM) * POINT_SNAP_MM));
+
+  const tasks: TaskModel[] = [];
+  for (const mock of MOCK_TASKS) {
+    const points = mock.points.map(([fx, fy]) => ({ x: snap(fx * w, w), y: snap(fy * h, h) }));
+    const free = points.every((p, i) => !collidesAny(p, MOCK_CLEARANCE_MM, obstacles) && (i === 0 || segmentIsFree(points[i - 1], p, obstacles)));
+    if (!free) continue;
+    tasks.push({
+      uuid: `mock-task-${tasks.length + 1}`,
+      name: mock.name,
+      priority: mock.priority,
+      status: TaskStatus.Pending,
+      waypoints: points.map((p, orderIndex) => ({ orderIndex, x: p.x, y: p.y })),
+      robots: [],
+      isDeleted: false,
+    });
+  }
+  return tasks;
+}
+
 export type ParseScenarioResult = { ok: true; scenario: ScenarioModel } | { ok: false; error: string };
 
 export const SimulationService = {
@@ -199,6 +252,14 @@ export const SimulationService = {
       robots: [],
       sim: { ...DEFAULT_SIM_CONFIG },
     };
+  },
+
+  /**
+   * Tasks mock pro cenário (todas Pending, rotas que cabem nele). Quando a
+   * API existir, isto vira o `TaskService.list()`.
+   */
+  createMockTasks(scenario: ScenarioModel): TaskModel[] {
+    return buildMockTasks(scenario);
   },
 
   /**

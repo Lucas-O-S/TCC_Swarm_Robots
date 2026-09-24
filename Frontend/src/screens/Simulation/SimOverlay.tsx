@@ -15,13 +15,17 @@ interface SimOverlayProps {
   focusAddress: string | null;
   /** Rota em montagem no modo Simular (vira LH2_WAYPOINTS ao enviar). */
   routeDraft: { address: string; points: Vec2Model[] } | null;
+  /** Rota de uma task em destaque (cartão Tarefas / seletor do Semi-auto). */
+  taskPreview?: { from: Vec2Model | null; points: Vec2Model[] } | null;
 }
+
+const PREVIEW_COLOR = '#d63384'; // fora da paleta dos robôs e do laranja do rascunho
 
 // Camada SVG (sem clique) com o que é "desenho" e não elemento de mapa:
 // rastro recente de cada robô, rota do modo AUTO (tracejada, alvo atual
 // destacado, fecha o circuito quando em loop) e a rota em montagem —
 // mesmas informações do MapView do RobotSwarmSimulator.
-export function SimOverlay({ scale, robots, trails, editable, focusAddress, routeDraft }: SimOverlayProps) {
+export function SimOverlay({ scale, robots, trails, editable, focusAddress, routeDraft, taskPreview = null }: SimOverlayProps) {
   const px = (p: Vec2Model) => toPx(scale, p);
   const pts = (list: Vec2Model[]) => list.map((p) => { const q = px(p); return `${q.x},${q.y}`; }).join(' ');
 
@@ -79,6 +83,29 @@ export function SimOverlay({ scale, robots, trails, editable, focusAddress, rout
         const line = owner ? [{ x: owner.x, y: owner.y }, ...routeDraft.points] : routeDraft.points;
         return <polyline points={pts(line)} fill="none" stroke="var(--color-orange)" strokeWidth={2} strokeDasharray="4 3" />;
       })()}
+      {taskPreview && taskPreview.points.length > 0 && (
+        <g>
+          <polyline
+            points={pts(taskPreview.from ? [taskPreview.from, ...taskPreview.points] : taskPreview.points)}
+            fill="none"
+            stroke={PREVIEW_COLOR}
+            strokeWidth={2.5}
+            strokeDasharray="8 4"
+            opacity={0.85}
+          />
+          {taskPreview.points.map((wp, k) => {
+            const q = px(wp);
+            return (
+              <g key={`preview-${k}`}>
+                <circle cx={q.x} cy={q.y} r={4.5} fill={PREVIEW_COLOR} />
+                <text x={q.x + 6} y={q.y - 5} className={styles.waypointLabel}>
+                  {k + 1}
+                </text>
+              </g>
+            );
+          })}
+        </g>
+      )}
     </svg>
   );
 }

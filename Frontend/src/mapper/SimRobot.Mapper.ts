@@ -1,7 +1,9 @@
 import { RAD_TO_DEG, DEG_TO_RAD } from '../Consts/SimulationConsts';
 import { DotBotControlMode } from '../enums/DotBotControlMode.enum';
+import type { RobotControlMode } from '../enums/RobotControlMode.enum';
 import { RobotStatus } from '../enums/RobotStatus.enum';
 import type { SwarmitDeviceStatus } from '../enums/SwarmitDeviceStatus.enum';
+import { controlModeLabel } from '../Integration/LocalOrchestrator';
 import type { ScenarioRobotModel } from '../model/Scenario.Model';
 import type { RgbColorModel, SimMapRobotModel, SimRobotModel, SimRobotRowModel } from '../model/SimRobot.Model';
 
@@ -115,13 +117,19 @@ export const SimRobotMapper = {
   rowFromState(
     r: SimRobotModel,
     index: number,
-    seen: { backendStatus: RobotStatus | null; swarmitStatus: SwarmitDeviceStatus | null },
+    seen: {
+      backendStatus: RobotStatus | null;
+      swarmitStatus: SwarmitDeviceStatus | null;
+      /** Modo de orquestração (coluna `mode`) — null = backend ainda não cadastrou; aí vale o do fio. */
+      backendMode: RobotControlMode | null;
+      taskName: string | null;
+    },
   ): SimRobotRowModel {
     return {
       address: r.address,
       label: label(index),
       color: color(index, r.rgb),
-      modeLabel: modeLabel(r.mode, r.loop),
+      modeLabel: seen.backendMode !== null ? controlModeLabel(seen.backendMode) : modeLabel(r.mode, r.loop),
       battery: r.battery,
       x: r.pos_x,
       y: r.pos_y,
@@ -129,7 +137,13 @@ export const SimRobotMapper = {
       waypoints: r.waypoints.length,
       waypointIdx: r.waypoint_idx,
       loop: r.loop,
-      sim: { online: r.online, appRunning: r.appRunning, ...seen },
+      sim: {
+        online: r.online,
+        appRunning: r.appRunning,
+        backendStatus: seen.backendStatus,
+        swarmitStatus: seen.swarmitStatus,
+        taskName: seen.taskName,
+      },
     };
   },
 };

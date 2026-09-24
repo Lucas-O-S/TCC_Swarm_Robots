@@ -62,6 +62,11 @@ export function SimRobotCard({ robot, selected, onClick }: SimRobotCardProps) {
           >
             API: {sim.backendStatus !== null ? BACKEND_LABEL[sim.backendStatus] : '—'}
           </Badge>
+          {sim.taskName && (
+            <Badge tone="blue" title="Task em andamento (orquestrador do backend local)">
+              tarefa: {sim.taskName}
+            </Badge>
+          )}
         </div>
       )}
 

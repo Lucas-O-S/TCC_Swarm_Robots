@@ -6,6 +6,7 @@ import type { DotBotAdvertisement } from './Protocols/DotBot.Payload';
 import { SWARMIT_OTA_CHUNK_SIZE, swarmitStatusName } from './Protocols/Swarmit/Swarmit.Protocol';
 import { describeCommand } from './FleetLink';
 import type { FleetCommand, FleetLink, FleetUplink } from './FleetLink';
+import { LocalOrchestrator } from './LocalOrchestrator';
 
 // Link OFFLINE (padrão enquanto não existe conexão com a API): um "backend
 // de bolso" em memória no lugar do broker MQTT + NestJS. Faz o papel do
@@ -16,8 +17,10 @@ import type { FleetCommand, FleetLink, FleetUplink } from './FleetLink';
 //     simulador deixa de propósito pro backend: Active (< 5 s sem
 //     telemetria) → Inactive (5–60 s) → Lost (> 60 s), os mesmos de
 //     src/enums/RobotStatus.enum.ts;
-//   - manda os comandos que a tela dispara (joystick, modo, rota, LED,
-//     swarmit), que descem pelo modelo de rede como desceriam do backend.
+//   - manda os comandos que a tela dispara (joystick, modo, LED, swarmit),
+//     que descem pelo modelo de rede como desceriam do backend;
+//   - roda o orquestrador (LocalOrchestrator): tasks, modos Manual/SemiAuto/
+//     Auto e a atribuição automática da fila, como o OrchestratorService.
 // Tudo em TEMPO SIMULADO (relógio do World): pausar congela os timers.
 // Quando a API existir, é trocar este link pelo MqttFleetLink em
 // screens/Simulation/useSimulation.ts — o gateway, o motor e a tela não mudam.
@@ -96,8 +99,17 @@ export class LocalFleetLink implements FleetLink {
   };
   lastGatewayInfoAt: number | null = null;
 
+  /** Tasks + colunas mode/taskId dos robôs — o OrchestratorService do backend. */
+  readonly orchestrator: LocalOrchestrator;
+
   constructor(opts: LocalFleetLinkOptions) {
     this.clock = opts.clock;
+    this.orchestrator = new LocalOrchestrator({
+      clock: () => this.clock(),
+      send: (cmd) => this.send(cmd),
+      log: (text) => this.log('backend', text),
+      statusOf: (address) => this.statusOf(address),
+    });
   }
 
   // ---- FleetLink ----------------------------------------------------------------
@@ -144,6 +156,7 @@ export class LocalFleetLink implements FleetLink {
         v.advertisement = uplink.payload;
         v.lastAdvertisementAt = now;
         v.advertisements++;
+        this.orchestrator.onAdvertisement(uplink.source, uplink.payload);
         break;
       }
       case 'swarmit-data':
@@ -173,7 +186,7 @@ export class LocalFleetLink implements FleetLink {
     });
   }
 
-  /** Chamado pelo loop da tela depois de cada lote de ticks: retransmissão do OTA e timers de status. */
+  /** Chamado pelo loop da tela depois de cada lote de ticks: retransmissão do OTA, timers de status e rodada do orquestrador. */
   update(): void {
     const now = this.clock();
 
@@ -206,9 +219,12 @@ export class LocalFleetLink implements FleetLink {
         const label = status === RobotStatus.Active ? 'Active' : status === RobotStatus.Inactive ? 'Inactive' : 'Lost';
         const why = status === RobotStatus.Active ? 'telemetria voltou' : `${status === RobotStatus.Inactive ? INACTIVE_AFTER_S : LOST_AFTER_S} s sem telemetria`;
         this.log('backend', `${status === RobotStatus.Active ? '✓' : '⚠'} ${v.address} → ${label} (${why})`);
+        if (status === RobotStatus.Lost) this.orchestrator.onLost(v.address);
       }
       this.lastStatus.set(v.address, status);
     }
+
+    this.orchestrator.update();
   }
 
   // ---- Leitura (UI) -------------------------------------------------------------
