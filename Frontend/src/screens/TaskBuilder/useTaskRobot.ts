@@ -71,7 +71,7 @@ export function wallHit(p: PathPoint, walls: Wall[]): Wall | undefined {
 // está. Chegar num ponto consome a distância até ele e segue pro próximo com
 // o que sobrou do passo, sem perder velocidade entre um ponto e outro.
 //
-// Colisão (mesma regra do simulador, screens/simulator/core/Robot.ts):
+// Colisão (mesma regra do simulador, screens/Simulation/SimPhysics.ts):
 // esbarrou numa parede, o robô para ali, colado nela, em vez de deslizar ou
 // contornar — e a ida fica bloqueada (`blockedBy`). O trecho é testado em
 // sub-passos de COLLISION_SUB_STEP, então não dá pra atravessar parede fina

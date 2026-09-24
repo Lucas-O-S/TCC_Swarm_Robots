@@ -11,7 +11,7 @@ interface RobotProps extends HTMLAttributes<HTMLDivElement> {
   selected?: boolean;
   /**
    * Orientação do robô em graus (0° = apontando pra cima, sentido horário) —
-   * mesmo `theta` usado em screens/simulator/ui/components/SimulationMap.tsx.
+   * o `theta` do simulador vira esta direção em screens/Simulation/useMapGeometry.ts (thetaToDirection).
    * Desenha uma seta indicando pra onde o robô está apontando, sem girar o
    * label (ao contrário do robô do simulador, este tem texto dentro).
    */
