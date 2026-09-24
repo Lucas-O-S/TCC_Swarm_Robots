@@ -122,6 +122,10 @@ interface SimRobotDrawerProps {
   onMode: (mode: RobotControlMode) => string | null;
   onRgb: (rgb: RgbColorModel) => void;
   onAssign: (taskId: string) => string | null;
+  /** Semi-auto: larga a task em andamento (o robô para, ela volta pra fila). */
+  onReleaseTask: () => string | null;
+  /** Semi-auto: troca a task em andamento por outra pendente. */
+  onSwitchTask: (taskId: string) => string | null;
   /** Task escolhida no seletor do Semi-auto — o mapa mostra a rota dela antes de atribuir. */
   onPreviewTask: (taskId: string | null) => void;
   onThreshold: (mm: number) => void;
@@ -160,6 +164,8 @@ function SimRobotPanel({
   onMode,
   onRgb,
   onAssign,
+  onReleaseTask,
+  onSwitchTask,
   onPreviewTask,
   onThreshold,
   onSendRoute,
@@ -331,6 +337,8 @@ function SimRobotPanel({
           pendingTasks={pendingTasks}
           nextRunIn={nextRunIn}
           onAssign={(id) => setError(onAssign(id))}
+          onRelease={() => setError(onReleaseTask())}
+          onSwitch={(id) => setError(onSwitchTask(id))}
           onPreview={onPreviewTask}
           onThreshold={onThreshold}
         />
@@ -390,9 +398,10 @@ function SimRobotPanel({
 
 // ---------------------------------------------------------------------------
 // Tarefa do robô (Semi-auto e Auto). A tela NÃO cria task — só seleciona
-// entre as que o backend tem (mock enquanto não há API). Com tarefa em
-// andamento: progresso. Sem tarefa: no Semi-auto, escolher uma pendente
-// (o mapa mostra a rota dela) e Atribuir; no Auto, esperar a rodada.
+// entre as que o backend tem (mock enquanto não há API). No Semi-auto:
+// sem tarefa, escolher uma pendente (o mapa mostra a rota) e Atribuir; com
+// tarefa em andamento, progresso + Cancelar (larga, volta pra fila) ou
+// Trocar por outra pendente no meio do caminho. No Auto, só acompanhar.
 // ---------------------------------------------------------------------------
 
 interface TaskSectionProps {
@@ -403,15 +412,46 @@ interface TaskSectionProps {
   pendingTasks: readonly TaskModel[];
   nextRunIn: number;
   onAssign: (taskId: string) => void;
+  onRelease: () => void;
+  onSwitch: (taskId: string) => void;
   onPreview: (taskId: string | null) => void;
   onThreshold: (mm: number) => void;
 }
 
-function TaskSection({ semiAuto, task, wpIdx, threshold, pendingTasks, nextRunIn, onAssign, onPreview, onThreshold }: TaskSectionProps) {
-  const assignable = pendingTasks.filter((t) => t.waypoints.length > 0);
+function TaskSection({
+  semiAuto,
+  task,
+  wpIdx,
+  threshold,
+  pendingTasks,
+  nextRunIn,
+  onAssign,
+  onRelease,
+  onSwitch,
+  onPreview,
+  onThreshold,
+}: TaskSectionProps) {
+  const assignable = pendingTasks.filter((t) => t.waypoints.length > 0 && t.uuid !== task?.uuid);
   const [picked, setPicked] = useState('');
   const pickedId = assignable.some((t) => t.uuid === picked) ? picked : (assignable[0]?.uuid ?? '');
-  const previewId = semiAuto && !task && pickedId ? pickedId : null;
+  const previewId = semiAuto && pickedId ? pickedId : null;
+
+  const picker = (label: string, empty: string) => (
+    <label className={styles.field}>
+      {label}
+      {assignable.length > 0 ? (
+        <select className={styles.select} value={pickedId} onChange={(e) => setPicked(e.target.value)}>
+          {assignable.map((t) => (
+            <option key={t.uuid} value={t.uuid}>
+              {t.name} · prioridade {t.priority} · {t.waypoints.length} ponto(s)
+            </option>
+          ))}
+        </select>
+      ) : (
+        <span className={styles.hint}>{empty}</span>
+      )}
+    </label>
+  );
 
   // Mostra no mapa a rota da task escolhida; some ao sair/atribuir.
   const onPreviewRef = useRef(onPreview);
@@ -437,23 +477,32 @@ function TaskSection({ semiAuto, task, wpIdx, threshold, pendingTasks, nextRunIn
           <div className={styles.progress} title="waypoint_idx do último advertisement">
             <div className={styles.progressBar} style={{ width: `${Math.round((Math.min(wpIdx, task.waypoints.length) / task.waypoints.length) * 100)}%` }} />
           </div>
+          {semiAuto && (
+            <>
+              <div className={styles.actions}>
+                <Button variant="outline" onClick={onRelease} title="O robô para onde está e a tarefa volta pra fila (pendente)">
+                  Cancelar tarefa
+                </Button>
+              </div>
+              {picker('Trocar por', 'Nenhuma outra tarefa pendente pra trocar.')}
+              {assignable.length > 0 && (
+                <>
+                  <p className={styles.hint}>
+                    A rota da escolhida aparece em rosa. Ao trocar, a atual volta pra fila e o robô segue a nova de onde está.
+                  </p>
+                  <div className={styles.actions}>
+                    <Button variant="accent" onClick={() => pickedId && onSwitch(pickedId)}>
+                      Trocar tarefa
+                    </Button>
+                  </div>
+                </>
+              )}
+            </>
+          )}
         </>
       ) : semiAuto ? (
         <>
-          <label className={styles.field}>
-            Escolher tarefa
-            {assignable.length > 0 ? (
-              <select className={styles.select} value={pickedId} onChange={(e) => setPicked(e.target.value)}>
-                {assignable.map((t) => (
-                  <option key={t.uuid} value={t.uuid}>
-                    {t.name} · prioridade {t.priority} · {t.waypoints.length} ponto(s)
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <span className={styles.hint}>Nenhuma tarefa pendente no backend.</span>
-            )}
-          </label>
+          {picker('Escolher tarefa', 'Nenhuma tarefa pendente no backend.')}
           {assignable.length > 0 && (
             <>
               <p className={styles.hint}>A rota da tarefa escolhida aparece em rosa no mapa.</p>

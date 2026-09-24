@@ -275,6 +275,16 @@ export function useSimulation() {
     (address: string, taskId: string) => withOrchestrator((o) => o.assign(address, taskId), 'Simulação parada.'),
     [withOrchestrator],
   );
+  /** Semi-auto: larga a task no meio (o robô para, a task volta pra fila). */
+  const releaseTask = useCallback(
+    (address: string) => withOrchestrator((o) => o.release(address), 'Simulação parada.'),
+    [withOrchestrator],
+  );
+  /** Semi-auto: troca a task em andamento por outra pendente. */
+  const switchTask = useCallback(
+    (address: string, taskId: string) => withOrchestrator((o) => o.switchTask(address, taskId), 'Simulação parada.'),
+    [withOrchestrator],
+  );
   const setWaypointThreshold = useCallback(
     (address: string, mm: number) => withOrchestrator((o) => o.setThreshold(address, mm), undefined),
     [withOrchestrator],
@@ -403,6 +413,8 @@ export function useSimulation() {
     setRgb,
     setRobotMode,
     assignTask,
+    releaseTask,
+    switchTask,
     setWaypointThreshold,
     setRobotOnline,
     setSwarmitEnabled,

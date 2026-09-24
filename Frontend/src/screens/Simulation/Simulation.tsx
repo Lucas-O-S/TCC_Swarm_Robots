@@ -377,7 +377,7 @@ export function Simulation() {
   const taskPreview = previewTask
     ? {
         from:
-          focusSimRobot && focusMode === RobotControlMode.SemiAuto && !focusBackend?.task
+          focusSimRobot && focusMode === RobotControlMode.SemiAuto
             ? { x: focusSimRobot.pos_x, y: focusSimRobot.pos_y }
             : null,
         points: [...previewTask.waypoints].sort((a, b) => a.orderIndex - b.orderIndex).map((w) => ({ x: w.x, y: w.y })),
@@ -427,6 +427,8 @@ export function Simulation() {
       }}
       onRgb={(c) => focusAddress && sim.setRgb(focusAddress, c.r, c.g, c.b)}
       onAssign={(taskId) => (focusAddress ? sim.assignTask(focusAddress, taskId) : null)}
+      onReleaseTask={() => (focusAddress ? sim.releaseTask(focusAddress) : null)}
+      onSwitchTask={(taskId) => (focusAddress ? sim.switchTask(focusAddress, taskId) : null)}
       onPreviewTask={setPreviewTaskId}
       onThreshold={(mm) => focusAddress && sim.setWaypointThreshold(focusAddress, mm)}
       onSendRoute={(threshold) => {

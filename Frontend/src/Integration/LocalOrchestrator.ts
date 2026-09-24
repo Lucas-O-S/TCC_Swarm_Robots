@@ -134,7 +134,7 @@ export class LocalOrchestrator {
     }
 
     if (adv.battery <= LOW_BATTERY_MV) {
-      this.release(robot, task, TaskStatus.Pending);
+      this.releaseTo(robot, task, TaskStatus.Pending);
       this.host.log(`[ORQ] ${address} com bateria baixa → task "${task.name}" voltou pra fila`);
       return;
     }
@@ -151,7 +151,7 @@ export class LocalOrchestrator {
       Math.abs(adv.waypoint_x - last.x) <= WAYPOINT_MATCH_MM &&
       Math.abs(adv.waypoint_y - last.y) <= WAYPOINT_MATCH_MM;
     if (adv.mode === DotBotControlMode.Auto && adv.waypoint_idx >= points.length && onThisRoute) {
-      this.release(robot, task, TaskStatus.Completed);
+      this.releaseTo(robot, task, TaskStatus.Completed);
       this.host.log(`[ORQ] task "${task.name}" concluída por ${address}`);
     }
   }
@@ -161,7 +161,7 @@ export class LocalOrchestrator {
     const robot = this.robots.get(address);
     const task = robot?.taskId ? this.find(robot.taskId) : undefined;
     if (!robot || !task) return;
-    this.release(robot, task, TaskStatus.Pending);
+    this.releaseTo(robot, task, TaskStatus.Pending);
     this.host.log(`[ORQ] robô ${address} sumiu → task "${task.name}" voltou pra fila`);
   }
 
@@ -195,6 +195,43 @@ export class LocalOrchestrator {
     return null;
   }
 
+  /**
+   * DIFERENÇA (extensão, o backend não tem rota pra isso): no SemiAuto o
+   * operador pode largar a task no meio. O robô recebe uma rota vazia (para
+   * onde está) e a task volta pra fila como Pending — a tela não cancela task
+   * de verdade, isso é da tela Tarefas.
+   */
+  release(address: string): string | null {
+    const robot = this.robots.get(address);
+    const task = robot?.taskId ? this.find(robot.taskId) : undefined;
+    if (!robot || !task) return 'Este robô não está executando nenhuma task.';
+    if (robot.mode !== RobotControlMode.SemiAuto) return 'Só dá pra largar a task no modo Semi-auto — no Auto quem decide é o orquestrador.';
+    this.host.log(`[ORQ] ${address} largou a task "${task.name}" (operador) → voltou pra fila`);
+    this.releaseTo(robot, task, TaskStatus.Pending);
+    this.host.send({ kind: 'waypoints', destination: address, threshold: robot.waypointsThreshold, waypoints: [] });
+    return null;
+  }
+
+  /**
+   * DIFERENÇA (extensão): troca a task do robô SemiAuto no meio — a atual
+   * volta pra fila e a nova desce como LH2_WAYPOINTS, saindo de onde ele está.
+   */
+  switchTask(address: string, taskId: string): string | null {
+    const robot = this.robots.get(address);
+    const current = robot?.taskId ? this.find(robot.taskId) : undefined;
+    if (!robot || !current) return this.assign(address, taskId);
+    if (robot.mode !== RobotControlMode.SemiAuto) return 'Só dá pra trocar a task no modo Semi-auto — no Auto quem decide é o orquestrador.';
+    const next = this.find(taskId);
+    if (!next) return `Nenhuma task com uuid '${taskId}'.`;
+    if (next.uuid === current.uuid) return null;
+    if (!next.waypoints.length) return `Task "${next.name}" não tem waypoints.`;
+    if (next.status !== TaskStatus.Pending) return `Task "${next.name}" está ${taskStatusLabel(next.status)}.`;
+    this.host.log(`[ORQ] ${address} trocou a task "${current.name}" (voltou pra fila) por "${next.name}"`);
+    this.releaseTo(robot, current, TaskStatus.Pending);
+    this.start(robot, next);
+    return null;
+  }
+
   /** Muda a coluna `mode` e manda o CONTROL_MODE equivalente no fio (Manual → MANUAL; SemiAuto/Auto → AUTO). */
   setMode(address: string, mode: RobotControlMode): string | null {
     const robot = this.robots.get(address);
@@ -205,7 +242,7 @@ export class LocalOrchestrator {
     // (o backend só troca a coluna e a task ficaria presa em InProgress).
     const task = robot.taskId ? this.find(robot.taskId) : undefined;
     if (mode === RobotControlMode.Manual && task) {
-      this.release(robot, task, TaskStatus.Pending);
+      this.releaseTo(robot, task, TaskStatus.Pending);
       this.host.log(`[ORQ] ${address} foi pra Manual → task "${task.name}" voltou pra fila`);
     }
     this.host.log(`[ORQ] modo de ${address} → ${controlModeLabel(mode)}`);
@@ -262,7 +299,7 @@ export class LocalOrchestrator {
     robot.taskId = task.uuid;
   }
 
-  private release(robot: OrchestratorRobotRecord, task: TaskModel, status: TaskStatus): void {
+  private releaseTo(robot: OrchestratorRobotRecord, task: TaskModel, status: TaskStatus): void {
     task.status = status;
     if (status === TaskStatus.Pending) task.robots = [];
     robot.taskId = null;
