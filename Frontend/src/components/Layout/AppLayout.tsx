@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import styles from './AppLayout.module.css';
 
@@ -23,6 +24,33 @@ const NAV_ITEMS: NavItem[] = [
 // renderizado no lugar do <Outlet /> (ver AppRoutes.tsx).
 export function AppLayout() {
   const navigate = useNavigate();
+  const layoutRef = useRef<HTMLDivElement>(null);
+  const topbarRef = useRef<HTMLElement>(null);
+
+  // Os drawers abrem logo abaixo da barra (a altura dela muda quando as abas
+  // quebram de linha); rolando a página, sobem junto até o topo da janela.
+  useEffect(() => {
+    let frame = 0;
+    function update() {
+      frame = 0;
+      const bottom = topbarRef.current?.getBoundingClientRect().bottom ?? 0;
+      layoutRef.current?.style.setProperty('--drawer-top', `${Math.max(0, bottom)}px`);
+    }
+    function schedule() {
+      if (!frame) frame = requestAnimationFrame(update);
+    }
+    update();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    const observer = topbarRef.current ? new ResizeObserver(schedule) : null;
+    if (observer && topbarRef.current) observer.observe(topbarRef.current);
+    return () => {
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+      observer?.disconnect();
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
 
   function handleLogout() {
     // TODO: limpar sessão/token quando a autenticação real existir.
@@ -30,8 +58,8 @@ export function AppLayout() {
   }
 
   return (
-    <div className={styles.layout}>
-      <header className={styles.topbar}>
+    <div className={styles.layout} ref={layoutRef}>
+      <header className={styles.topbar} ref={topbarRef}>
         <span className={styles.brand}>
           <svg viewBox="0 0 24 24" className={styles.brandIcon} aria-hidden="true">
             <path

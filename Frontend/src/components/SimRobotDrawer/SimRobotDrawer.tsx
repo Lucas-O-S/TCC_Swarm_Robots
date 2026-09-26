@@ -17,6 +17,17 @@ import type { SwarmitDeviceView } from '../../screens/Simulation/SimGateway';
 import { clamp } from '../../screens/Simulation/SimPhysics';
 import { normalizeAngle } from '../../screens/Simulation/SimRobot';
 import type { BackendRobotInfo } from '../../screens/Simulation/useSimulation';
+import {
+  DrawerActions,
+  DrawerBody,
+  DrawerDivider,
+  DrawerError,
+  DrawerField,
+  DrawerHint,
+  DrawerRow,
+  DrawerSection,
+  DrawerSubtitle,
+} from '../Drawer/DrawerForm';
 import { num } from './numInput';
 import styles from './SimRobotDrawer.module.css';
 
@@ -186,7 +197,7 @@ function SimRobotPanel({
   const canCommand = robot.online && robot.appRunning;
 
   return (
-    <div className={styles.section}>
+    <DrawerBody>
       <div className={styles.status}>
         <span className={`${styles.dot} ${robot.online ? styles.dotOn : styles.dotOff}`} />
         {robot.online ? 'na rede' : 'fora da rede'}
@@ -194,9 +205,7 @@ function SimRobotPanel({
         API: {backend?.status !== null && backend?.status !== undefined ? SimRobotMapper.statusLabel(backend.status) : 'não cadastrado'}
         {lastAdv !== null && ` (há ${(now - lastAdv).toFixed(1)} s)`}
       </div>
-      <p className={styles.hint} style={{ fontFamily: 'var(--font-mono)' }}>
-        {robot.address}
-      </p>
+      <DrawerHint className={styles.mono}>{robot.address}</DrawerHint>
 
       <dl className={styles.kv}>
         <dt>pos (mm)</dt>
@@ -242,58 +251,57 @@ function SimRobotPanel({
         {robot.online ? 'Derrubar (falha)' : 'Religar'}
       </Button>
 
-      <hr className={styles.divider} />
-      <p className={styles.subtitle}>Comandos (backend)</p>
+      <DrawerSection title="Comandos (backend)" />
       {!canCommand && (
-        <p className={styles.hint}>
+        <DrawerHint>
           {robot.online ? 'App parado no bootloader — mande START na seção Swarmit.' : 'Fora da rede — comandos não chegam.'}
-        </p>
+        </DrawerHint>
       )}
 
-      <div className={styles.field}>
-        Modo
+      <DrawerField as="div" label="Modo">
         {mode !== null ? (
           <Segmented options={MODE_OPTIONS} value={mode} onChange={handleMode} ariaLabel="Modo de controle" />
         ) : (
-          <span className={styles.hint}>O backend ainda não cadastrou este robô — espera o primeiro DOTBOT_ADVERTISEMENT.</span>
+          <span className={styles.fieldHint}>O backend ainda não cadastrou este robô — espera o primeiro DOTBOT_ADVERTISEMENT.</span>
         )}
-      </div>
-      {mode !== null && <p className={styles.hint}>{MODE_HINT[mode]}</p>}
-      {error && <p className={styles.error}>{error}</p>}
+      </DrawerField>
+      {mode !== null && <DrawerHint>{MODE_HINT[mode]}</DrawerHint>}
+      {error && <DrawerError>{error}</DrawerError>}
 
       {mode === RobotControlMode.Manual && (
         <>
-          <label className={styles.field}>
-            <span>
-              Joystick (CMD_MOVE_RAW) · velocidade máx. <strong>{speed}</strong>/127
-            </span>
+          <DrawerField
+            label={
+              <span>
+                Joystick (CMD_MOVE_RAW) · velocidade máx. <strong>{speed}</strong>/127
+              </span>
+            }
+          >
             <input type="range" min={10} max={PWM_MAX} value={speed} onChange={num(setSpeed)} />
-          </label>
+          </DrawerField>
           <Joystick onChange={handleJoystick} rateHz={JOYSTICK_HZ} />
           <p className={styles.joystickReadout}>
             {sending ? `rumo ${sending.headingDeg.toFixed(0)}° · enviando L=${sending.left} R=${sending.right}` : 'solto — robô parado'}
           </p>
-          <p className={styles.hint}>
+          <DrawerHint>
             Arraste pra direção do mapa em que o robô deve ir: ele gira sozinho até apontar pra lá e anda — quanto mais
             longe do centro, mais rápido. Enquanto arrasta, manda CMD_MOVE_RAW a {JOYSTICK_HZ} Hz; ao soltar, a bolinha
             volta pro centro e manda a parada.
-          </p>
+          </DrawerHint>
 
-          <div className={styles.field}>
-            Rota avulsa (LH2_WAYPOINTS)
-            <span className={styles.hint}>
+          <DrawerField as="div" label="Rota avulsa (LH2_WAYPOINTS)">
+            <span className={styles.fieldHint}>
               {routeDraft.length > 0
                 ? `${routeDraft.length} ponto(s) montado(s) — laranja no mapa.`
                 : 'Ligue a ferramenta Waypoint no mapa e clique pra montar a rota deste robô.'}
             </span>
-          </div>
-          <div className={styles.fieldRow}>
-            <label className={styles.field}>
-              Raio (mm)
+          </DrawerField>
+          <DrawerRow>
+            <DrawerField label="Raio (mm)">
               <input type="number" min={5} step={5} value={routeThreshold} onChange={num((v) => v > 0 && setRouteThreshold(v))} />
-            </label>
-          </div>
-          <div className={styles.actions}>
+            </DrawerField>
+          </DrawerRow>
+          <DrawerActions>
             <Button variant="accent" onClick={() => onSendRoute(routeThreshold)} disabled={routeDraft.length === 0}>
               Enviar rota
             </Button>
@@ -303,10 +311,8 @@ function SimRobotPanel({
             <Button variant="outline" onClick={onResendRoute} disabled={robot.waypoints.length === 0} title="Reenvia a rota atual do robô (volta ao ponto 1)">
               Reenviar atual
             </Button>
-          </div>
-          <p className={styles.hint}>
-            O robô segue a rota sozinho (entra em AUTO no fio) até você mexer no joystick de novo.
-          </p>
+          </DrawerActions>
+          <DrawerHint>O robô segue a rota sozinho (entra em AUTO no fio) até você mexer no joystick de novo.</DrawerHint>
         </>
       )}
 
@@ -327,29 +333,26 @@ function SimRobotPanel({
         />
       )}
 
-      <hr className={styles.divider} />
-      <div className={styles.fieldRow}>
-        <label className={styles.field}>
-          LED (CMD_RGB_LED)
+      <DrawerDivider />
+      <DrawerRow>
+        <DrawerField label="LED (CMD_RGB_LED)">
           <input type="color" className={styles.colorInput} value={color} onChange={(e) => setColor(e.target.value)} />
-        </label>
-        <div className={styles.field}>
-          &nbsp;
-          <div className={styles.actions}>
+        </DrawerField>
+        <DrawerField as="div" label={'\u00a0'}>
+          <DrawerActions>
             <Button variant="outline" onClick={() => onRgb(SimRobotMapper.hexToRgb(color))}>
               Acender
             </Button>
             <Button variant="outline" onClick={() => onRgb({ r: 0, g: 0, b: 0 })}>
               Apagar
             </Button>
-          </div>
-        </div>
-      </div>
+          </DrawerActions>
+        </DrawerField>
+      </DrawerRow>
 
       {swarmitOn && (
         <>
-          <hr className={styles.divider} />
-          <p className={styles.subtitle}>Swarmit</p>
+          <DrawerSection title="Swarmit" />
           <div className={styles.status}>
             estado: {device ? swarmitStatusName(device.status) : '—'}
             {device?.status === SwarmitDeviceStatus.Programming && ` · flash ${Math.round(device.flashProgress * 100)}%`}
@@ -359,7 +362,7 @@ function SimRobotPanel({
               <div className={styles.progressBar} style={{ width: `${Math.round(backend.view.otaProgress * 100)}%` }} />
             </div>
           )}
-          <div className={styles.actions}>
+          <DrawerActions>
             <Button variant="outline" onClick={onFlash} title="OTA_START + 8 chunks de 128 B">
               Flash
             </Button>
@@ -372,10 +375,10 @@ function SimRobotPanel({
             <Button variant="outline" onClick={() => onSwarmit('reset')} title="RESET na pose atual → Bootloader">
               Reset
             </Button>
-          </div>
+          </DrawerActions>
         </>
       )}
-    </div>
+    </DrawerBody>
   );
 }
 
@@ -420,10 +423,9 @@ function TaskSection({
   const previewId = semiAuto && pickedId ? pickedId : null;
 
   const picker = (label: string, empty: string) => (
-    <label className={styles.field}>
-      {label}
+    <DrawerField label={label}>
       {assignable.length > 0 ? (
-        <select className={styles.select} value={pickedId} onChange={(e) => setPicked(e.target.value)}>
+        <select value={pickedId} onChange={(e) => setPicked(e.target.value)}>
           {assignable.map((t) => (
             <option key={t.uuid} value={t.uuid}>
               {t.name} · prioridade {t.priority} · {t.waypoints.length} ponto(s)
@@ -431,9 +433,9 @@ function TaskSection({
           ))}
         </select>
       ) : (
-        <span className={styles.hint}>{empty}</span>
+        <span className={styles.fieldHint}>{empty}</span>
       )}
-    </label>
+    </DrawerField>
   );
 
   // Mostra no mapa a rota da task escolhida; some ao sair/atribuir.
@@ -448,7 +450,7 @@ function TaskSection({
 
   return (
     <>
-      <p className={styles.subtitle}>Tarefa</p>
+      <DrawerSubtitle>Tarefa</DrawerSubtitle>
       {task ? (
         <>
           <div className={styles.taskCurrent}>
@@ -462,22 +464,22 @@ function TaskSection({
           </div>
           {semiAuto && (
             <>
-              <div className={styles.actions}>
+              <DrawerActions>
                 <Button variant="outline" onClick={onRelease} title="O robô para onde está e a tarefa volta pra fila (pendente)">
                   Cancelar tarefa
                 </Button>
-              </div>
+              </DrawerActions>
               {picker('Trocar por', 'Nenhuma outra tarefa pendente pra trocar.')}
               {assignable.length > 0 && (
                 <>
-                  <p className={styles.hint}>
+                  <DrawerHint>
                     A rota da escolhida aparece em rosa. Ao trocar, a atual volta pra fila e o robô segue a nova de onde está.
-                  </p>
-                  <div className={styles.actions}>
+                  </DrawerHint>
+                  <DrawerActions>
                     <Button variant="accent" onClick={() => pickedId && onSwitch(pickedId)}>
                       Trocar tarefa
                     </Button>
-                  </div>
+                  </DrawerActions>
                 </>
               )}
             </>
@@ -488,24 +490,23 @@ function TaskSection({
           {picker('Escolher tarefa', 'Nenhuma tarefa pendente no backend.')}
           {assignable.length > 0 && (
             <>
-              <p className={styles.hint}>A rota da tarefa escolhida aparece em rosa no mapa.</p>
-              <div className={styles.actions}>
+              <DrawerHint>A rota da tarefa escolhida aparece em rosa no mapa.</DrawerHint>
+              <DrawerActions>
                 <Button variant="accent" onClick={() => pickedId && onAssign(pickedId)}>
                   Atribuir
                 </Button>
-              </div>
+              </DrawerActions>
             </>
           )}
         </>
       ) : (
-        <p className={styles.hint}>
+        <DrawerHint>
           Livre — esperando tarefa da fila ({assignable.length} pendente(s)); próxima rodada em {nextRunIn.toFixed(1)} s.
-        </p>
+        </DrawerHint>
       )}
 
-      <div className={styles.fieldRow}>
-        <label className={styles.field}>
-          Raio de chegada (mm)
+      <DrawerRow>
+        <DrawerField label="Raio de chegada (mm)">
           <input
             type="number"
             min={5}
@@ -514,8 +515,8 @@ function TaskSection({
             onChange={num((v) => v > 0 && onThreshold(v))}
             title="waypointsThreshold do robô — vale a partir da próxima tarefa"
           />
-        </label>
-      </div>
+        </DrawerField>
+      </DrawerRow>
     </>
   );
 }

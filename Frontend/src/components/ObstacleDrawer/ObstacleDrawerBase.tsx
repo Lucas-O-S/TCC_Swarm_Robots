@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useMapSelection } from '../../hooks/useMapElements';
 import { Drawer } from '../Drawer/Drawer';
 import { Button } from '../Button/Button';
-import styles from './ObstacleDrawer.module.css';
+import { DrawerBody, DrawerHint } from '../Drawer/DrawerForm';
 
 export interface ObstacleDrawerLabels {
   /** Título com 1 selecionado (ex.: "Obstáculo"). */
@@ -41,12 +41,12 @@ export function ObstacleDrawerBase<T>({ allObstacles, selectionId, nameOf, label
       {single !== null && renderSingle(single, removeSelected)}
 
       {obstacles.length > 1 && (
-        <>
-          <p className={styles.summary}>{obstacles.map(nameOf).join(', ')}</p>
+        <DrawerBody>
+          <DrawerHint>{obstacles.map(nameOf).join(', ')}</DrawerHint>
           <Button variant="outline" onClick={removeSelected}>
             {labels.removeMany}
           </Button>
-        </>
+        </DrawerBody>
       )}
     </Drawer>
   );

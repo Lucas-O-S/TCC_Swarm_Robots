@@ -1,31 +1,10 @@
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--color-text-muted);
-  margin-bottom: 14px;
-}
+/* Campos, linhas, resumo e dicas vêm do DrawerForm (components/Drawer);
+   aqui só os controles próprios do bloco (cantos e stepper). */
 
-.fieldRow {
-  display: flex;
-  gap: 12px;
-}
-
-.fieldRow .field {
-  flex: 1;
-}
-
-.summary {
-  font-size: 13px;
-  color: var(--color-text-muted);
-  margin: 0 0 14px;
-}
-
-.hint {
+/* Dica curta dentro de um campo (ex.: "4 passadas (máx. 7)"). */
+.fieldHint {
   font-size: 12px;
   color: var(--color-text-muted);
-  margin: 0 0 14px;
 }
 
 .cornerGrid {
@@ -33,10 +12,6 @@
   grid-template-columns: repeat(2, 40px);
   grid-template-rows: repeat(2, 40px);
   gap: 6px;
-}
-
-.field .hint {
-  margin: 0;
 }
 
 .stepper {
