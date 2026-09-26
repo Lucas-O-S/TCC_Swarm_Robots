@@ -12,6 +12,8 @@ interface MapMenuLayoutProps {
   header?: ReactNode;
   /** Conteúdo do mapa — recebe a altura máxima calculada (px) pra caber na tela sem rolagem. */
   children: (maxMapHeight: number | undefined) => ReactNode;
+  /** Mapa acompanha a rolagem da página (menu mais comprido que a tela, ex.: Simulação). Só com duas colunas. */
+  stickyMap?: boolean;
   className?: string;
 }
 
@@ -21,18 +23,20 @@ interface MapMenuLayoutProps {
 // repassa pro conteúdo, pra ele preencher a tela sem estourar o rodapé.
 // Com `header`, a faixa fica em cima das duas colunas; se ela mudar de
 // altura (quebra de linha, aviso aparecendo), a altura do mapa é recalculada.
-export function MapMenuLayout({ menu, header, children, className = '' }: MapMenuLayoutProps) {
-  const mapColumnRef = useRef<HTMLDivElement>(null);
+export function MapMenuLayout({ menu, header, children, stickyMap = false, className = '' }: MapMenuLayoutProps) {
+  const bodyRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const [maxMapHeight, setMaxMapHeight] = useState<number>();
   const hasHeader = header !== undefined && header !== null;
 
   useEffect(() => {
     function updateMaxHeight() {
-      if (!mapColumnRef.current) return;
+      if (!bodyRef.current) return;
       // Posição na PÁGINA (não na janela): recalcular com a página rolada (ex.:
       // um drawer abrindo e empurrando o conteúdo) não pode mudar a altura.
-      const top = mapColumnRef.current.getBoundingClientRect().top + window.scrollY;
+      // Mede o topo do corpo, não o da coluna do mapa: com `stickyMap`, a coluna
+      // rolada fica grudada no alto da janela e não está mais no lugar dela.
+      const top = bodyRef.current.getBoundingClientRect().top + window.scrollY;
       setMaxMapHeight(Math.max(0, window.innerHeight - top - SCREEN_BOTTOM_GAP));
     }
 
@@ -53,8 +57,8 @@ export function MapMenuLayout({ menu, header, children, className = '' }: MapMen
           {header}
         </div>
       )}
-      <div className={styles.body}>
-        <div className={styles.mapColumn} ref={mapColumnRef}>
+      <div className={styles.body} ref={bodyRef}>
+        <div className={`${styles.mapColumn} ${stickyMap ? styles.sticky : ''}`}>
           {children(maxMapHeight)}
         </div>
 

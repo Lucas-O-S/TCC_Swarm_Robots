@@ -6,6 +6,7 @@ import { MapToolButton } from '../../components/MapToolButton/MapToolButton';
 import { ObstacleIcon, PauseIcon, PlayIcon, RobotIcon, StopIcon, WaypointIcon } from '../../components/MapToolButton/icons';
 import type { BaseTool } from '../../components/MapViewport/MapViewport';
 import { Menu } from '../../components/Menu/Menu';
+import { MenuColumns } from '../../components/MenuColumns/MenuColumns';
 import { NetworkPanel } from '../../components/NetworkPanel/NetworkPanel';
 import { Obstacle } from '../../components/Obstacle/Obstacle';
 import { Robot } from '../../components/Robot/RobotProp';
@@ -477,7 +478,7 @@ export function Simulation() {
   );
 
   const menu = (
-    <div className={styles.menuColumn}>
+    <MenuColumns className={styles.menuColumn}>
       <Menu title={`Robôs (${mapRobots.length})`}>
         <SimRobotList robots={rows} editing={editing} />
       </Menu>
@@ -530,7 +531,7 @@ export function Simulation() {
           <GatewayLog entries={sim.logEntries} />
         </Menu>
       )}
-    </div>
+    </MenuColumns>
   );
 
   return (
@@ -550,7 +551,7 @@ export function Simulation() {
         error={pickerError}
       />
 
-      <MapMenuLayout header={header} menu={menu}>
+      <MapMenuLayout header={header} menu={menu} stickyMap>
         {(maxMapHeight) =>
           draft ? (
             <SimulationMap

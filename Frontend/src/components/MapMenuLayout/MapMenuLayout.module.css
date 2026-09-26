@@ -22,6 +22,15 @@
   order: 2;
 }
 
+/* `stickyMap`: o mapa desce junto com a tela enquanto o menu rola. A altura
+   dele é a que cabe na tela sem rolar, então grudado no alto ele sempre cabe. */
+@media (min-width: 781px) {
+  .sticky {
+    position: sticky;
+    top: 16px;
+  }
+}
+
 @media (max-width: 780px) {
   .body {
     grid-template-columns: 1fr;

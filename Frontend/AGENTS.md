@@ -69,7 +69,13 @@ Onde fica cada peça:
   (Simular), `SimRobotEditDrawer` (Editar), `SimObstacleDrawer`,
   `SimRobotList`/`SimRobotCard`, `SimTaskPanel`, `NetworkPanel`,
   `SwarmitPanel`, `GatewayLog`, `Joystick`, `Segmented`, `Badge`,
-  `SelectSimulationScenarioModal`.
+  `SelectSimulationScenarioModal`, `MenuColumns` (cartões do menu).
+- Layout: os cartões do menu ficam no `MenuColumns` — quantas colunas de
+  300 px couberem, cada coluna empilhando os seus cartões (a grade antiga
+  alinhava por linha e deixava buraco embaixo do cartão mais baixo). O mapa
+  usa `<MapMenuLayout stickyMap>`: acompanha a rolagem acima de 780 px (numa
+  coluna só ele cobriria o menu). As outras telas não usam: o menu delas não
+  rola.
 - `Integration/` — `FleetLink` (contrato), `LocalFleetLink` (backend local,
   offline), `LocalOrchestrator` (porte do `Orchestrator.Service` do backend),
   `MqttFleetLink` (pronto, não ligado) e `Protocols/` (DotBot, Mari, Swarmit).
@@ -175,7 +181,13 @@ imitando as outras telas) tinha sido revertida por ele.
   - `assignTaskManually` não confere se a tarefa está pendente.
 - Pré-existentes, não mexidos:
   - renomear a barreira fecha o drawer;
-  - no celular a barra de navegação do app estoura a largura.
+  - no celular a barra de navegação do app estoura a largura;
+  - a roda do mouse em cima do mapa dá zoom e também rola a página (o
+    `onWheel` do React é passivo, então o `preventDefault` do `MapViewport`
+    não vale e aparece um erro no console). Com o mapa grudado na Simulação
+    isso fica mais visível;
+  - em mapa estreito (Teste Mapa, celular) a escala cobre parte das
+    ferramentas.
 - O cenário só guarda modo inicial Manual/Auto (Semi-auto só durante a
   simulação).
 

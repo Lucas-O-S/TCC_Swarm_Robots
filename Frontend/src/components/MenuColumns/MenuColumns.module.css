@@ -1,0 +1,15 @@
+/* O número de colunas vem do componente (grid-template-columns inline). */
+.columns {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+  min-width: 0;
+}
+
+/* Cada coluna empilha os seus cartões, sem depender da altura das outras. */
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
