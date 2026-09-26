@@ -36,9 +36,17 @@ protocolo, orquestrador) está no `AGENTS.md` do repositório principal.
   `mapper/*.Mapper.ts`, `Consts/`, `Integration/`, `hooks/`.
 - Drawers entram pelo `<MapCanvas panel={...}>` e acham o que está
   selecionado com `useMapSelection()`.
-- **Drawers (todas as telas):** abrem à esquerda, logo abaixo da barra de
-  navegação, e empurram o conteúdo da tela pra direita (em tela estreita, até
-  780 px, ficam por cima). O conteúdo de todos usa as peças de
+- **Páginas espelhadas (pedido do dono):** o layout é [Menu | Mapa |
+  Drawer] — Simulação, Construtor e Tarefas (`MapMenuLayout`) e Mapa &
+  Conexão (lista à esquerda, mapa encostado na direita). Também foram
+  espelhados: os grupos do header da Simulação (`SimulationControls`), as
+  ferramentas do mapa (canto inferior esquerdo, `MapViewport`) e a escala
+  (direito, `MapCanvas`), e o título/botões do Mapa & Conexão. Até 780 px
+  (uma coluna só) volta a ordem normal: mapa primeiro, alinhado à esquerda.
+- **Drawers (todas as telas):** abrem à direita, logo abaixo da barra de
+  navegação, e empurram o conteúdo da tela pra esquerda (`padding-right` no
+  `AppLayout`; em tela estreita, até 780 px, ficam por cima). O conteúdo de
+  todos usa as peças de
   `components/Drawer/DrawerForm.tsx` (`DrawerBody`, `DrawerField`,
   `DrawerRow`, `DrawerHint`, `DrawerError`, `DrawerActions`,
   `DrawerSection`, `DrawerSubtitle`, `DrawerDivider`), com a aparência dos

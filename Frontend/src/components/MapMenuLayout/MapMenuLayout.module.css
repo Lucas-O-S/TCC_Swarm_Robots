@@ -18,10 +18,17 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  /* Páginas espelhadas: menu à esquerda, mapa à direita (perto do drawer). */
+  order: 2;
 }
 
 @media (max-width: 780px) {
   .body {
     grid-template-columns: 1fr;
+  }
+
+  /* Uma coluna só: o mapa continua vindo primeiro. */
+  .mapColumn {
+    order: 0;
   }
 }

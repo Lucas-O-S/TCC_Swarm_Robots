@@ -9,6 +9,8 @@
 
 .row {
   display: flex;
+  /* Página espelhada: o primeiro grupo de cada faixa fica à direita. */
+  flex-direction: row-reverse;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
