@@ -29,12 +29,20 @@ protocolo, orquestrador) está no `AGENTS.md` do repositório principal.
 
 - `screens/<Tela>/` — a tela, o hook principal e helpers `use*.ts`, sem subpastas.
 - `components/<Nome>/<Nome>.tsx` + `<Nome>.module.css` — cada componente com o
-  seu CSS (repetir `.field`, `.hint` etc. por módulo é o padrão da casa).
+  seu CSS (repetir `.field`, `.hint` etc. por módulo é o padrão da casa,
+  exceto nos drawers — ver abaixo).
 - `enums/*.enum.ts` (espelho do backend), `model/*.Model.ts` (interfaces
   terminam em `Model`), `services/*.Service.ts` (objeto literal),
   `mapper/*.Mapper.ts`, `Consts/`, `Integration/`, `hooks/`.
 - Drawers entram pelo `<MapCanvas panel={...}>` e acham o que está
   selecionado com `useMapSelection()`.
+- **Drawers (todas as telas):** abrem à esquerda, logo abaixo da barra de
+  navegação, e empurram o conteúdo da tela pra direita (em tela estreita, até
+  780 px, ficam por cima). O conteúdo de todos usa as peças de
+  `components/Drawer/DrawerForm.tsx` (`DrawerBody`, `DrawerField`,
+  `DrawerRow`, `DrawerHint`, `DrawerError`, `DrawerActions`,
+  `DrawerSection`, `DrawerSubtitle`, `DrawerDivider`), com a aparência dos
+  drawers da Simulação. O CSS de cada drawer fica só com o que é próprio dele.
 
 ## Tela de Simulação (`/simulacao`)
 
@@ -140,17 +148,13 @@ Onde fica cada peça:
 - `RobotPath` ganhou `units`, `from`, `reachedCount` e `markers`. O padrão
   continua igual pro TaskBuilder e pro MapTestScreen.
 
-### Diferenças conhecidas em relação às outras telas
+### Drawers unificados
 
-Os drawers do simulador **não seguem** o padrão visual dos drawers do
-CenarioBuilder/TaskBuilder:
-
-- campos dentro de um bloco com espaçamento menor, e inputs com outro fundo;
-- tabela de telemetria no lugar do resumo em texto;
-- títulos de seção em maiúsculas e linhas divisórias;
-- várias fileiras de botões.
-
-Uma padronização foi feita e revertida pelo dono. Só alinhar se ele pedir.
+Pedido do dono: todos os drawers com a mesma estrutura (`DrawerForm`) e a
+aparência dos drawers da Simulação — SimRobotDrawer, SimRobotEditDrawer,
+SimObstacleDrawer, ObstacleDrawer (Construtor), WaypointDrawer e AreaDrawer
+(Tarefas). Antes disso, uma padronização no sentido contrário (simulador
+imitando as outras telas) tinha sido revertida por ele.
 
 ### Pendências e achados
 

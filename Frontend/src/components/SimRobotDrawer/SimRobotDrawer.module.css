@@ -1,68 +1,15 @@
-.section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
+/* Campos, linhas, dicas, seções e botões vêm do DrawerForm (components/Drawer);
+   aqui só o que é próprio deste drawer (telemetria, LED, progresso, joystick). */
 
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--color-text-muted);
-}
-
-.field input[type='text'],
-.field input[type='number'] {
-  font: inherit;
-  padding: 7px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-text);
-  background: var(--color-surface);
-  min-width: 0;
-}
-
-.field input[type='range'] {
-  accent-color: var(--color-orange);
-}
-
-.fieldRow {
-  display: flex;
-  gap: 10px;
-}
-
-.fieldRow .field {
-  flex: 1;
-  min-width: 0;
-}
-
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.hint {
+/* Dica curta dentro de um campo. */
+.fieldHint {
   font-size: 12px;
   color: var(--color-text-muted);
-  margin: 0;
   line-height: 1.45;
 }
 
-.subtitle {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-  margin: 4px 0 0;
-}
-
-.divider {
-  border: none;
-  border-top: 1px solid var(--color-border);
-  margin: 4px 0;
+.mono {
+  font-family: var(--font-mono);
 }
 
 .status {
@@ -146,22 +93,7 @@
   color: var(--color-text-muted);
 }
 
-.error {
-  font-size: 12px;
-  color: var(--color-red);
-  margin: 0;
-}
 
-.select {
-  font: inherit;
-  font-size: 12px;
-  padding: 7px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-text);
-  background: var(--color-surface);
-  min-width: 0;
-}
 
 .taskCurrent {
   display: flex;

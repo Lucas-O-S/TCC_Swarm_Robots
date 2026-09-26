@@ -30,7 +30,9 @@ export function MapMenuLayout({ menu, header, children, className = '' }: MapMen
   useEffect(() => {
     function updateMaxHeight() {
       if (!mapColumnRef.current) return;
-      const top = mapColumnRef.current.getBoundingClientRect().top;
+      // Posição na PÁGINA (não na janela): recalcular com a página rolada (ex.:
+      // um drawer abrindo e empurrando o conteúdo) não pode mudar a altura.
+      const top = mapColumnRef.current.getBoundingClientRect().top + window.scrollY;
       setMaxMapHeight(Math.max(0, window.innerHeight - top - SCREEN_BOTTOM_GAP));
     }
 

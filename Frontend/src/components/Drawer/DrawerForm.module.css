@@ -1,4 +1,6 @@
-.section {
+/* Aparência compartilhada dos drawers (a mesma dos drawers da Simulação). */
+
+.body {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -10,10 +12,13 @@
   gap: 6px;
   font-size: 13px;
   color: var(--color-text-muted);
+  min-width: 0;
 }
 
 .field input[type='text'],
-.field input[type='number'] {
+.field input[type='number'],
+.field select,
+.field textarea {
   font: inherit;
   padding: 7px 10px;
   border: 1px solid var(--color-border);
@@ -23,16 +28,26 @@
   min-width: 0;
 }
 
-.field input[type='range'] {
+.field select {
+  font-size: 12px;
+}
+
+.field textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.field input[type='range'],
+.field input[type='checkbox'] {
   accent-color: var(--color-orange);
 }
 
-.fieldRow {
+.row {
   display: flex;
   gap: 10px;
 }
 
-.fieldRow .field {
+.row > * {
   flex: 1;
   min-width: 0;
 }
@@ -48,4 +63,25 @@
   font-size: 12px;
   color: var(--color-red);
   margin: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.subtitle {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin: 4px 0 0;
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 4px 0;
 }

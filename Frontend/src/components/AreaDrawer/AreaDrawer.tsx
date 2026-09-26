@@ -10,6 +10,7 @@ import { useMapSelection } from '../../hooks/useMapElements';
 import { Drawer } from '../Drawer/Drawer';
 import { Button } from '../Button/Button';
 import { Segmented } from '../Segmented/Segmented';
+import { DrawerBody, DrawerField, DrawerHint, DrawerRow } from '../Drawer/DrawerForm';
 import styles from './AreaDrawer.module.css';
 
 interface AreaDrawerProps {
@@ -94,108 +95,104 @@ export function AreaDrawer({ allAreas, orderById, onChange }: AreaDrawerProps) {
 
   return (
     <Drawer open onClose={clear} title="Bloco">
-      <p className={styles.summary}>
-        Pontos {Math.min(...numbers)}–{Math.max(...numbers)} da rota · {Math.abs(current.x2 - current.x1) + 1}×
-        {Math.abs(current.y2 - current.y1) + 1} células
-      </p>
+      <DrawerBody>
+        <DrawerHint>
+          Pontos {Math.min(...numbers)}–{Math.max(...numbers)} da rota · {Math.abs(current.x2 - current.x1) + 1}×
+          {Math.abs(current.y2 - current.y1) + 1} células
+        </DrawerHint>
 
-      <div className={styles.field}>
-        Padrão
-        <Segmented options={PATTERNS} value={current.pattern} onChange={(pattern) => onChange(current.id, { pattern })} ariaLabel="Padrão" />
-      </div>
+        <DrawerField as="div" label="Padrão">
+          <Segmented options={PATTERNS} value={current.pattern} onChange={(pattern) => onChange(current.id, { pattern })} ariaLabel="Padrão" />
+        </DrawerField>
 
-      {!isZigzag && (
-        <>
-          {/* Entrada e saída nunca podem ser o mesmo canto — o já escolhido no outro campo fica desabilitado. */}
-          <div className={styles.fieldRow}>
-            <div className={styles.field}>
-              Entrada
-              {renderCornerPicker(current.entry, (entry) => onChange(current.id, { entry }), {
-                disabled: current.exit,
-              })}
-            </div>
+        {!isZigzag && (
+          <>
+            {/* Entrada e saída nunca podem ser o mesmo canto — o já escolhido no outro campo fica desabilitado. */}
+            <DrawerRow>
+              <DrawerField as="div" label="Entrada">
+                {renderCornerPicker(current.entry, (entry) => onChange(current.id, { entry }), {
+                  disabled: current.exit,
+                })}
+              </DrawerField>
 
-            <div className={styles.field}>
-              Saída
-              {renderCornerPicker(current.exit, (exit) => onChange(current.id, { exit }), {
-                disabled: current.entry,
-              })}
-            </div>
-          </div>
+              <DrawerField as="div" label="Saída">
+                {renderCornerPicker(current.exit, (exit) => onChange(current.id, { exit }), {
+                  disabled: current.entry,
+                })}
+              </DrawerField>
+            </DrawerRow>
 
-          <div className={styles.field}>
-            Sentido
-            <Segmented
-              options={DIRECTIONS}
-              value={current.direction}
-              onChange={(direction) => onChange(current.id, { direction })}
-              ariaLabel="Sentido"
-            />
-          </div>
+            <DrawerField as="div" label="Sentido">
+              <Segmented
+                options={DIRECTIONS}
+                value={current.direction}
+                onChange={(direction) => onChange(current.id, { direction })}
+                ariaLabel="Sentido"
+              />
+            </DrawerField>
 
-          <p className={styles.hint}>
-            Os 4 cantos são sempre percorridos: entrada primeiro, saída por último. O sentido define a ordem dos 2
-            cantos do meio, girando a partir da entrada.
-          </p>
-        </>
-      )}
+            <DrawerHint>
+              Os 4 cantos são sempre percorridos: entrada primeiro, saída por último. O sentido define a ordem dos 2
+              cantos do meio, girando a partir da entrada.
+            </DrawerHint>
+          </>
+        )}
 
-      {isZigzag && (
-        <>
-          <div className={styles.fieldRow}>
-            <div className={styles.field}>
-              Início
-              {/*
-                Se o início cair no canto que é a saída do contorno, troca os
-                dois — senão, ao voltar pro contorno, entrada = saída.
-              */}
-              {renderCornerPicker(
-                current.entry,
-                (entry) =>
-                  onChange(current.id, entry === current.exit ? { entry, exit: current.entry } : { entry }),
-                { marked: points.at(-1)?.corner },
-              )}
-            </div>
+        {isZigzag && (
+          <>
+            <DrawerRow>
+              <DrawerField as="div" label="Início">
+                {/*
+                  Se o início cair no canto que é a saída do contorno, troca os
+                  dois — senão, ao voltar pro contorno, entrada = saída.
+                */}
+                {renderCornerPicker(
+                  current.entry,
+                  (entry) =>
+                    onChange(current.id, entry === current.exit ? { entry, exit: current.entry } : { entry }),
+                  { marked: points.at(-1)?.corner },
+                )}
+              </DrawerField>
 
-            <div className={styles.field}>
-              Pontos
-              <div className={styles.stepper}>
-                <button
-                  type="button"
-                  className={styles.cornerButton}
-                  onClick={() => onChange(current.id, { lanes: zigzagLanes(current) - 1 })}
-                  disabled={zigzagLanes(current) <= 2}
-                  aria-label="Menos pontos"
-                >
-                  −
-                </button>
-                <span className={styles.stepperValue}>{points.length}</span>
-                <button
-                  type="button"
-                  className={styles.cornerButton}
-                  onClick={() => onChange(current.id, { lanes: zigzagLanes(current) + 1 })}
-                  disabled={zigzagLanes(current) >= zigzagMaxLanes(current)}
-                  aria-label="Mais pontos"
-                >
-                  +
-                </button>
-              </div>
-              <span className={styles.hint}>
-                {zigzagLanes(current)} passadas (máx. {zigzagMaxLanes(current)})
-              </span>
-            </div>
-          </div>
+              <DrawerField as="div" label="Pontos">
+                <div className={styles.stepper}>
+                  <button
+                    type="button"
+                    className={styles.cornerButton}
+                    onClick={() => onChange(current.id, { lanes: zigzagLanes(current) - 1 })}
+                    disabled={zigzagLanes(current) <= 2}
+                    aria-label="Menos pontos"
+                  >
+                    −
+                  </button>
+                  <span className={styles.stepperValue}>{points.length}</span>
+                  <button
+                    type="button"
+                    className={styles.cornerButton}
+                    onClick={() => onChange(current.id, { lanes: zigzagLanes(current) + 1 })}
+                    disabled={zigzagLanes(current) >= zigzagMaxLanes(current)}
+                    aria-label="Mais pontos"
+                  >
+                    +
+                  </button>
+                </div>
+                <span className={styles.fieldHint}>
+                  {zigzagLanes(current)} passadas (máx. {zigzagMaxLanes(current)})
+                </span>
+              </DrawerField>
+            </DrawerRow>
 
-          <p className={styles.hint}>
-            Passadas {current.pattern === 'zigzag-h' ? 'horizontais' : 'verticais'} de lado a lado, começando no
-            canto de início. A saída (canto tracejado) depende do início e da quantidade de passadas.
-          </p>
-        </>
-      )}
+            <DrawerHint>
+              Passadas {current.pattern === 'zigzag-h' ? 'horizontais' : 'verticais'} de lado a lado, começando no
+              canto de início. A saída (canto tracejado) depende do início e da quantidade de passadas.
+            </DrawerHint>
+          </>
+        )}
 
-      <Button variant="outline" onClick={removeSelected}>
-        Remover bloco
-      </Button>
+        <Button variant="outline" onClick={removeSelected}>
+          Remover bloco
+        </Button>
+      </DrawerBody>
     </Drawer>
   );
 }

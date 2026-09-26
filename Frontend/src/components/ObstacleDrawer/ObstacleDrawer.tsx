@@ -2,7 +2,7 @@ import type { ChangeEvent } from 'react';
 import type { ObstaclesModel } from '../../model/Obstacles.Model';
 import { ObstacleDrawerBase } from './ObstacleDrawerBase';
 import { Button } from '../Button/Button';
-import styles from './ObstacleDrawer.module.css';
+import { DrawerBody, DrawerField, DrawerRow } from '../Drawer/DrawerForm';
 
 interface ObstacleDrawerProps {
   /** Todos os obstáculos do cenário — o drawer filtra sozinho quem está selecionado (ver useMapSelection). */
@@ -49,32 +49,28 @@ function ObstacleFields({
   }
 
   return (
-    <>
-      <label className={styles.field}>
-        Nome
+    <DrawerBody>
+      <DrawerField label="Nome">
         <input type="text" value={obstacle.name} onChange={(e) => onChange({ name: e.target.value })} />
-      </label>
+      </DrawerField>
 
-      <label className={styles.field}>
-        Descrição
+      <DrawerField label="Descrição">
         <textarea value={obstacle.description} onChange={(e) => onChange({ description: e.target.value })} />
-      </label>
+      </DrawerField>
 
-      <div className={styles.fieldRow}>
-        <label className={styles.field}>
-          Largura (colunas)
+      <DrawerRow>
+        <DrawerField label="Largura (colunas)">
           <input type="number" min={1} value={obstacle.sizeX} onChange={handleNumberChange('sizeX')} />
-        </label>
+        </DrawerField>
 
-        <label className={styles.field}>
-          Altura (linhas)
+        <DrawerField label="Altura (linhas)">
           <input type="number" min={1} value={obstacle.sizeY} onChange={handleNumberChange('sizeY')} />
-        </label>
-      </div>
+        </DrawerField>
+      </DrawerRow>
 
       <Button variant="outline" onClick={onRemove}>
         Remover obstáculo
       </Button>
-    </>
+    </DrawerBody>
   );
 }

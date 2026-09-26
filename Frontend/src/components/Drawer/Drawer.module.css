@@ -1,13 +1,15 @@
 .drawer {
   position: fixed;
-  top: 0;
-  right: 0;
-  height: 100vh;
-  width: 280px;
+  /* Começa logo abaixo da barra de navegação (--drawer-top vem do AppLayout
+     e vai a 0 quando a página rola até a barra sumir). */
+  top: var(--drawer-top, 0px);
+  bottom: 0;
+  left: 0;
+  width: var(--drawer-width, 280px);
   max-width: calc(100vw - 32px);
   background: var(--color-surface);
-  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.15);
-  transform: translateX(100%);
+  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.15);
+  transform: translateX(-100%);
   transition: transform 0.2s ease;
   z-index: 90;
   display: flex;

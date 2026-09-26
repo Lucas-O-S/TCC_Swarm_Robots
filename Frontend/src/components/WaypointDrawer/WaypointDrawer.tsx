@@ -3,7 +3,7 @@ import type { TaskWaypointDraft } from '../../screens/TaskBuilder/useTaskEditor'
 import { useMapSelection } from '../../hooks/useMapElements';
 import { Drawer } from '../Drawer/Drawer';
 import { Button } from '../Button/Button';
-import styles from './WaypointDrawer.module.css';
+import { DrawerBody, DrawerField, DrawerHint, DrawerRow } from '../Drawer/DrawerForm';
 
 interface WaypointDrawerProps {
   /** Todos os waypoints da rota — o drawer filtra sozinho quem está selecionado (ver useMapSelection). */
@@ -35,36 +35,32 @@ export function WaypointDrawer({ allWaypoints, onChange, orderById: orderByIdPro
   return (
     <Drawer open={waypoints.length > 0} onClose={clear} title={title}>
       {single && (
-        <>
-          <p className={styles.summary}>{orderById.get(single.id)}ª parada da rota</p>
+        <DrawerBody>
+          <DrawerHint>{orderById.get(single.id)}ª parada da rota</DrawerHint>
 
-          <div className={styles.fieldRow}>
-            <label className={styles.field}>
-              Coluna (x)
+          <DrawerRow>
+            <DrawerField label="Coluna (x)">
               <input type="number" min={0} value={single.x} onChange={handleNumberChange('x')} />
-            </label>
+            </DrawerField>
 
-            <label className={styles.field}>
-              Linha (y)
+            <DrawerField label="Linha (y)">
               <input type="number" min={0} value={single.y} onChange={handleNumberChange('y')} />
-            </label>
-          </div>
+            </DrawerField>
+          </DrawerRow>
 
           <Button variant="outline" onClick={removeSelected}>
             Remover waypoint
           </Button>
-        </>
+        </DrawerBody>
       )}
 
       {waypoints.length > 1 && (
-        <>
-          <p className={styles.summary}>
-            {waypoints.map((w) => `${orderById.get(w.id)}ª`).join(', ')}
-          </p>
+        <DrawerBody>
+          <DrawerHint>{waypoints.map((w) => `${orderById.get(w.id)}ª`).join(', ')}</DrawerHint>
           <Button variant="outline" onClick={removeSelected}>
             Remover selecionados
           </Button>
-        </>
+        </DrawerBody>
       )}
     </Drawer>
   );

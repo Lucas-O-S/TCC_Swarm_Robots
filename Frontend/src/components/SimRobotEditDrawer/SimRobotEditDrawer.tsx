@@ -7,6 +7,7 @@ import { SimRobotMapper } from '../../mapper/SimRobot.Mapper';
 import type { ScenarioRobotModel } from '../../model/Scenario.Model';
 import { useCommitField } from '../../screens/Simulation/useCommitField';
 import { num } from '../SimRobotDrawer/numInput';
+import { DrawerActions, DrawerBody, DrawerDivider, DrawerError, DrawerField, DrawerHint, DrawerRow, DrawerSection } from '../Drawer/DrawerForm';
 import styles from './SimRobotEditDrawer.module.css';
 
 const MODE_OPTIONS: { value: DotBotControlMode; label: string; title: string }[] = [
@@ -46,9 +47,8 @@ function EditRobotForm({ robot, onRename, onPatch, onStart, onRemoveWaypoint, on
   const rgb = robot.rgb ?? { r: 0, g: 0, b: 0 };
 
   return (
-    <div className={styles.section}>
-      <label className={styles.field}>
-        Endereço (16 hex)
+    <DrawerBody>
+      <DrawerField label="Endereço (16 hex)">
         <input
           type="text"
           value={address.value}
@@ -57,29 +57,29 @@ function EditRobotForm({ robot, onRename, onPatch, onStart, onRemoveWaypoint, on
           onBlur={address.onBlur}
           onKeyDown={address.onKeyDown}
         />
-      </label>
-      {address.error && <p className={styles.error}>{address.error}</p>}
+      </DrawerField>
+      {address.error && <DrawerError>{address.error}</DrawerError>}
 
-      <div className={styles.field}>
-        Modo inicial
+      <DrawerField as="div" label="Modo inicial">
         <Segmented options={MODE_OPTIONS} value={robot.mode as DotBotControlMode} onChange={(mode) => onPatch({ mode })} />
-      </div>
+      </DrawerField>
 
-      <div className={styles.fieldRow}>
-        <label className={styles.field}>
-          x (mm)
+      <DrawerRow>
+        <DrawerField label="x (mm)">
           <input type="number" step={50} value={Math.round(robot.start.x_mm)} onChange={num((v) => onStart({ x_mm: v }))} />
-        </label>
-        <label className={styles.field}>
-          y (mm)
+        </DrawerField>
+        <DrawerField label="y (mm)">
           <input type="number" step={50} value={Math.round(robot.start.y_mm)} onChange={num((v) => onStart({ y_mm: v }))} />
-        </label>
-      </div>
+        </DrawerField>
+      </DrawerRow>
 
-      <label className={styles.field}>
-        <span>
-          Rumo: <strong>{Math.round(robot.start.theta_deg)}°</strong> (0° = leste, 90° = norte)
-        </span>
+      <DrawerField
+        label={
+          <span>
+            Rumo: <strong>{Math.round(robot.start.theta_deg)}°</strong> (0° = leste, 90° = norte)
+          </span>
+        }
+      >
         <input
           type="range"
           min={-180}
@@ -88,45 +88,44 @@ function EditRobotForm({ robot, onRename, onPatch, onStart, onRemoveWaypoint, on
           value={((((robot.start.theta_deg + 180) % 360) + 360) % 360) - 180}
           onChange={num((v) => onStart({ theta_deg: v }))}
         />
-      </label>
+      </DrawerField>
 
-      <label className={styles.field}>
-        <span>
-          Bateria: <strong>{robot.battery.toFixed(0)}%</strong>
-        </span>
+      <DrawerField
+        label={
+          <span>
+            Bateria: <strong>{robot.battery.toFixed(0)}%</strong>
+          </span>
+        }
+      >
         <input type="range" min={0} max={100} step={1} value={robot.battery} onChange={num((v) => onPatch({ battery: v }))} />
-      </label>
+      </DrawerField>
 
-      <div className={styles.fieldRow}>
-        <label className={styles.field}>
-          LED
+      <DrawerRow>
+        <DrawerField label="LED">
           <input
             type="color"
             className={styles.colorInput}
             value={SimRobotMapper.rgbToHex(rgb)}
             onChange={(e) => onPatch({ rgb: SimRobotMapper.hexToRgb(e.target.value) })}
           />
-        </label>
-        <div className={styles.field}>
-          &nbsp;
+        </DrawerField>
+        <DrawerField as="div" label={'\u00a0'}>
           <Button variant="outline" onClick={() => onPatch({ rgb: undefined })} disabled={!robot.rgb}>
             Apagar LED
           </Button>
-        </div>
-      </div>
+        </DrawerField>
+      </DrawerRow>
 
-      <hr className={styles.divider} />
       {robot.mode === DotBotControlMode.Auto ? (
         <>
-          <p className={styles.subtitle}>Rota (modo Auto)</p>
-          <p className={styles.hint}>
+          <DrawerSection title="Rota (modo Auto)" />
+          <DrawerHint>
             Com o robô selecionado, a ferramenta Waypoint adiciona pontos clicando no mapa (e põe o robô em Auto). Arraste os
             pontos numerados pra ajustar; Backspace apaga o selecionado.
-          </p>
+          </DrawerHint>
 
-          <div className={styles.fieldRow}>
-            <label className={styles.field}>
-              Raio de chegada (mm)
+          <DrawerRow>
+            <DrawerField label="Raio de chegada (mm)">
               <input
                 type="number"
                 min={5}
@@ -134,12 +133,12 @@ function EditRobotForm({ robot, onRename, onPatch, onStart, onRemoveWaypoint, on
                 value={robot.waypoint_threshold_mm ?? DEFAULT_WAYPOINT_THRESHOLD_MM}
                 onChange={num((v) => v > 0 && onPatch({ waypoint_threshold_mm: v }))}
               />
-            </label>
+            </DrawerField>
             <label className={styles.checkbox} style={{ alignSelf: 'flex-end', paddingBottom: 8 }}>
               <input type="checkbox" checked={robot.loop ?? false} onChange={(e) => onPatch({ loop: e.target.checked })} />
               Loop
             </label>
-          </div>
+          </DrawerRow>
 
           {waypoints.length > 0 ? (
             <ul className={styles.pointList}>
@@ -155,26 +154,29 @@ function EditRobotForm({ robot, onRename, onPatch, onStart, onRemoveWaypoint, on
               ))}
             </ul>
           ) : (
-            <p className={styles.hint}>Sem rota.</p>
+            <DrawerHint>Sem rota.</DrawerHint>
           )}
-          <div className={styles.actions}>
+          <DrawerActions>
             <Button variant="outline" onClick={() => onPatch({ waypoints: [] })} disabled={waypoints.length === 0}>
               Limpar rota
             </Button>
-          </div>
+          </DrawerActions>
         </>
       ) : (
-        <p className={styles.hint}>
-          Em Manual o robô começa parado, esperando o joystick. Pra ele já começar seguindo uma rota, mude o modo inicial
-          pra Auto (ou use a ferramenta Waypoint no mapa, que já faz isso).
-        </p>
+        <>
+          <DrawerDivider />
+          <DrawerHint>
+            Em Manual o robô começa parado, esperando o joystick. Pra ele já começar seguindo uma rota, mude o modo inicial
+            pra Auto (ou use a ferramenta Waypoint no mapa, que já faz isso).
+          </DrawerHint>
+        </>
       )}
 
-      <div className={styles.actions}>
+      <DrawerActions>
         <Button variant="solid" onClick={onRemove}>
           Remover robô
         </Button>
-      </div>
-    </div>
+      </DrawerActions>
+    </DrawerBody>
   );
 }
