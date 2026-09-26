@@ -14,6 +14,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Mapa & Conexão' },
   { to: '/simulacao', label: 'Simulação' },
+  { to: '/visualizador', label: 'Visualizador' },
   { to: '/mapa-teste', label: 'Teste Mapa' },
   { to: '/CenarioBuilder', label: 'Construtor de Cenários' },
   { to: '/TaskBuilder', label: 'Tarefas' },

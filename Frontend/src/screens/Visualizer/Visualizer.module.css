@@ -1,0 +1,10 @@
+/* Menu lateral do Visualizador: cartões (<Menu>) no <MenuColumns>, como na Simulação. */
+.menuColumn {
+  min-width: 0;
+}
+
+.placeholder {
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
+}

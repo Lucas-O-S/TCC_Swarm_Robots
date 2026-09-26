@@ -1,0 +1,112 @@
+/* Campos, linhas, dicas, seções e botões vêm do DrawerForm (components/Drawer);
+   aqui só o que é próprio deste drawer (telemetria, LED, progresso, joystick) —
+   mesmo visual do SimRobotDrawer da Simulação. */
+
+/* Dica curta dentro de um campo. */
+.fieldHint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  background: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.dotOn {
+  background: var(--color-green);
+}
+
+.dotWarn {
+  background: var(--color-yellow);
+}
+
+.dotOff {
+  background: var(--color-red);
+}
+
+.sep {
+  opacity: 0.5;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.kv dt {
+  color: var(--color-text-muted);
+}
+
+.kv dd {
+  margin: 0;
+  color: var(--color-text);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.colorInput {
+  width: 40px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.progress {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.progressBar {
+  height: 100%;
+  background: #2f6fed;
+}
+
+.joystickReadout {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.taskCurrent {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text);
+}
+
+.taskCurrent span {
+  color: var(--color-text-muted);
+}
