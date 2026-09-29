@@ -1,0 +1,13 @@
+/* Tarefa em andamento: nome à esquerda, progresso à direita. */
+.current {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text);
+}
+
+.current span {
+  color: var(--color-text-muted);
+}

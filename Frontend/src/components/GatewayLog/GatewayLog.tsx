@@ -1,16 +1,17 @@
-import type { LinkLogEntry } from '../../Integration/LocalFleetLink';
+import type { LinkLogEntry } from '../../Integration/LinkLog';
 import styles from './GatewayLog.module.css';
 
 interface GatewayLogProps {
   entries: readonly LinkLogEntry[];
 }
 
-// Log do ciclo de vida da rede — o que o gateway simulado fez (gw) e o que
-// o backend local viu/mandou (api): NODE_JOINED/LEFT, comandos aplicados ou
-// perdidos, mudanças de status por timeout, swarmit. Advertise e keep-alive
-// não entram (seriam dezenas por segundo) — só os contadores no cartão Rede;
-// o fluxo do joystick vira uma linha só, com o contador de repetições (×N).
-// Mesmo papel do ConnectionLog do Dashboard, com timestamp do tempo simulado.
+// Log de eventos de link (Integration/LinkLog). Na Simulação: o que o
+// gateway simulado fez (gw) e o que o backend local viu/mandou (api) —
+// NODE_JOINED/LEFT, comandos aplicados ou perdidos, mudanças de status por
+// timeout, swarmit. No Visualizador: o que a API mandou e os comandos da
+// tela (api). Advertise e keep-alive não entram (seriam dezenas por
+// segundo); o fluxo do joystick vira uma linha só, com o contador de
+// repetições (×N). Mesmo papel do ConnectionLog do Dashboard.
 export function GatewayLog({ entries }: GatewayLogProps) {
   if (entries.length === 0) return <p className={styles.hint}>Sem eventos ainda.</p>;
 

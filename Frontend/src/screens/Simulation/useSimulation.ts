@@ -4,7 +4,8 @@ import type { RobotStatus } from '../../enums/RobotStatus.enum';
 import { SwarmitPayloadType } from '../../enums/SwarmitPayloadType.enum';
 import type { FleetCommand } from '../../Integration/FleetLink';
 import { LocalFleetLink } from '../../Integration/LocalFleetLink';
-import type { BackendRobotView, LinkLogEntry } from '../../Integration/LocalFleetLink';
+import type { BackendRobotView } from '../../Integration/LocalFleetLink';
+import type { LinkLogEntry } from '../../Integration/LinkLog';
 import type { OrchestratorRobotRecord } from '../../Integration/LocalOrchestrator';
 import { ScenarioMapper } from '../../mapper/Scenario.Mapper';
 import { SimulationService } from '../../services/Simulation.Service';
@@ -17,6 +18,7 @@ import type { SwarmitDeviceView } from './SimGateway';
 import { planTicks } from './SimLoop';
 import type { NetChannelStats } from './SimNetModel';
 import type { SimWorld } from './SimWorld';
+import { pushTrailPoint } from './useTrails';
 
 // Orquestra motor (SimWorld) + gateway (SimGateway) + transporte (FleetLink)
 // + estado React da tela de Simulação — o equivalente do useWorld do
@@ -56,9 +58,6 @@ interface Runtime {
   gateway: SimGateway;
   ready: boolean;
 }
-
-const TRAIL_MAX_POINTS = 400;
-const TRAIL_MIN_DIST_MM = 8;
 
 function netConfigOf(sim: SimConfigModel): NetConfigValues {
   return {
@@ -429,16 +428,5 @@ export function useSimulation() {
 export type SimulationController = ReturnType<typeof useSimulation>;
 
 function recordTrails(trails: Map<string, Vec2Model[]>, world: SimWorld): void {
-  for (const r of world.robots) {
-    let trail = trails.get(r.address);
-    if (!trail) {
-      trail = [];
-      trails.set(r.address, trail);
-    }
-    const last = trail[trail.length - 1];
-    if (!last || Math.hypot(r.pos_x - last.x, r.pos_y - last.y) >= TRAIL_MIN_DIST_MM) {
-      trail.push({ x: r.pos_x, y: r.pos_y });
-      if (trail.length > TRAIL_MAX_POINTS) trail.splice(0, trail.length - TRAIL_MAX_POINTS);
-    }
-  }
+  for (const r of world.robots) pushTrailPoint(trails, r.address, { x: r.pos_x, y: r.pos_y });
 }

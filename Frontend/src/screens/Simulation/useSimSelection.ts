@@ -1,3 +1,5 @@
+import { useRef } from 'react';
+
 // Ids de seleção do mapa da Simulação (src/hooks/useMapElements.tsx seleciona
 // por id estável). Prefixo por tipo pra um address de robô nunca colidir com
 // o id de uma barreira e pros drawers acharem "os seus" na seleção.
@@ -21,4 +23,18 @@ export function obstaclesFromSelection(ids: ReadonlySet<string>): string[] {
 
 export function hasDraftSelection(ids: ReadonlySet<string>): boolean {
   return [...ids].some((id) => id.startsWith('rd:'));
+}
+
+/**
+ * Robô em foco (drawer + ferramenta Waypoint), na Simulação e no
+ * Visualizador: o robô selecionado, ou o dono do rascunho quando um ponto
+ * dele está selecionado. Com `keep` (ferramenta Waypoint ligada) o foco
+ * "gruda": clicar no mapa pra criar ponto não pode perder o robô-alvo.
+ */
+export function useStickyFocus(selectedIds: ReadonlySet<string>, draftOwner: string | null, keep: boolean): string | null {
+  const focus = useRef<string | null>(null);
+  const fromSelection = robotFromSelection(selectedIds) ?? (hasDraftSelection(selectedIds) ? draftOwner : null);
+  if (fromSelection) focus.current = fromSelection;
+  else if (!keep) focus.current = null;
+  return focus.current;
 }

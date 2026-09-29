@@ -2,10 +2,8 @@ import { DEG_TO_RAD, PWM_MAX, RAD_TO_DEG } from '../../Consts/SimulationConsts';
 import { clamp } from '../../screens/Simulation/SimPhysics';
 import { normalizeAngle } from '../../screens/Simulation/SimRobot';
 
-// Controlador do joystick "de jogo" do Visualizador — CÓPIA do que está no
-// SimRobotDrawer (mesmos ganhos, mesma regra), pra dirigir o robô real do
-// mesmo jeito que a Simulação dirige o simulado. Unificar os dois num lugar
-// só é uma limpeza pendente (ver AGENTS.md do front).
+// Controlador do joystick "de jogo" do ManualDrive — o mesmo na Simulação
+// (robô simulado) e no Visualizador (robô da API).
 
 /** Giro automático: PWM de diferença entre as rodas por rad de erro de rumo. */
 const HEADING_KP = 40;
@@ -28,7 +26,7 @@ export interface DriveCommand {
 /**
  * Manche → CMD_MOVE_RAW com giro automático: a direção do manche é a direção
  * no MAPA pra onde o robô deve ir (pra cima = +Y do mundo). A partir do
- * theta atual (no Visualizador, o `direction` da telemetria) calcula o erro
+ * theta atual (pose simulada, ou o `direction` da telemetria) calcula o erro
  * de rumo, gira as rodas em sentidos opostos até apontar pra lá e, dentro do
  * cone de 60°, soma o avanço. Saída: PWM das duas rodas (int8, ±127).
  */

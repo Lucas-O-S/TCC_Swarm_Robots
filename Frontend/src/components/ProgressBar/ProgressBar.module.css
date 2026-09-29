@@ -1,0 +1,11 @@
+.track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.bar {
+  height: 100%;
+  background: #2f6fed;
+}

@@ -6,7 +6,7 @@ import { DotBotControlMode } from '../../enums/DotBotControlMode.enum';
 import { SimRobotMapper } from '../../mapper/SimRobot.Mapper';
 import type { ScenarioRobotModel } from '../../model/Scenario.Model';
 import { useCommitField } from '../../screens/Simulation/useCommitField';
-import { num } from '../SimRobotDrawer/numInput';
+import { num } from '../Drawer/numInput';
 import { DrawerActions, DrawerBody, DrawerDivider, DrawerError, DrawerField, DrawerHint, DrawerRow, DrawerSection } from '../Drawer/DrawerForm';
 import styles from './SimRobotEditDrawer.module.css';
 

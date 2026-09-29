@@ -7,6 +7,8 @@ import type { DotBotAdvertisement } from './Protocols/DotBot.Payload';
 import { SWARMIT_OTA_CHUNK_SIZE, swarmitStatusName } from './Protocols/Swarmit/Swarmit.Protocol';
 import { describeCommand } from './FleetLink';
 import type { FleetCommand, FleetLink, FleetUplink } from './FleetLink';
+import { LinkLog } from './LinkLog';
+import type { LinkLogEntry } from './LinkLog';
 import { LocalOrchestrator } from './LocalOrchestrator';
 
 // Link OFFLINE (padrão enquanto não existe conexão com a API): um "backend
@@ -28,7 +30,6 @@ import { LocalOrchestrator } from './LocalOrchestrator';
 
 const OTA_RETRY_S = 0.5;
 const OTA_MAX_ROUNDS = 20;
-const LOG_MAX = 150;
 
 interface OtaState {
   total: number;
@@ -50,30 +51,6 @@ export interface BackendRobotView {
   otaProgress: number | null;
 }
 
-export interface LinkLogEntry {
-  id: number;
-  t: number;
-  source: 'gateway' | 'backend';
-  text: string;
-  /** Quantas mensagens iguais em sequência essa linha resume (fluxo do joystick). */
-  count: number;
-  /** Chave de agrupamento — só existe pras mensagens de fluxo (ver `streamKey`). */
-  key?: string;
-}
-
-/** Quantas linhas pra trás procurar uma do mesmo fluxo (backend e gateway se alternam). */
-const STREAM_LOOKBACK = 4;
-
-/**
- * O joystick manda CMD_MOVE_RAW a 10 Hz — uma linha por mensagem afogaria o
- * log. Mensagens de fluxo (mesmo comando/alvo/desfecho, só os valores de
- * L/R mudando) viram UMA linha que se atualiza e conta as repetições.
- */
-function streamKey(source: LinkLogEntry['source'], text: string): string | undefined {
-  if (!text.includes('CMD_MOVE_RAW')) return undefined;
-  return `${source}|${text.replace(/L=-?\d+ R=-?\d+/, 'L=# R=#')}`;
-}
-
 export interface LocalFleetLinkOptions {
   /** Relógio simulado (s) — normalmente `() => world.time`. */
   clock: () => number;
@@ -86,8 +63,7 @@ export class LocalFleetLink implements FleetLink {
   private readonly views = new Map<string, BackendRobotView>();
   private readonly ota = new Map<string, OtaState>();
   private readonly lastStatus = new Map<string, RobotStatus>();
-  private logEntries: LinkLogEntry[] = [];
-  private logSeq = 0;
+  private readonly linkLog = new LinkLog();
 
   /** Contadores de uplink por tipo (o que "chegou na API"). */
   readonly received: Record<FleetUplink['kind'], number> = {
@@ -243,24 +219,13 @@ export class LocalFleetLink implements FleetLink {
     return RobotStatus.Lost;
   }
 
-  /** Log (mais recente primeiro) — gateway + backend de bolso. */
+  /** Log (mais recente primeiro) — gateway + backend de bolso, no tempo simulado. */
   get entries(): readonly LinkLogEntry[] {
-    return this.logEntries;
+    return this.linkLog.entries;
   }
 
   log(source: LinkLogEntry['source'], text: string): void {
-    const key = streamKey(source, text);
-    const t = this.clock();
-    if (key) {
-      const k = this.logEntries.findIndex((e, i) => i < STREAM_LOOKBACK && e.key === key);
-      if (k >= 0) {
-        const prev = this.logEntries[k];
-        const merged: LinkLogEntry = { ...prev, id: ++this.logSeq, t, text, count: prev.count + 1 };
-        this.logEntries = [merged, ...this.logEntries.filter((_, i) => i !== k)];
-        return;
-      }
-    }
-    this.logEntries = [{ id: ++this.logSeq, t, source, text, count: 1, key }, ...this.logEntries].slice(0, LOG_MAX);
+    this.linkLog.add(source, text, this.clock());
   }
 
   // ---- internos -----------------------------------------------------------------

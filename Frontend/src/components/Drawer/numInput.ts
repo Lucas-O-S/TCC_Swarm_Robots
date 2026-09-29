@@ -1,6 +1,6 @@
 import type { ChangeEvent } from 'react';
 
-/** onChange de <input type="number"/"range"> que só repassa valores numéricos válidos — usado pelos drawers de robô da Simulação. */
+/** onChange de <input type="number"/"range"> que só repassa valores numéricos válidos — usado pelos drawers. */
 export function num(handler: (v: number) => void) {
   return (e: ChangeEvent<HTMLInputElement>) => {
     const v = Number(e.target.value);
