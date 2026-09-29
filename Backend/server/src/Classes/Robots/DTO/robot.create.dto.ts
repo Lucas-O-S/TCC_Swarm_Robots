@@ -1,10 +1,11 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, Min } from "class-validator";
 import { RobotApplication } from "src/Enums/RobotApplication.enum";
+import { RobotControlMode } from "src/Enums/RobotControlMode.enum";
 
 /**
  * Campos aceitos ao registrar um robô via API. Campos calculados/geridos
- * pelo backend (status, lastSync, mode em runtime) não entram aqui.
+ * pelo backend (lastSync) não entram aqui.
  */
 export class RobotCreateDto {
 
@@ -33,6 +34,16 @@ export class RobotCreateDto {
     @IsOptional()
     @IsEnum(RobotApplication, { message: "Aplicação inválida" })
     application?: RobotApplication;
+
+    @ApiProperty({
+        description: "Modo de controle do robô: 0 (Auto), 1 (Manual) ou 2 (SemiAuto)",
+        enum: RobotControlMode,
+        example: RobotControlMode.Manual,
+        required: false,
+    })
+    @IsOptional()
+    @IsEnum(RobotControlMode, { message: "mode deve ser 0 (Manual), 1 (Auto) ou 2 (SemiAuto)" })
+    mode?: RobotControlMode;
 
     @ApiProperty({
         description: "Id do enxame/rede (network_id em hex)",

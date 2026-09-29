@@ -201,8 +201,11 @@ separação em módulos NestJS:
   binários. Guarda só o que **realmente trafega no pacote de rádio**:
   - `Enums/RobotApplication.enum.ts` - `ApplicationType` (0=DotBot, 1=SailBot,
     2=Freebot, 3=XGO, 4=LH2_mini_mote)
-  - `Enums/RobotControlMode.enum.ts` - `RobotControlMode` (0=Auto, 1=Manual,
-    2=SemiAuto - ver "Objetivo" acima; o CHECK em `robots.mode` é 0..2)
+  - `Enums/RobotControlMode.enum.ts` - `RobotControlMode` (0=Manual, 1=Auto,
+    2=SemiAuto - ver "Objetivo" acima; o CHECK em `robots.mode` é 0..2).
+    0/1 batem com o `ControlModeType` do firmware (MANUAL=0, AUTO=1) - já
+    esteve invertido (0=Auto) e foi corrigido. SemiAuto é só do backend,
+    nunca vai no pacote (`control-mode` só aceita 0/1).
   - `Enums/PositionSource.enum.ts` - de onde veio uma amostra de posição
     (LH2 vs GPS), decidido pelo tipo de payload recebido.
 - `src/Model/` - persistência (Sequelize). Guarda só o que faz sentido durar
