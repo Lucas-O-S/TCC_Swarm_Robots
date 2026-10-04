@@ -6,6 +6,7 @@ export const RobotSchema = {
             address: { type: 'string', example: '0000000000000001' },
             name: { type: 'string', example: 'DotBot 01' },
             application: { type: 'number', example: 0 },
+            mode: { type: 'number', enum: [0, 1, 2], example: 0 },
             swarmId: { type: 'string', example: '0000' },
             waypointsThreshold: { type: 'number', example: 100 },
             taskId: { type: 'string', example: 'a3f1c2d4-...' },

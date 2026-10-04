@@ -20,7 +20,10 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "frota": "node ../../scripts/frota/frota.mjs",
     "frota:list": "node ../../scripts/frota/frota.mjs list",
-    "frota:stop": "node ../../scripts/frota/frota.mjs stop"
+    "frota:stop": "node ../../scripts/frota/frota.mjs stop",
+    "swarm:up": "bash ../../scripts/swarm/up.sh",
+    "swarm:status": "bash ../../scripts/swarm/up.sh --status",
+    "start:hw": "bash ../../scripts/swarm/up.sh && nest start"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.23",

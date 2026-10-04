@@ -17,4 +17,9 @@ export class OrchestratorListener {
     handleAdvertisement(payload: { address: string; data: any }) {
         return this.orchestrator.onAdvertisement(payload);
     }
+
+    @OnEvent(EventsCommands.modeChanged)
+    handleModeChanged(payload: { address: string }) {
+        return this.orchestrator.onModeChanged(payload);
+    }
 }
