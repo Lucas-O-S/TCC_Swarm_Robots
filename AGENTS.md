@@ -469,6 +469,15 @@ esse campo - pra tipar certo precisaria também tratar o `ADVERTISEMENT` (0x04).
   o envio funcionou (o próximo ciclo tenta de novo se falhar).
 - Gatilho: `onModuleInit` + `setInterval(assignPending, 5000)` com `.catch` (é job
   de fundo, sem o ExceptionFilter do HTTP - por isso o catch é obrigatório).
+- **Liga/desliga** (`autoEnabled` no `OrchestratorService`): estado inicial por
+  `ORCHESTRATOR_AUTO` (`src/config/orchestrator.config.ts`, default `true`) e em
+  runtime por `GET`/`PUT /orchestrator/auto` (`{ enabled }`, vale até reiniciar).
+  Desligado, o tick retorna antes de consultar o banco. Desligar só para de
+  entregar tasks novas: robô Auto que já executa uma termina normalmente. O
+  toggle **só** controla esse loop - a atribuição manual (SemiAuto) e as regras
+  reativas do `OrchestratorListener` não checam o `autoEnabled`, então o SemiAuto
+  funciona igual com o Auto desligado. O assign manual recusa (409) task já
+  `InProgress`, pra não dividir a mesma task com um robô Auto.
 - `OrchestratorModule` importa `RobotModule` + `TaskModule`; registrado no `IndexModule`.
 - **1 task ↔ N robôs já cabe no schema** (`robots.task_id` é muitos-pra-um); hoje o
   Orchestrator faz 1:1. Pra N robôs por task depois: adicionar `requiredRobots` na

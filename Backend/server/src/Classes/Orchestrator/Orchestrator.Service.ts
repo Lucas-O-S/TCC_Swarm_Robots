@@ -10,6 +10,7 @@ import { Command } from "src/Enums/Command.enum";
 import { OnEvent } from "@nestjs/event-emitter";
 import { EventsCommands } from "src/Enums/Events.Enum";
 import { RobotStatus } from "src/Enums/RobotStatus.enum";
+import { orchestratorConfig } from "src/config/orchestrator.config";
 
 
 @Injectable()
@@ -20,6 +21,9 @@ export class OrchestratorService implements OnModuleInit {
     /** Limiar de bateria baixa, em Volts. O protocolo manda mV; convertemos ao comparar. */
     private LOW_BATTERY_VOLTS = 3.0;
 
+    /** Atribuição automática ligada? Começa pelo .env e muda em runtime (setAutoEnabled). */
+    private autoEnabled = orchestratorConfig.autoEnabled;
+
     constructor(
         private readonly taskService: TaskService,
         private readonly robotService: RobotService
@@ -27,13 +31,40 @@ export class OrchestratorService implements OnModuleInit {
 
 
     onModuleInit() {
+        console.log(`[ORQ] atribuição automática ${this.autoEnabled ? "ligada" : "desligada"} (ORCHESTRATOR_AUTO)`);
+
         setInterval(async () => {
-            
+
+            // Desligada: nem consulta o banco. SemiAuto (assignTaskManually) e
+            // as regras reativas (OrchestratorListener) não passam por aqui.
+            if (!this.autoEnabled) {
+                return;
+            }
+
             await this.assignPending().catch(error => {
                 console.error("Erro ao atribuir tarefas pendentes:", error);
             });
 
         }, this.RUN_TIME);
+    }
+
+    isAutoEnabled(): boolean {
+        return this.autoEnabled;
+    }
+
+    /**
+     * Liga/desliga a atribuição automática sem reiniciar o backend. Desligar só
+     * para de entregar tasks novas: robô em Auto que já está executando uma
+     * termina normalmente (as regras reativas continuam valendo pra ele).
+     */
+    setAutoEnabled(enabled: boolean): void {
+        if (this.autoEnabled === enabled) {
+            return;
+        }
+
+        this.autoEnabled = enabled;
+
+        console.log(`[ORQ] atribuição automática ${enabled ? "ligada" : "desligada"}`);
     }
 
     async assignPending() : Promise<void> {
@@ -94,6 +125,8 @@ export class OrchestratorService implements OnModuleInit {
      * Atribuição MANUAL (uso típico: robô SemiAuto). Faz o mesmo que o loop
      * automático de `assignPending`, mas disparado por um humano via rota, não
      * pela fila. Reusa o `sendCommandToRobot` pra montar/enviar os waypoints.
+     * Não depende do `autoEnabled`: funciona com a atribuição automática
+     * desligada.
      */
     async assignTaskManually(address: string, taskId: string): Promise<void> {
 
@@ -120,6 +153,13 @@ export class OrchestratorService implements OnModuleInit {
 
         if (!task.waypoints?.length) {
             throw new BadRequestException(`Task ${taskId} não tem waypoints`);
+        }
+
+        // Em andamento = já é de outro robô (inclusive de um Auto, se o loop
+        // automático pegou antes). Dois robôs na mesma task quebraria o
+        // release/conclusão, que andam pelo taskId do robô.
+        if (task.status === TaskStatus.InProgress) {
+            throw new ConflictException(`Task ${taskId} já está em andamento em outro robô`);
         }
 
         const sent = await this.sendCommandToRobot(robot, task);
