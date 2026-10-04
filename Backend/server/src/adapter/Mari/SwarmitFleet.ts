@@ -1,5 +1,6 @@
 import { SwarmitDeviceStatus } from "src/Enums/SwarmitDeviceStatus.enum";
 import { SwarmitDeviceInfo, SwarmitProtocol, SwarmitStatus } from "src/Protocols/Swarmit/Swarmit.Protocol";
+import { Protocol } from "src/Protocols/Protocol";
 
 // Registro do que a malha SwarmIT está reportando, mais a política de quando
 // dar START. Fica fora do adapter de propósito: nada de Nest nem de serial
@@ -55,11 +56,13 @@ export class SwarmitFleet {
     constructor(private readonly options: SwarmitFleetOptions = SWARMIT_FLEET_DEFAULTS) {}
 
     // Endereço sempre em MAIÚSCULAS: é como o swarmit chaveia (addr_to_hex) e
-    // como a tabela do CLI imprime. O parse do header Mari devolve minúsculas,
-    // e o `-d` do swarmit compara string sem normalizar - foi assim que um
-    // endereço em caixa baixa virou "No device to start" em silêncio.
+    // como a tabela do CLI imprime. O parse do header Mari já devolve assim
+    // (Protocol.normalizeAddress); normalizar de novo aqui protege quem chamar
+    // com endereço digitado à mão - o `-d` do swarmit compara string sem
+    // normalizar, e foi assim que um endereço em caixa baixa virou "No device
+    // to start" em silêncio.
     private static key(address: string): string {
-        return address.toUpperCase();
+        return Protocol.normalizeAddress(address);
     }
 
     onStatus(address: string, status: SwarmitStatus, now: number = Date.now()): SwarmitNode {

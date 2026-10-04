@@ -1,7 +1,9 @@
 import { ApiProperty } from "@nestjs/swagger";
+import { Transform } from "class-transformer";
 import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, Min } from "class-validator";
 import { RobotApplication } from "src/Enums/RobotApplication.enum";
 import { RobotControlMode } from "src/Enums/RobotControlMode.enum";
+import { Protocol } from "src/Protocols/Protocol";
 
 /**
  * Campos aceitos ao registrar um robô via API. Campos calculados/geridos
@@ -13,6 +15,7 @@ export class RobotCreateDto {
         description: "Endereço físico do rádio (hex) - chave real do protocolo",
         example: "0000000000000001",
     })
+    @Transform(({ value }) => typeof value === "string" ? Protocol.normalizeAddress(value) : value)
     @IsString({ message: "O endereço deve ser uma string" })
     @IsNotEmpty({ message: "O endereço não pode ser vazio" })
     @MaxLength(16, { message: "O endereço deve ter no máximo 16 caracteres" })

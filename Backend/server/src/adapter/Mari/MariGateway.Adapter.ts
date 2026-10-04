@@ -128,7 +128,7 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
         const packet = mari.payload;
         if (packet.length < 1) return;
 
-        const address = mari.header.source.toUpperCase();
+        const address = mari.header.source;
 
         if (packet[0] === SwarmitPayloadType.SWARMIT_STATUS) {
             const status = SwarmitProtocol.parseStatus(packet);

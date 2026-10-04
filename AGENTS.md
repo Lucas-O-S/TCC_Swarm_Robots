@@ -1078,6 +1078,14 @@ da frota e o auto-cadastro cria os robôs. Conferir em `GET /robots/:address/sta
   recalculada o tempo todo a partir de `lastSync`, não escolhida.
 - Não confundir `uuid` (chave interna do Postgres) com `address` (chave
   física do protocolo) - frames de rádio são endereçados por `address`.
+- Não gravar nem comparar `address` sem passar por `Protocol.normalizeAddress`
+  (ou `Protocol.readAddress`, ao ler dos bytes). A forma canônica é hex em
+  **MAIÚSCULAS** (igual swarmit/CLI). O `toString(16)` devolve minúsculas e o
+  Postgres compara com caixa: antes disso, robô cadastrado em maiúsculas não
+  casava com o que chegava da rede, o auto-cadastro criava uma duplicata em
+  minúsculas e o status ia pra ela. O banco tem `CHECK robots_address_upper`;
+  bancos antigos precisam rodar `database/sql/migrate_address_uppercase.sql`
+  (funde as duplicatas e converte).
 - Não adicionar coluna de FK sem o par `@ForeignKey`/`@BelongsTo` (ou
   `@HasMany` do outro lado) - é o padrão usado no `ApiGameHit`, seguir aqui
   também.
