@@ -68,11 +68,11 @@ export class RobotController extends BaseController<RobotModel> {
         return this.robotService.sendCommand(address, PayloadType.CMD_RGB_LED, Command.RgbLed, dto);
     }
 
-    /** Alterna o modo de controle do robô (Manual/Auto). */
+    /** Troca o modo de controle (Manual/Auto/SemiAuto): grava no banco e para o robô. */
     @Put(':address/control-mode')
     @ApiBody(ControlModeSchema)
     async controlMode(@Param('address') address: string, @Body() dto: ControlModeDto) {
-        return this.robotService.sendCommand(address, PayloadType.CONTROL_MODE, Command.ControlMode, dto);
+        return this.robotService.setControlMode(address, dto.mode);
     }
 
     /** Envia uma lista de waypoints (LH2) para o robô seguir. */

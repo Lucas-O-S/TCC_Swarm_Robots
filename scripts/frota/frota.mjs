@@ -77,7 +77,7 @@ comandos:
   girar      --speed N             gira no proprio eixo
   stop                              move-raw com tudo em 0 (para a frota)
   rgb        --red --green --blue   cor do LED p/ todos (0..255)
-  mode       --mode                 control-mode p/ todos (0=Manual, 1=Auto)
+  mode       --mode                 control-mode p/ todos (0=Manual, 1=Auto, 2=SemiAuto)
   waypoints  --threshold --points "x,y;x,y;..."   rota (igual) p/ todos
   quadrados  --size --gap --threshold [--cols --x0 --y0]   quadradinho por robô,
                                     cada um na SUA célula (não se batem)

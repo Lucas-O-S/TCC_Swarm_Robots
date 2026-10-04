@@ -8,6 +8,9 @@ import { PayloadType } from 'src/Enums/PayloadType.enum';
 import { Command } from 'src/Enums/Command.enum';
 import { PayloadSelector } from 'src/Protocols/PayloadSelector';
 import { PayloadCoder } from 'src/Protocols/Wrappers/PayloadProtocol';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { RobotControlMode } from 'src/Enums/RobotControlMode.enum';
+import { EventsCommands } from 'src/Enums/Events.Enum';
 
 /**
  * CRUD básico (create/getOne/getAll/update/remove) vem do BaseService; aqui
@@ -21,6 +24,7 @@ export class RobotService extends BaseService<RobotModel> {
     constructor(
         private readonly robotRepository: RobotRepository,
         @Inject(GATEWAY_ADAPTER) private readonly gateway: GatewayAdapter,
+        private readonly events: EventEmitter2,
     ) {
         super(robotRepository);
     }
@@ -65,6 +69,23 @@ export class RobotService extends BaseService<RobotModel> {
         await this.requireByAddress(address);
         this.dispatch(address, payloadType, payload);
         return { address, command, payload };
+    }
+
+    /**
+     * O modo é regra do backend (quem pode comandar o robô), então a fonte da
+     * verdade é robots.mode. No firmware DotBot 1.22.0 o CONTROL_MODE só para
+     * os motores e aborta os waypoints (o valor é ignorado), e o `mode` do
+     * advertisement vai zerado - não dá pra ler o modo de volta do robô.
+     * Como o robô para, a task em andamento é solta via evento (Orchestrator).
+     */
+    async setControlMode(address: string, mode: RobotControlMode) {
+        const robot = await this.requireByAddress(address);
+        // SemiAuto não existe no robô: pra ele é Auto (segue waypoints).
+        const wireMode = mode === RobotControlMode.Manual ? RobotControlMode.Manual : RobotControlMode.Auto;
+        this.dispatch(robot.address, PayloadType.CONTROL_MODE, { mode: wireMode });
+        await this.update(robot.uuid, { mode });
+        this.events.emit(EventsCommands.modeChanged, { address: robot.address, mode });
+        return { address: robot.address, command: Command.ControlMode, payload: { mode } };
     }
 
     async getFreeRobots(): Promise<RobotModel[] | null> {

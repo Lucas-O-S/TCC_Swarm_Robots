@@ -29,7 +29,7 @@ node frota.mjs girar  --speed 100                    # gira no proprio eixo
 node frota.mjs move-raw --left_y 100 --right_y 100   # equivalente ao "frente"
 node frota.mjs stop                                  # move-raw tudo em 0
 node frota.mjs rgb --red 255 --green 0 --blue 0
-node frota.mjs mode --mode 1                         # 0=Manual, 1=Auto
+node frota.mjs mode --mode 1                         # 0=Manual, 1=Auto, 2=SemiAuto
 node frota.mjs waypoints --threshold 100 --points "1000,2000;1500,300"
 node frota.mjs move-raw --body '{"left_x":100,"left_y":0,"right_x":0,"right_y":0}'
 ```
@@ -62,7 +62,7 @@ chmod +x frota.sh
 | --------------- | ----------------------------------- | ----------------------------------------------- |
 | `move-raw`      | `PUT /robots/:address/move-raw`     | `{left_x, left_y, right_x, right_y}` (−128..127) |
 | `rgb` / rgb-led | `PUT /robots/:address/rgb-led`      | `{red, green, blue}` (0..255)                    |
-| `mode`          | `PUT /robots/:address/control-mode` | `{mode}` (0=Manual, 1=Auto)                      |
+| `mode`          | `PUT /robots/:address/control-mode` | `{mode}` (0=Manual, 1=Auto, 2=SemiAuto)          |
 | `waypoints`     | `PUT /robots/:address/waypoints`    | `{threshold, waypoints:[{x,y}]}`                 |
 | `assign`        | `PUT /orchestrator/robots/:address/assign` | `{taskId}`                              |
 

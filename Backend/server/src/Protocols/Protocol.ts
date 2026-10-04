@@ -16,6 +16,22 @@ export class Frame  {
 
 export class Protocol{
 
+    /**
+     * Forma canônica do `address` em todo o backend (banco, Map do
+     * SwarmService, rotas): hex em MAIÚSCULAS, como o swarmit/CLI imprime.
+     * O toString(16) devolve minúsculas, e o Postgres compara com caixa - um
+     * robô cadastrado em maiúsculas não casava com o que chegava da rede e o
+     * auto-cadastro criava uma duplicata em minúsculas.
+     */
+    static normalizeAddress(address: string): string {
+        return address.toUpperCase();
+    }
+
+    /** Lê um endereço de 8 bytes (little-endian) já na forma canônica. */
+    static readAddress(buffer: Buffer, offset: number): string {
+        return Protocol.normalizeAddress(buffer.readBigUInt64LE(offset).toString(16).padStart(16, "0"));
+    }
+
     static buildHeader(
         destination : string,
         version : number = 1,
