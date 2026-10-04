@@ -1,10 +1,12 @@
 
 
 /**
- * 0 e 1 batem com o ControlModeType do protocolo/firmware DotBot
- * (MANUAL = 0, AUTO = 1) - é o valor que vai no pacote CONTROL_MODE e que o
- * robô devolve no campo `mode` do advertisement. SemiAuto (2) só existe no
- * backend: nunca é enviado ao robô.
+ * Regra do BACKEND sobre quem pode comandar o robô; a fonte da verdade é
+ * robots.mode, não o robô. 0 e 1 batem com o ControlModeType do protocolo
+ * (MANUAL = 0, AUTO = 1), mas no firmware DotBot 1.22.0 isso não é um modo
+ * configurável: o CONTROL_MODE só para os motores (valor ignorado), o robô
+ * entra em Auto sozinho ao receber waypoints, e o `mode` do advertisement vai
+ * zerado. SemiAuto (2) só existe aqui: nunca é enviado ao robô.
  */
 export enum RobotControlMode {
     /** Humano dirige no joystick; o orquestrador não mexe. */

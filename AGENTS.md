@@ -205,7 +205,9 @@ separação em módulos NestJS:
     2=SemiAuto - ver "Objetivo" acima; o CHECK em `robots.mode` é 0..2).
     0/1 batem com o `ControlModeType` do firmware (MANUAL=0, AUTO=1) - já
     esteve invertido (0=Auto) e foi corrigido. SemiAuto é só do backend,
-    nunca vai no pacote (`control-mode` só aceita 0/1).
+    nunca vai no pacote (o `control-mode` aceita 0/1/2, mas manda 2 como 1).
+    O modo é regra do backend, fonte da verdade = `robots.mode` - ver
+    "Troca de modo (control-mode)" abaixo.
   - `Enums/PositionSource.enum.ts` - de onde veio uma amostra de posição
     (LH2 vs GPS), decidido pelo tipo de payload recebido.
 - `src/Model/` - persistência (Sequelize). Guarda só o que faz sentido durar
@@ -497,6 +499,23 @@ quem detecta de quem age:
 o loop automático, mas disparado por humano: valida (robô existe, não é Manual,
 está livre), pega a task com waypoints, manda o comando e grava `taskId` +
 `InProgress`. Reusa o `sendCommandToRobot` do próprio service.
+
+**Troca de modo (control-mode)**: no firmware que está no robô (DotBot-firmware
+1.22.0, `apps-sandbox/dotbot/main.c`) o modo **não é configurável**: o pacote
+`CONTROL_MODE` só para os motores (o valor é ignorado), o robô entra em Auto
+sozinho ao receber `LH2_WAYPOINTS` (e volta pra Manual ao terminar ou com lista
+vazia), e no advertisement os campos `mode`, `waypoint_idx`, pwm e encoders vão
+**zerados** (placeholder). Por isso o modo 0/1/2 é só regra do backend (quem
+pode comandar o robô) e a fonte da verdade é `robots.mode` - NUNCA gravar o
+`mode` do advertisement (zeraria a frota). `PUT /robots/:address/control-mode`
+(`RobotService.setControlMode`): manda o `CONTROL_MODE` (SemiAuto vai como 1)
+como "pare", grava `robots.mode` e emite `robot.mode.changed`; o
+`OrchestratorListener` solta a task em andamento de volta pra fila (o robô parou,
+os waypoints foram abortados). Consequência do firmware 1.22.0: como o
+`waypoint_idx` vem sempre 0, a regra de conclusão do `onAdvertisement` nunca
+dispara. A release 1.25.0 preenche `mode`/`waypoint_idx` (prefixo do
+advertisement igual ao nosso decoder), mas o `LH2_WAYPOINTS` ganhou `batch_id` -
+conferir o encoder antes de atualizar o robô.
 
 **Bugs corrigidos junto** (auditoria): `handleRobotLost` chamava a si mesmo
 (recursão infinita) - era pra chamar `handleLostRobot`; o `OrchestratorListener`

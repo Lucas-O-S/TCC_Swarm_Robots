@@ -198,6 +198,25 @@ export class OrchestratorService implements OnModuleInit {
     }
 
 
+    /**
+     * Troca de modo para o robô (o CONTROL_MODE aborta os waypoints no
+     * firmware), então a task que ele executava volta pra fila.
+     */
+    async onModeChanged(payload : {address : string}) : Promise<void>{
+
+        const robot = await this.robotService.getByAddress(payload.address);
+
+        if (!robot || !robot.taskId){
+            return
+        }
+
+        const taskId = robot.taskId;
+
+        await this.resetTask(robot);
+
+        console.log(`[ORQ] robô ${payload.address} trocou de modo → task ${taskId} voltou pra fila`);
+    }
+
     private async resetTask(robot : RobotModel) : Promise<void>{
        
         const taskId : string = robot.taskId ?? "";
