@@ -522,9 +522,10 @@ como "pare", grava `robots.mode` e emite `robot.mode.changed`; o
 `OrchestratorListener` solta a task em andamento de volta pra fila (o robô parou,
 os waypoints foram abortados). Consequência do firmware 1.22.0: como o
 `waypoint_idx` vem sempre 0, a regra de conclusão do `onAdvertisement` nunca
-dispara. A release 1.25.0 preenche `mode`/`waypoint_idx` (prefixo do
-advertisement igual ao nosso decoder), mas o `LH2_WAYPOINTS` ganhou `batch_id` -
-conferir o encoder antes de atualizar o robô.
+dispara. As releases novas preenchem `mode`/`waypoint_idx` (prefixo do
+advertisement igual ao nosso decoder), mas o formato do `LH2_WAYPOINTS` mudou a
+partir da **1.24.0** (não da 1.25.0 como estava anotado antes) - conferir o encoder
+antes de atualizar o robô. Detalhes e matriz de versões em "Lighthouse (LH2)" abaixo.
 
 **Bugs corrigidos junto** (auditoria): `handleRobotLost` chamava a si mesmo
 (recursão infinita) - era pra chamar `handleLostRobot`; o `OrchestratorListener`
@@ -616,8 +617,77 @@ dependência real, cada bloco precisa do anterior:
   **RobotSwarmSimulator** (guia completo em "Conexão com o RobotSwarmSimulator" abaixo —
   é o caminho pra rodar API + frota simulada sem hardware); (b) testar o transporte
   **Mari** com o gateway FÍSICO (código pronto, ver Passo 4.3); (c) **frontend** (ver
-  SIMULADOR_PLANO.md); (d) recarga (adiada, ver "Adiado"); (e) gate de calibração LH2 na
-  gravação de posição.
+  SIMULADOR_PLANO.md); (d) recarga (adiada, ver "Adiado"); (e) suporte a lighthouse
+  (calibração, homografia, gate de posição/atribuição - ver "Lighthouse (LH2)" abaixo).
+
+### Lighthouse (LH2) - o que falta pra funcionar - PENDENTE
+
+Levantado em 2026-10-04 contra o PyDotBot `main` (0.32.0). **Hoje o backend não
+sabe se existe lighthouse**: não há entidade/config de base station; só infere pelo
+advertisement. O que existe: decode do `calibrated` (bitmask bit0=LH1, bit1=LH2) e
+de `pos_x/pos_y`; descarte do sentinela `0xFFFFFFFF` no `persistPosition`; decoder
+do `LH2_PROCESSED_DATA` (só índices crus, nada vira posição). O que NÃO existe:
+`robots.calibrated` nunca é gravado (fica 0); ninguém lê o `calibrated` pra decidir
+nada; `LH2_CALIBRATION_HOMOGRAPHY` (0x0E) sem encoder; `lh2HomographyCount`/
+`lh2Flags` do status swarmit decodificados mas sem uso; `/waypoints` e Orchestrator
+mandam `LH2_WAYPOINTS` sem checar calibração/posição.
+
+**Consequência hoje (sem base stations)**: robô Auto/SemiAuto recebe a task, vira
+`InProgress`, não anda (firmware sem pose LH2 não fecha a malha) e, como no 1.22.0 o
+`waypoint_idx` vem sempre 0, a task nunca conclui - fica presa até `Lost` ou troca de
+modo. Só `move-raw` (manual) funciona sem lighthouse.
+
+**Matriz de versões** (as três saem juntas; misturar quebra):
+
+| Firmware | `dotbot-libs` | PyDotBot | O que muda pra nós |
+| --- | --- | --- | --- |
+| 1.22.0 (no robô hoje) | ≤ 0.3.0 | ≤ 0.30.0 | formato antigo - é o que nosso encoder/decoder falam; `waypoint_idx`/`mode` zerados |
+| **1.24.0** (2026-09-28) | 0.4.0 (pré-tag) | 0.31.0 | **formato novo do `LH2_WAYPOINTS`** (lotes com pose, `batch_id`, limite de velocidade, relatório de conclusão - PR DotBot-libs#35); advertisement estendido; homografia em float32 (#31); EKF odometria+LH2 |
+| **1.25.0** (2026-10-01) | 0.5.0 | 0.32.0 | modelo pinhole da LH2 - **quebra calibrações antigas** (recalibrar); calibração schema 3; exige **swarmit 0.11.0** gravado antes (apps vão OTA depois) |
+
+Formatos novos (PyDotBot `protocol.py`, 0.32.0):
+- `LH2_WAYPOINTS`: `threshold`(2) `count`(1) `waypoints`(N×8: x,y int32) `batch_id`(1)
+  `heading_tol_deg`(1) `pass_mm`(2) `headings`(N×2, com sinal).
+- `DOTBOT_ADVERTISEMENT`: o prefixo atual + `waypoints_status`(1) `waypoints_reason`(1)
+  `batch_id`(1) `max_speed_10mm`(1) `axle_x`(2) `axle_y`(2). Nosso decoder lê só o
+  prefixo, então não quebra; o encoder de waypoints quebra.
+- `LH2_CALIBRATION_HOMOGRAPHY` (0x0E): `index`(1) + 9 `float32` row-major (36 B) = 37 B.
+
+**Como o PyDotBot faz** (referência):
+- Calibração é **offline**, ferramenta própria (`dotbot/calibration/`): firmware de
+  calibração lendo contagens LH2 pela serial (115200), robô posto em 4 pontos de um
+  quadrado (`--distance`, padrão 500 mm), `cv2.findHomography` por estação. Salva TOML
+  (schema 3) em `~/.dotbot/calibrations/{site}/` com, por estação, `index` +
+  `homography` 3×3 + `residual_mm`, e `valid_mm` (área válida). Avisa se tiver mais de
+  30 dias (`LH2_CALIBRATION_MAX_AGE_DAYS`). Até 16 estações.
+- Manda a homografia quando o robô se conecta e `calibrated` não cobre todas as
+  estações da calibração carregada: 1 payload 0x0E por estação.
+- Só grava posição se o robô está **totalmente calibrado** E é um fix válido
+  (`is_lh2_fix`, fora do sentinela). Trilha a cada 20 mm.
+- Avisa se o robô tem estação que a calibração não cobre (`_warn_unsolved_stations`).
+- Físico: base stations SteamVR 2.0, canais distintos; no DotBot v3 o fotodiodo fica
+  53,5 mm à frente do eixo (a posição é do fotodiodo); `direction` só é confiável
+  depois que o robô anda.
+
+**Plano (ordem sugerida)**:
+1. **Fixar a versão de firmware** (1.22.0 vs 1.24.0 vs 1.25.0) - decide o formato do
+   encoder de waypoints e da homografia. Hoje o 1.22.0 deixa a regra de conclusão morta.
+2. **Carregar a calibração** no backend: reaproveitar o TOML da ferramenta do PyDotBot
+   (não reimplementar a matemática/OpenCV em TS). Arquivo de config ou tabela
+   (`lh2_calibrations` + `lh2_stations`) - decisão pendente.
+3. **Encoder 0x0E**: o `PayloadCodec` só tem inteiros 1/2/4 B - precisa de float32
+   (`writeFloatLE`) ou montar à mão no wrapper (como waypoints). Validar byte a byte
+   contra o PyDotBot.
+4. **Push da homografia** no advertisement quando `calibrated` não cobre as estações
+   carregadas; controlar por address (estilo `knownRobots`) pra não reenviar a cada
+   frame; reenviar pra frota quando carregar calibração nova.
+5. **Persistir `robots.calibrated`** no `refreshAndPersist` (só quando muda).
+6. **Gate de posição**: só gravar LH2 com robô totalmente calibrado + fix válido. (O
+   simulador fake manda `calibrated=0x01`, então não quebra com 1 estação.)
+7. **Gate de atribuição**: `getFreeRobots` e assign manual só entregam task a robô
+   calibrado com posição válida; validar waypoints da task dentro do `valid_mm`.
+
+Itens 5-7 independem da lighthouse física e já resolvem as tasks presas.
 
 ### Adiado: comportamento de recarga (bateria baixa) - DECISÃO DE DESIGN PENDENTE
 
