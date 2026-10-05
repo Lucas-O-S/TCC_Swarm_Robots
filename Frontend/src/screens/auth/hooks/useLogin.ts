@@ -25,7 +25,7 @@ export function useLogin() {
     try {
       // TODO: integrar com authService.login({ username, password }) assim
       // que a rota POST /auth/login estiver ligada no AUTH_ACTIVATED=true.
-      navigate('/dashboard');
+      navigate('/simulacao');
     } finally {
       setLoading(false);
     }

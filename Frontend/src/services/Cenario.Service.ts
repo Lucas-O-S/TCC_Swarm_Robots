@@ -18,7 +18,7 @@ export const CenarioService = {
   /**
    * Mapa fixo (sem persistência) só pra destravar o fluxo de quem depende
    * de "selecionar um mapa existente" enquanto não existe conexão real com
-   * o banco (ver SelectTaskMapModal/TaskBuilder) — mesmo espírito do botão
+   * o banco (ver SelectReadyMapModal/TaskBuilder) — mesmo espírito do botão
    * "Mapas salvos" desabilitado do SelectMapModal, mas com uma opção que
    * de fato funciona pra testar.
    */

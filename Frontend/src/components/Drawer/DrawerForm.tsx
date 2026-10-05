@@ -7,7 +7,7 @@ import styles from './DrawerForm.module.css';
 //   <DrawerBody>
 //     <DrawerField label="Nome"><input /></DrawerField>
 //     <DrawerRow>{dois DrawerField lado a lado}</DrawerRow>
-//     <DrawerHint>…</DrawerHint>
+//     <DrawerHint>…</DrawerHint>   (dentro de um campo: <DrawerFieldHint>)
 //     <DrawerSection title="Comandos" />
 //     <DrawerActions>{botões}</DrawerActions>
 //   </DrawerBody>
@@ -46,9 +46,14 @@ export function DrawerRow({ children, className = '' }: ChildrenProps) {
   return <div className={`${styles.row} ${className}`.trim()}>{children}</div>;
 }
 
-/** Texto de apoio/resumo, pequeno e esmaecido. */
-export function DrawerHint({ children, className = '' }: ChildrenProps) {
-  return <p className={`${styles.hint} ${className}`.trim()}>{children}</p>;
+/** Texto de apoio/resumo, pequeno e esmaecido; `mono` pra endereço/código. */
+export function DrawerHint({ children, className = '', mono = false }: ChildrenProps & { mono?: boolean }) {
+  return <p className={`${styles.hint} ${mono ? styles.mono : ''} ${className}`.trim()}>{children}</p>;
+}
+
+/** Dica curta DENTRO de um DrawerField (span — um <p> não pode ficar dentro do <label>). */
+export function DrawerFieldHint({ children, className = '' }: ChildrenProps) {
+  return <span className={`${styles.fieldHint} ${className}`.trim()}>{children}</span>;
 }
 
 /** Mensagem de erro. */

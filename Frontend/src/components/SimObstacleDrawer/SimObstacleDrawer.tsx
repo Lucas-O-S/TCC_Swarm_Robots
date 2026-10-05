@@ -3,8 +3,8 @@ import { Button } from '../Button/Button';
 import { DrawerBody, DrawerError, DrawerField, DrawerHint, DrawerRow } from '../Drawer/DrawerForm';
 import { ObstacleDrawerBase } from '../ObstacleDrawer/ObstacleDrawerBase';
 import type { ScenarioObstacleModel } from '../../model/Scenario.Model';
-import { useCommitField } from '../../screens/Simulation/useCommitField';
-import { obstacleSelId } from '../../screens/Simulation/useSimSelection';
+import { useCommitField } from '../../screens/Simulation/hooks/useCommitField';
+import { obstacleSelId } from '../../screens/Simulation/hooks/useSimSelection';
 
 interface SimObstacleDrawerProps {
   /** Barreiras do cenário — o drawer filtra sozinho as selecionadas (useMapSelection), como o ObstacleDrawer. */

@@ -11,7 +11,14 @@ protocolo, orquestrador) está no `AGENTS.md` do repositório principal.
 - **Ficar no escopo do pedido.** Se for fazer algo além, perguntar antes. Uma
   mudança que foi além do pedido (padronizar o visual dos drawers) foi
   revertida por ele.
-- **Refatorações e limpezas: uma por vez**, perguntando antes de cada item.
+- **Reutilizar, nunca copiar** (regra do dono, 2026-09-25). Fazer tudo de
+  forma reutilizável sempre que der. Se algo que já existe for servir em outro
+  lugar, adaptar o original pra ser reutilizado (extrair componente, hook ou
+  helper; parametrizar por props) e fazer os dois lugares usarem a mesma peça
+  — nunca duplicar código nem CSS. Adaptar código de outra tela pra reusar faz
+  parte da tarefa e não precisa de pergunta.
+- **Refatorações e limpezas sem relação com a tarefa: uma por vez**,
+  perguntando antes de cada item.
 - **Não fazer commit** sem ele pedir.
 - Respostas em português, diretas.
 
@@ -27,10 +34,14 @@ protocolo, orquestrador) está no `AGENTS.md` do repositório principal.
 
 ## Padrão de pastas (camadas)
 
-- `screens/<Tela>/` — a tela, o hook principal e helpers `use*.ts`, sem subpastas.
+- `screens/<Tela>/` — a tela (`<Tela>.tsx` + CSS) na raiz; componentes só
+  dela em `components/` e hooks em `hooks/` (padrão do `auth` e do
+  `dashboard`). Na Simulação o motor (`Sim*.ts`, `SwarmitDevice`) e no
+  Visualizador o `VisFleet.ts` continuam na raiz da tela.
 - `components/<Nome>/<Nome>.tsx` + `<Nome>.module.css` — cada componente com o
-  seu CSS (repetir `.field`, `.hint` etc. por módulo é o padrão da casa,
-  exceto nos drawers — ver abaixo).
+  seu CSS. Estilo que se repete vira peça compartilhada em vez de ser copiado
+  (ver "Reutilizar, nunca copiar"). Módulos antigos ainda repetem `.field`,
+  `.hint` etc.; ao mexer num deles, trocar pela peça compartilhada.
 - `enums/*.enum.ts` (espelho do backend), `model/*.Model.ts` (interfaces
   terminam em `Model`), `services/*.Service.ts` (objeto literal),
   `mapper/*.Mapper.ts`, `Consts/`, `Integration/`, `hooks/`.
@@ -60,11 +71,13 @@ lógica do projeto **RobotSwarmSimulator** portada.
 
 Onde fica cada peça:
 
-- `screens/Simulation/` — `Simulation.tsx` (tela), `useSimulation.ts` (ponte
-  motor ↔ React), `SimulationMap`/`SimRobotMarker`/`SimOverlay`, o motor
+- `screens/Simulation/` — `Simulation.tsx` (tela) e o motor na raiz
   (`SimWorld`, `SimRobot`, `SimPhysics`, `SimWaypoints`, `SimLoop`,
-  `SimGateway`, `SimNetModel`, `SwarmitDevice`) e helpers (`useScenarioEditor`,
-  `useMapGeometry`, `useSimSelection`, `useCommitField`).
+  `SimGateway`, `SimNetModel`, `SwarmitDevice`); `components/`
+  (`SimulationMap`, `SimRobotMarker`, `SimOverlay`, `SimRobotsLayer`) e
+  `hooks/` (`useSimulation` = ponte motor ↔ React, `useScenarioEditor`,
+  `useMapGeometry`, `useSimSelection`, `useCommitField`, `useRouteDraft`,
+  `useTrails`).
 - `components/` — `SimulationControls` (header do topo), `SimRobotDrawer`
   (Simular), `SimRobotEditDrawer` (Editar), `SimObstacleDrawer`,
   `SimRobotList`/`SimRobotCard`, `SimTaskPanel`, `NetworkPanel`,
@@ -89,7 +102,7 @@ Onde fica cada peça:
 - **Offline.** Ainda não há API: o gateway simulado conversa com o
   `LocalFleetLink`, que faz o papel do backend. Ele marca o robô como Active
   (menos de 5 s sem telemetria), Inactive (5–60 s) ou Lost (mais de 60 s).
-  Pra ligar na API, trocar pelo `MqttFleetLink` em `useSimulation.ts`; o
+  Pra ligar na API, trocar pelo `MqttFleetLink` em `hooks/useSimulation.ts`; o
   contrato é o mesmo. O botão "Conectar à API" fica desabilitado.
 - **Unidades:** mundo em mm com Y pra cima e origem no canto inferior
   esquerdo; conversão pra px só em `useMapGeometry.ts`. 1 célula = 200 mm
@@ -148,7 +161,7 @@ Onde fica cada peça:
 ### Peças compartilhadas (limpeza de duplicados, feita item a item)
 
 - `clamp` exportada do `SimPhysics.ts`.
-- `num` (lê campo numérico) em `components/SimRobotDrawer/numInput.ts`.
+- `num` (lê campo numérico) em `components/Drawer/numInput.ts`.
 - `SimRobotMapper.statusLabel()` pros rótulos Active/Inactive/Lost.
 - `useCommitField` (campo que confirma no blur/Enter e volta o valor se der
   erro): nome da barreira e endereço do robô.
@@ -161,6 +174,19 @@ Onde fica cada peça:
   `SimObstacleDrawer` (Simulação, em mm). Os campos continuam com cada um.
 - `RobotPath` ganhou `units`, `from`, `reachedCount` e `markers`. O padrão
   continua igual pro TaskBuilder e pro MapTestScreen.
+- Usadas pela Simulação e pelo Visualizador (nada copiado entre as duas):
+  - `components/`: `StatusLine`, `KeyValueList`, `ProgressBar`, `ColorInput`,
+    `MapPlaceholder`, `HeaderBar` (+ tipo `Notice`), `ManualDrive`
+    (+ `joystickDrive.ts`), `RobotModeField`, `RouteDraftSection`,
+    `RobotTaskSection`, `LedControl`, `RobotCard`, `RobotList`, `TaskPanel` e
+    `SelectReadyMapModal` (também no TaskBuilder);
+  - `DrawerForm`: `DrawerHint mono` e `DrawerFieldHint`;
+  - `Integration/LinkLog.ts` (log do GatewayLog: LocalFleetLink e VisFleet);
+  - `screens/Simulation/`: `useTrails` (`pushTrailPoint`), `useRouteDraft`,
+    `SimRobotsLayer` (robôs, rastros, rotas e rascunho no mapa),
+    `useMapGeometry` (`screenTheta`, `clampPointToArena`, `cellPointToWorld`),
+    `useSimSelection` (`useStickyFocus`);
+  - `SimRobot.Mapper.statusSummary` e `TaskMapper.routePoints`.
 
 ### Drawers unificados
 
@@ -190,6 +216,77 @@ imitando as outras telas) tinha sido revertida por ele.
     ferramentas.
 - O cenário só guarda modo inicial Manual/Auto (Semi-auto só durante a
   simulação).
+
+## Tela do Visualizador (`/visualizador`)
+
+Pedido do dono (2026-09-25): parecida com a Simulação, mas sem customização e
+sem simular nada. Roda ligada na rede, só com cenário pronto e só com os robôs
+que vierem da API, que dá pra acompanhar e comandar do mesmo jeito que na
+Simulação. **Por enquanto é só a tela**: a conexão com a API ainda não existe
+(pedido do dono: deixar as portas abertas, sem implementar a conexão).
+
+Onde fica cada peça:
+
+- `screens/Visualizer/` — `Visualizer.tsx` (tela), `hooks/useVisualizer.ts`
+  (ponte API ↔ React), `VisFleet.ts` (a frota como a API mostra, fora do
+  React: registro, telemetria, rastro, tarefas e log) e
+  `components/VisualizerMap.tsx` (mapa).
+- `components/` — `VisualizerControls` (header), `VisRobotList` e
+  `VisRobotDrawer`, montados com as peças compartilhadas listadas em "Peças
+  compartilhadas" da Simulação (`RobotList`, `RobotCard`, `TaskPanel`,
+  `ManualDrive`, `SelectReadyMapModal`, `SimRobotsLayer`, `GatewayLog` como log
+  da API etc.).
+- `Integration/ApiLink.ts` (contrato) + `Integration/DisconnectedApiLink.ts`
+  (o link que não conecta), `enums/SocketEvents.enum.ts` (espelho do backend),
+  `model/RobotTelemetry.Model.ts`, `model/VisRobot.Model.ts` e
+  `mapper/VisRobot.Mapper.ts`.
+
+### Decisões
+
+- **Porta pra API:** tudo passa pelo `ApiLink` (o papel do FleetLink na
+  Simulação). Hoje é o `DisconnectedApiLink`: avisa "sem conexão", não emite
+  evento e todo comando volta com erro, então a tela abre só com o mapa, sem
+  robôs. Pra ligar, é escrever a implementação real (REST pelo `Callout` +
+  socket.io nos eventos `robot:update`/`robot:status`/`robot:new` do
+  `RobotWebsockets`) e trocar a linha marcada em `hooks/useVisualizer.ts`. As rotas e
+  os eventos estão no contrato, conferidos no backend. Vai precisar do
+  `socket.io-client`, que ainda não está instalado.
+- **Cenário:** só pronto. "Salvos" fica desabilitado (a API não tem rota de
+  cenário, só os models `Cenario`/`Obstacle`); a única opção é o mapa mock do
+  Construtor, sem robôs.
+- **Blocos como na tela de gerar mapa** (escolha do dono): cenário em células,
+  célula esticando pra preencher a altura (`fitWidth` + `maxHeight`) e
+  obstáculos por célula. A telemetria (mm, Y pra cima) vira px pela escala de
+  cada eixo, e a seta do robô é corrigida pro esticamento (`screenTheta` no
+  `useMapGeometry`) pra apontar pra onde ele anda na tela. No celular o mapa
+  passa da largura, igual ao Construtor e às Tarefas.
+- **Robôs:** só os da API (`GET /robots` + `robot:new`), com rótulos R1, R2…
+  na ordem em que aparecem. Pose, rumo (`direction`; -1 = sem leitura),
+  bateria (mV) e modo do fio vêm do advertisement; posição `0xFFFFFFFF` = sem
+  localização (o robô só aparece na lista). O status é o que o backend calcula
+  (`robot:status`). O endereço vai como a API devolve (hex minúsculo).
+- **Drawer** = o do modo Simular sem o que é do mundo simulado
+  (derrubar/religar, swarmit):
+  - Modo (Manual/Semi-auto/Auto) → `PUT /robots/:address/control-mode`;
+  - Manual: joystick (CMD_MOVE_RAW a 20 Hz pela API, usando o rumo da
+    telemetria) + rota avulsa (`PUT /robots/:address/waypoints`);
+  - Semi-auto: escolher tarefa pendente + Atribuir
+    (`PUT /orchestrator/robots/:address/assign`). Cancelar/Trocar no meio não
+    existem na API;
+  - Auto: só acompanhar;
+  - raio de chegada (`PUT /robots/:uuid`) e LED (`PUT /robots/:address/rgb-led`).
+- **Rota desenhada:** a da tarefa (quando a API mandar os pontos) ou a última
+  avulsa mandada desta tela; sem nenhuma, só o alvo atual do advertisement.
+
+### Pendências
+
+- Backend (achado ao montar a tela): a rota `control-mode` existe, mas não foi
+  implementada. Ela só manda o byte pro robô, cru (Auto=0 vira MANUAL no
+  firmware; Semi-auto=2 não existe no fio), e não grava `robots.mode`; o
+  `RobotUpdateDto` também não aceita `mode`. Resultado: todo robô continua
+  Manual pro orquestrador.
+- Backend: `GET /tasks` não inclui os waypoints (o `getAll` não faz include),
+  então o mapa não desenha a rota da tarefa e não dá pra filtrar "tem pontos".
 
 ## Ambiente (Cowork)
 

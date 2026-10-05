@@ -13,7 +13,7 @@ import { Robot } from "../../components/Robot/RobotProp";
 import { RobotStatus } from "../../enums/RobotStatus.enum";
 import { WaypointDrawer } from "../../components/WaypointDrawer/WaypointDrawer";
 import { AreaDrawer } from "../../components/AreaDrawer/AreaDrawer";
-import { SelectTaskMapModal } from "../../components/SelectTaskMapModal/SelectTaskMapModal";
+import { SelectReadyMapModal } from "../../components/SelectReadyMapModal/SelectReadyMapModal";
 import { Button } from "../../components/Button/Button";
 import { TaskService } from "../../services/Task.Service";
 import { CenarioService } from "../../services/Cenario.Service";
@@ -24,11 +24,11 @@ import {
   createWaypointFromRect,
   flattenRoute,
   moveAreaCorner,
-} from "./useTaskEditor";
-import type { AreaCorner, AreaTraversalSettings, TaskStopDraft, TaskWaypointDraft } from "./useTaskEditor";
-import { useTaskRobot } from "./useTaskRobot";
-import type { PathPoint, Wall } from "./useTaskRobot";
-import { TaskRobot } from "./TaskRobot";
+} from "./hooks/useTaskEditor";
+import type { AreaCorner, AreaTraversalSettings, TaskStopDraft, TaskWaypointDraft } from "./hooks/useTaskEditor";
+import { useTaskRobot } from "./hooks/useTaskRobot";
+import type { PathPoint, Wall } from "./hooks/useTaskRobot";
+import { TaskRobot } from "./components/TaskRobot";
 import styles from "./TaskBuilder.module.css";
 
 const AREA_COLOR = "var(--color-yellow)";
@@ -46,7 +46,7 @@ type SaveState = { status: "idle" | "saving" | "error" | "success"; message?: st
 // <Waypoint>). Diferente do CenarioBuilder: a rota precisa saber o tamanho
 // do grid e os obstáculos de um mapa já existente (pra desviar deles), então
 // selecionar um mapa é obrigatório antes de liberar o mapa — ver
-// SelectTaskMapModal. Sem conexão com o banco ainda, a única opção é o mock
+// SelectReadyMapModal. Sem conexão com o banco ainda, a única opção é o mock
 // (CenarioService.createMockMap).
 export function TaskBuilder() {
   const [mapConfig, setMapConfig] = useState<MapModel | null>(null);
@@ -161,7 +161,16 @@ export function TaskBuilder() {
 
   return (
     <>
-      <SelectTaskMapModal open={mapConfig === null} onSelectMock={handleSelectMockMap} />
+      <SelectReadyMapModal
+        open={mapConfig === null}
+        title="Selecionar mapa da task"
+        description="A rota é desenhada em cima de um mapa (tamanho do grid e obstáculos a evitar) — selecione um antes de continuar."
+        savedTitle="Mapas salvos"
+        savedEmptyText="Nenhum mapa disponível — a conexão com o banco de dados ainda não foi implementada."
+        savedButtonLabel="Selecionar mapa"
+        mockText="Sem conexão com o banco ainda — use um mapa fixo (com alguns obstáculos de exemplo) pra testar a tela."
+        onSelectMock={handleSelectMockMap}
+      />
 
       <MapMenuLayout
         menu={

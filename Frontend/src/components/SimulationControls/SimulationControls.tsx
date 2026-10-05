@@ -1,15 +1,12 @@
 import { useRef } from 'react';
 import type { ChangeEvent } from 'react';
 import { Button } from '../Button/Button';
-import { Card } from '../Card/Card';
+import { HeaderBar, HeaderGroup, HeaderLabel, HeaderNotice, HeaderRow } from '../HeaderBar/HeaderBar';
+import type { Notice } from '../HeaderBar/HeaderBar';
 import { Segmented } from '../Segmented/Segmented';
-import type { SimMode } from '../../screens/Simulation/useSimulation';
+import { StatusLine, StatusSep } from '../StatusLine/StatusLine';
+import type { SimMode } from '../../screens/Simulation/hooks/useSimulation';
 import styles from './SimulationControls.module.css';
-
-export interface Notice {
-  kind: 'error' | 'info';
-  text: string;
-}
 
 interface SimulationControlsProps {
   scenarioName: string;
@@ -37,11 +34,10 @@ const EDIT_HINT =
 const API_HINT =
   'A conexão com a API ainda não foi implementada — o gateway simulado conversa com um backend local, que recebe a telemetria e manda os comandos pelos drawers dos robôs. Quando o backend estiver no ar, é trocar o LocalFleetLink pelo MqttFleetLink (mesmo contrato).';
 
-// Header da Simulação (barra no topo, acima do mapa e do menu) — o papel da
+// Header da Simulação (HeaderBar, acima do mapa e do menu) — o papel da
 // barra do topo do RobotSwarmSimulator, em duas faixas:
 //   1. cenário + Trocar + Editar/Simular | Importar/Exportar;
 //   2. Pausar/Reiniciar + relógio/rede (ou resumo do Editar) | API.
-// Cada faixa quebra de linha quando a tela é estreita.
 export function SimulationControls({
   scenarioName,
   onRename,
@@ -73,11 +69,11 @@ export function SimulationControls({
   }
 
   return (
-    <Card className={styles.header}>
-      <div className={styles.row}>
-        <div className={styles.group}>
+    <HeaderBar>
+      <HeaderRow>
+        <HeaderGroup>
           <label className={styles.nameField}>
-            <span className={styles.label}>Cenário</span>
+            <HeaderLabel>Cenário</HeaderLabel>
             <input type="text" value={scenarioName} onChange={(e) => onRename(e.target.value)} aria-label="Nome do cenário" />
           </label>
           <Button variant="outline" onClick={onChangeScenario}>
@@ -92,9 +88,9 @@ export function SimulationControls({
               { value: 'sim', label: 'Simular', title: 'Roda o cenário do zero em tempo real' },
             ]}
           />
-        </div>
+        </HeaderGroup>
 
-        <div className={styles.group}>
+        <HeaderGroup>
           <Button variant="outline" onClick={() => fileInputRef.current?.click()} title="Carrega um cenário .json (mesmo formato do RobotSwarmSimulator)">
             Importar .json
           </Button>
@@ -107,50 +103,51 @@ export function SimulationControls({
             </Button>
           )}
           <input ref={fileInputRef} type="file" accept="application/json,.json" className={styles.hiddenInput} onChange={handleFileChange} />
-        </div>
-      </div>
+        </HeaderGroup>
+      </HeaderRow>
 
-      <div className={`${styles.row} ${styles.runRow}`}>
+      <HeaderRow divided>
         {simulating ? (
-          <div className={styles.group}>
+          <HeaderGroup>
             <Button variant="accent" onClick={onTogglePlay} className={styles.playButton}>
               {playing ? 'Pausar' : 'Retomar'}
             </Button>
             <Button variant="outline" onClick={onReset} title="Recarrega o cenário do zero (rede volta aos valores do cenário)">
               Reiniciar
             </Button>
-            <span className={styles.status}>
-              <span className={`${styles.dot} ${playing ? styles.dotOn : styles.dotWarn}`} />
+            <StatusLine inline tone={playing ? 'on' : 'warn'}>
               {playing ? 'rodando' : 'pausado'}
-              <span className={styles.sep}>·</span>t = {time.toFixed(1)} s<span className={styles.sep}>·</span>
-              {tickHz} Hz<span className={styles.sep}>·</span>
+              <StatusSep />t = {time.toFixed(1)} s<StatusSep />
+              {tickHz} Hz
+              <StatusSep />
               {onlineCount}/{robotCount} na rede
-            </span>
-          </div>
+            </StatusLine>
+          </HeaderGroup>
         ) : (
-          <div className={styles.group}>
-            <span className={styles.status} title={EDIT_HINT}>
-              <span className={`${styles.dot} ${styles.dotWarn}`} />
-              editando o estado inicial<span className={styles.sep}>·</span>
-              {arena.width}×{arena.height} mm<span className={styles.sep}>·</span>
-              {robotCount} robô(s)<span className={styles.sep}>·</span>
+          <HeaderGroup>
+            <StatusLine inline tone="warn" title={EDIT_HINT}>
+              editando o estado inicial
+              <StatusSep />
+              {arena.width}×{arena.height} mm
+              <StatusSep />
+              {robotCount} robô(s)
+              <StatusSep />
               {obstacleCount} barreira(s)
-            </span>
-          </div>
+            </StatusLine>
+          </HeaderGroup>
         )}
 
-        <div className={styles.group}>
-          <span className={styles.status} title={API_HINT}>
-            <span className={styles.dot} />
+        <HeaderGroup>
+          <StatusLine inline tone="muted" title={API_HINT}>
             API: offline · backend local
-          </span>
+          </StatusLine>
           <Button variant="outline" disabled title={API_HINT}>
             Conectar à API
           </Button>
-        </div>
-      </div>
+        </HeaderGroup>
+      </HeaderRow>
 
-      {notice && <p className={notice.kind === 'error' ? styles.error : styles.success}>{notice.text}</p>}
-    </Card>
+      {notice && <HeaderNotice kind={notice.kind}>{notice.text}</HeaderNotice>}
+    </HeaderBar>
   );
 }

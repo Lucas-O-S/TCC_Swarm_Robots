@@ -59,6 +59,16 @@
   line-height: 1.45;
 }
 
+.mono {
+  font-family: var(--font-mono);
+}
+
+.fieldHint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
 .error {
   font-size: 12px;
   color: var(--color-red);

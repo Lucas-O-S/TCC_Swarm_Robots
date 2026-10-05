@@ -53,6 +53,12 @@ function statusLabel(status: RobotStatus): string {
   return STATUS_LABEL[status];
 }
 
+/** "2 Active · 0 Inactive · 1 Lost" — contagem por status (null = ainda não cadastrado, fica de fora). */
+function statusSummary(statuses: readonly (RobotStatus | null)[]): string {
+  const count = (s: RobotStatus) => statuses.filter((x) => x === s).length;
+  return `${count(RobotStatus.Active)} Active · ${count(RobotStatus.Inactive)} Inactive · ${count(RobotStatus.Lost)} Lost`;
+}
+
 function modeLabel(mode: number, loop: boolean): string {
   if (mode !== DotBotControlMode.Auto) return 'MANUAL';
   return loop ? 'AUTO (loop)' : 'AUTO';
@@ -72,6 +78,7 @@ export const SimRobotMapper = {
   shortAddress,
   modeLabel,
   statusLabel,
+  statusSummary,
   rgbToHex,
   hexToRgb,
 

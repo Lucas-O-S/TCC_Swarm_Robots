@@ -1,5 +1,5 @@
 import type { ChangeEvent } from 'react';
-import type { TaskWaypointDraft } from '../../screens/TaskBuilder/useTaskEditor';
+import type { TaskWaypointDraft } from '../../screens/TaskBuilder/hooks/useTaskEditor';
 import { useMapSelection } from '../../hooks/useMapElements';
 import { Drawer } from '../Drawer/Drawer';
 import { Button } from '../Button/Button';

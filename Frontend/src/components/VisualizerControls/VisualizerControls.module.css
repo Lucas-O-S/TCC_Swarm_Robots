@@ -1,0 +1,10 @@
+/* Layout, rótulos e avisos vêm do HeaderBar; aqui só o nome do cenário (só leitura). */
+.name {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--color-text);
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

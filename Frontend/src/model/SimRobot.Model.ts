@@ -54,7 +54,7 @@ export interface SimMapRobotModel {
   loop: boolean;
 }
 
-/** Linha da lista de robôs do menu da Simulação (ver `SimRobotCard`). */
+/** Linha da lista de robôs do menu da Simulação (vira cartão no `SimRobotList`). */
 export interface SimRobotRowModel {
   address: string;
   label: string;

@@ -9,14 +9,11 @@ import { CenarioBuilder } from '../screens/CenarioBuilder/CenarioBuilder';
 const LoginScreen = lazy(() =>
   import('../screens/auth/LoginScreen').then((m) => ({ default: m.LoginScreen })),
 );
-const DashboardScreen = lazy(() =>
-  import('../screens/dashboard/DashboardScreen').then((m) => ({ default: m.DashboardScreen })),
-);
 const Simulation = lazy(() =>
   import('../screens/Simulation/Simulation').then((m) => ({ default: m.Simulation })),
 );
-const MapTestScreen = lazy(() =>
-  import('../screens/map-test/MapTestScreen').then((m) => ({ default: m.MapTestScreen })),
+const Visualizer = lazy(() =>
+  import('../screens/Visualizer/Visualizer').then((m) => ({ default: m.Visualizer })),
 );
 const TaskBuilder = lazy(() =>
   import('../screens/TaskBuilder/TaskBuilder').then((m) => ({ default: m.TaskBuilder })),
@@ -29,6 +26,9 @@ const TaskBuilder = lazy(() =>
 // backend (src/dto, src/model, src/mapper, src/services/RobotService)
 // deveria existir nesta rodada, sem tela ainda. /tarefas voltou como
 // TaskBuilder (mesmo padrão do CenarioBuilder, ver src/screens/TaskBuilder).
+//
+// /dashboard e /mapa-teste sem acesso a pedido (2026-10-05): as telas
+// continuam em src/screens (dashboard, map-test), só sem rota e sem menu.
 export function AppRoutes() {
   return (
     <BrowserRouter>
@@ -38,9 +38,8 @@ export function AppRoutes() {
           <Route path="/login" element={<LoginScreen />} />
 
           <Route element={<AppLayout />}>
-            <Route path="/dashboard" element={<DashboardScreen />} />
             <Route path="/simulacao" element={<Simulation />} />
-            <Route path="/mapa-teste" element={<MapTestScreen />} />
+            <Route path="/visualizador" element={<Visualizer />} />
             <Route path="/CenarioBuilder" element={<CenarioBuilder />} />
             <Route path="/TaskBuilder" element={<TaskBuilder />} />
           </Route>

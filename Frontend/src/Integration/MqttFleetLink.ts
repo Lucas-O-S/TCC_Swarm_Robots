@@ -41,7 +41,7 @@ function topic(part: 'to_edge' | 'to_cloud', networkId: number): string {
 //
 // AINDA NÃO LIGADO NA TELA: enquanto não há conexão com a API a Simulação
 // roda com o LocalFleetLink (offline). Trocar é só instanciar este link no
-// lugar do outro em screens/Simulation/useSimulation.ts.
+// lugar do outro em screens/Simulation/hooks/useSimulation.ts.
 //
 // Fora de escopo por ora (igual ao MqttGatewayAdapter planejado no backend):
 // uplinks swarmit — o backend filtra next_proto = DOTBOT_APP.

@@ -3,8 +3,8 @@ import type { ScenarioModel, ScenarioRobotModel } from '../model/Scenario.Model'
 import type { DotBotControlMode } from '../enums/DotBotControlMode.enum';
 import type { RobotApplication } from '../enums/RobotApplication.enum';
 import { ADDRESS_RE, CELL_MM, DEFAULT_NETWORK, DEFAULT_SIM_CONFIG, DEFAULT_WAYPOINT_THRESHOLD_MM, DEG_TO_RAD, RAD_TO_DEG } from '../Consts/SimulationConsts';
-import { SimRobot } from '../screens/Simulation/SimRobot';
-import { SimWorld } from '../screens/Simulation/SimWorld';
+import { SimRobot } from '../screens/Simulation/Service/SimRobot';
+import { SimWorld } from '../screens/Simulation/Service/SimWorld';
 
 // Conversões do cenário da Simulação (mesmo papel dos outros *.Mapper.ts:
 // traduzir de um formato pro outro, sem regra de tela):

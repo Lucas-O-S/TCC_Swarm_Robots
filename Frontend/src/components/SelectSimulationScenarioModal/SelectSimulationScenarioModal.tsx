@@ -23,7 +23,7 @@ interface SelectSimulationScenarioModalProps {
 }
 
 // Passo inicial da Simulação — mesmo padrão do SelectMapModal
-// (CenarioBuilder) e do SelectTaskMapModal (TaskBuilder): "salvos" fica
+// (CenarioBuilder) e do SelectReadyMapModal (TaskBuilder): "salvos" fica
 // inerte enquanto a conexão com o banco não existe, e as opções que
 // funcionam offline vêm embaixo (exemplos do RobotSwarmSimulator, o mapa
 // mock, em branco, ou um .json do disco).
