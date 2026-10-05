@@ -1,5 +1,5 @@
-import { CELL_MM, POINT_SNAP_MM, ROBOT_RADIUS_MM } from '../../Consts/SimulationConsts';
-import type { Vec2Model } from '../../model/SimWorld.Model';
+import { CELL_MM, POINT_SNAP_MM, ROBOT_RADIUS_MM } from '../../../Consts/SimulationConsts';
+import type { Vec2Model } from '../../../model/SimWorld.Model';
 
 // Ponte entre o mundo do simulador (mm, Y pra CIMA, origem no canto
 // inferior-esquerdo — convenção do RobotSwarmSimulator/LH2) e o mapa do app

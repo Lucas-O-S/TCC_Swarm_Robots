@@ -34,7 +34,10 @@ protocolo, orquestrador) está no `AGENTS.md` do repositório principal.
 
 ## Padrão de pastas (camadas)
 
-- `screens/<Tela>/` — a tela, o hook principal e helpers `use*.ts`, sem subpastas.
+- `screens/<Tela>/` — a tela (`<Tela>.tsx` + CSS) na raiz; componentes só
+  dela em `components/` e hooks em `hooks/` (padrão do `auth` e do
+  `dashboard`). Na Simulação o motor (`Sim*.ts`, `SwarmitDevice`) e no
+  Visualizador o `VisFleet.ts` continuam na raiz da tela.
 - `components/<Nome>/<Nome>.tsx` + `<Nome>.module.css` — cada componente com o
   seu CSS. Estilo que se repete vira peça compartilhada em vez de ser copiado
   (ver "Reutilizar, nunca copiar"). Módulos antigos ainda repetem `.field`,
@@ -68,11 +71,13 @@ lógica do projeto **RobotSwarmSimulator** portada.
 
 Onde fica cada peça:
 
-- `screens/Simulation/` — `Simulation.tsx` (tela), `useSimulation.ts` (ponte
-  motor ↔ React), `SimulationMap`/`SimRobotMarker`/`SimOverlay`, o motor
+- `screens/Simulation/` — `Simulation.tsx` (tela) e o motor na raiz
   (`SimWorld`, `SimRobot`, `SimPhysics`, `SimWaypoints`, `SimLoop`,
-  `SimGateway`, `SimNetModel`, `SwarmitDevice`) e helpers (`useScenarioEditor`,
-  `useMapGeometry`, `useSimSelection`, `useCommitField`).
+  `SimGateway`, `SimNetModel`, `SwarmitDevice`); `components/`
+  (`SimulationMap`, `SimRobotMarker`, `SimOverlay`, `SimRobotsLayer`) e
+  `hooks/` (`useSimulation` = ponte motor ↔ React, `useScenarioEditor`,
+  `useMapGeometry`, `useSimSelection`, `useCommitField`, `useRouteDraft`,
+  `useTrails`).
 - `components/` — `SimulationControls` (header do topo), `SimRobotDrawer`
   (Simular), `SimRobotEditDrawer` (Editar), `SimObstacleDrawer`,
   `SimRobotList`/`SimRobotCard`, `SimTaskPanel`, `NetworkPanel`,
@@ -97,7 +102,7 @@ Onde fica cada peça:
 - **Offline.** Ainda não há API: o gateway simulado conversa com o
   `LocalFleetLink`, que faz o papel do backend. Ele marca o robô como Active
   (menos de 5 s sem telemetria), Inactive (5–60 s) ou Lost (mais de 60 s).
-  Pra ligar na API, trocar pelo `MqttFleetLink` em `useSimulation.ts`; o
+  Pra ligar na API, trocar pelo `MqttFleetLink` em `hooks/useSimulation.ts`; o
   contrato é o mesmo. O botão "Conectar à API" fica desabilitado.
 - **Unidades:** mundo em mm com Y pra cima e origem no canto inferior
   esquerdo; conversão pra px só em `useMapGeometry.ts`. 1 célula = 200 mm
@@ -222,9 +227,10 @@ Simulação. **Por enquanto é só a tela**: a conexão com a API ainda não exi
 
 Onde fica cada peça:
 
-- `screens/Visualizer/` — `Visualizer.tsx` (tela), `useVisualizer.ts` (ponte
-  API ↔ React), `VisFleet.ts` (a frota como a API mostra, fora do React:
-  registro, telemetria, rastro, tarefas e log) e `VisualizerMap.tsx` (mapa).
+- `screens/Visualizer/` — `Visualizer.tsx` (tela), `hooks/useVisualizer.ts`
+  (ponte API ↔ React), `VisFleet.ts` (a frota como a API mostra, fora do
+  React: registro, telemetria, rastro, tarefas e log) e
+  `components/VisualizerMap.tsx` (mapa).
 - `components/` — `VisualizerControls` (header), `VisRobotList` e
   `VisRobotDrawer`, montados com as peças compartilhadas listadas em "Peças
   compartilhadas" da Simulação (`RobotList`, `RobotCard`, `TaskPanel`,
@@ -242,7 +248,7 @@ Onde fica cada peça:
   evento e todo comando volta com erro, então a tela abre só com o mapa, sem
   robôs. Pra ligar, é escrever a implementação real (REST pelo `Callout` +
   socket.io nos eventos `robot:update`/`robot:status`/`robot:new` do
-  `RobotWebsockets`) e trocar a linha marcada em `useVisualizer.ts`. As rotas e
+  `RobotWebsockets`) e trocar a linha marcada em `hooks/useVisualizer.ts`. As rotas e
   os eventos estão no contrato, conferidos no backend. Vai precisar do
   `socket.io-client`, que ainda não está instalado.
 - **Cenário:** só pronto. "Salvos" fica desabilitado (a API não tem rota de

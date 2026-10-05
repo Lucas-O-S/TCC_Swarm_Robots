@@ -4,7 +4,7 @@ import { Button } from '../Button/Button';
 import { SwarmitDeviceStatus } from '../../enums/SwarmitDeviceStatus.enum';
 import { swarmitStatusName } from '../../Integration/Protocols/Swarmit/Swarmit.Protocol';
 import { SimRobotMapper } from '../../mapper/SimRobot.Mapper';
-import type { SwarmitDeviceView } from '../../screens/Simulation/SimGateway';
+import type { SwarmitDeviceView } from '../../screens/Simulation/Service/SimGateway';
 import styles from './SwarmitPanel.module.css';
 
 interface SwarmitPanelProps {

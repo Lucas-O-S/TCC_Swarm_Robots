@@ -4,7 +4,7 @@ import type { RobotCardData } from '../RobotCard/RobotCard';
 import { StatusLine } from '../StatusLine/StatusLine';
 import type { StatusTone } from '../StatusLine/StatusLine';
 import { useMapSelection } from '../../hooks/useMapElements';
-import { robotSelId } from '../../screens/Simulation/useSimSelection';
+import { robotSelId } from '../../screens/Simulation/hooks/useSimSelection';
 import styles from './RobotList.module.css';
 
 interface RobotListProps {

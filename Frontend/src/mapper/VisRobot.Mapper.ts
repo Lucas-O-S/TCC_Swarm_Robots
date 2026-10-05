@@ -5,7 +5,7 @@ import type { RobotTelemetryModel } from '../model/RobotTelemetry.Model';
 import type { SimMapRobotModel } from '../model/SimRobot.Model';
 import type { Vec2Model } from '../model/SimWorld.Model';
 import type { VisRobotModel, VisRobotRowModel } from '../model/VisRobot.Model';
-import { clamp } from '../screens/Simulation/SimPhysics';
+import { clamp } from '../screens/Simulation/Service/SimPhysics';
 import { RobotMapper } from './Robot.Mapper';
 import { SimRobotMapper } from './SimRobot.Mapper';
 

@@ -1,4 +1,4 @@
-import type { Vec2Model } from '../../model/SimWorld.Model';
+import type { Vec2Model } from '../../../model/SimWorld.Model';
 
 /** Quantos pontos o rastro de cada robô guarda (os mais recentes). */
 const TRAIL_MAX_POINTS = 400;

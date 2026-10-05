@@ -4,8 +4,8 @@ import type {
   AreaPattern,
   AreaTraversalSettings,
   TaskAreaDraft,
-} from '../../screens/TaskBuilder/useTaskEditor';
-import { areaCorners, areaTraversal, zigzagLanes, zigzagMaxLanes } from '../../screens/TaskBuilder/useTaskEditor';
+} from '../../screens/TaskBuilder/hooks/useTaskEditor';
+import { areaCorners, areaTraversal, zigzagLanes, zigzagMaxLanes } from '../../screens/TaskBuilder/hooks/useTaskEditor';
 import { useMapSelection } from '../../hooks/useMapElements';
 import { Drawer } from '../Drawer/Drawer';
 import { Button } from '../Button/Button';

@@ -1,8 +1,8 @@
-import { DEFAULT_WAYPOINT_THRESHOLD_MM } from '../../Consts/SimulationConsts';
-import { DotBotControlMode } from '../../enums/DotBotControlMode.enum';
-import { RobotApplication } from '../../enums/RobotApplication.enum';
-import type { ScenarioModel, ScenarioObstacleModel, ScenarioRobotModel } from '../../model/Scenario.Model';
-import type { Vec2Model } from '../../model/SimWorld.Model';
+import { DEFAULT_WAYPOINT_THRESHOLD_MM } from '../../../Consts/SimulationConsts';
+import { DotBotControlMode } from '../../../enums/DotBotControlMode.enum';
+import { RobotApplication } from '../../../enums/RobotApplication.enum';
+import type { ScenarioModel, ScenarioObstacleModel, ScenarioRobotModel } from '../../../model/Scenario.Model';
+import type { Vec2Model } from '../../../model/SimWorld.Model';
 
 // Operações PURAS do modo Editar sobre o cenário JSON (mesmo papel do
 // useObstacleEditor do CenarioBuilder e do useTaskEditor do TaskBuilder) —

@@ -1,14 +1,14 @@
 import type { ReactNode } from 'react';
-import { Waypoint } from '../../components/Waypoint/Waypoint';
-import type { ElementBounds } from '../../hooks/useSelectableElements';
-import type { SimMapRobotModel } from '../../model/SimRobot.Model';
-import type { Vec2Model } from '../../model/SimWorld.Model';
+import { Waypoint } from '../../../components/Waypoint/Waypoint';
+import type { ElementBounds } from '../../../hooks/useSelectableElements';
+import type { SimMapRobotModel } from '../../../model/SimRobot.Model';
+import type { Vec2Model } from '../../../model/SimWorld.Model';
 import { SimOverlay } from './SimOverlay';
 import { SimRobotMarker } from './SimRobotMarker';
-import { fromPx, screenTheta, toPx } from './useMapGeometry';
-import type { MapScale } from './useMapGeometry';
-import type { RouteDraft } from './useRouteDraft';
-import { draftSelId } from './useSimSelection';
+import { fromPx, screenTheta, toPx } from '../hooks/useMapGeometry';
+import type { MapScale } from '../hooks/useMapGeometry';
+import type { RouteDraft } from '../hooks/useRouteDraft';
+import { draftSelId } from '../hooks/useSimSelection';
 import styles from './SimulationMap.module.css';
 
 interface SimRobotsLayerProps {

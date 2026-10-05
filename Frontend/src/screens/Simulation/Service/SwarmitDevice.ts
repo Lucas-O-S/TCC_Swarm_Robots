@@ -1,7 +1,7 @@
-import { SwarmitDeviceStatus, SwarmitDeviceType } from '../../enums/SwarmitDeviceStatus.enum';
-import { SwarmitPayloadType } from '../../enums/SwarmitPayloadType.enum';
-import { batteryToMillivolts } from '../../Integration/Protocols/DotBot.Payload';
-import type { SwarmitPayload } from '../../Integration/Protocols/Swarmit/Swarmit.Protocol';
+import { SwarmitDeviceStatus, SwarmitDeviceType } from '../../../enums/SwarmitDeviceStatus.enum';
+import { SwarmitPayloadType } from '../../../enums/SwarmitPayloadType.enum';
+import { batteryToMillivolts } from '../../../Integration/Protocols/DotBot.Payload';
+import type { SwarmitPayload } from '../../../Integration/Protocols/Swarmit/Swarmit.Protocol';
 import type { SimRobot } from './SimRobot';
 
 // Respondedor swarmit do LADO DISPOSITIVO — porte do RobotSwarmSimulator

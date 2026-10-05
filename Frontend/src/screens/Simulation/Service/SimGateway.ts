@@ -1,10 +1,10 @@
-import { BROADCAST_ADDRESS, RAD_TO_DEG } from '../../Consts/SimulationConsts';
-import { DotBotControlMode } from '../../enums/DotBotControlMode.enum';
-import { SwarmitDeviceStatus } from '../../enums/SwarmitDeviceStatus.enum';
-import { describeCommand } from '../../Integration/FleetLink';
-import type { FleetCommand, FleetLink, FleetUplink, SwarmitCommand } from '../../Integration/FleetLink';
-import { batteryToMillivolts } from '../../Integration/Protocols/DotBot.Payload';
-import type { DotBotAdvertisement } from '../../Integration/Protocols/DotBot.Payload';
+import { BROADCAST_ADDRESS, RAD_TO_DEG } from '../../../Consts/SimulationConsts';
+import { DotBotControlMode } from '../../../enums/DotBotControlMode.enum';
+import { SwarmitDeviceStatus } from '../../../enums/SwarmitDeviceStatus.enum';
+import { describeCommand } from '../../../Integration/FleetLink';
+import type { FleetCommand, FleetLink, FleetUplink, SwarmitCommand } from '../../../Integration/FleetLink';
+import { batteryToMillivolts } from '../../../Integration/Protocols/DotBot.Payload';
+import type { DotBotAdvertisement } from '../../../Integration/Protocols/DotBot.Payload';
 import type { SimRobot } from './SimRobot';
 import type { SimWorld } from './SimWorld';
 import { NetChannel, netParamsFromSim } from './SimNetModel';

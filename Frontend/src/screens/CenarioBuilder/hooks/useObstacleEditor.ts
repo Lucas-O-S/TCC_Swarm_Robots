@@ -1,5 +1,5 @@
-import type { CellSelectRect } from "../../components/MapCanvas/MapCanvas";
-import type { ObstaclesModel } from "../../model/Obstacles.Model";
+import type { CellSelectRect } from "../../../components/MapCanvas/MapCanvas";
+import type { ObstaclesModel } from "../../../model/Obstacles.Model";
 
 // Próximo "Obstáculo N" livre — olha o maior N já usado (não só a
 // quantidade), pra não repetir número depois de apagar um obstáculo no meio.

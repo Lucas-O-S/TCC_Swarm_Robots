@@ -19,8 +19,8 @@ import { SimRobotMapper } from '../../mapper/SimRobot.Mapper';
 import type { RgbColorModel, SimRobotModel } from '../../model/SimRobot.Model';
 import type { Vec2Model } from '../../model/SimWorld.Model';
 import type { TaskModel } from '../../model/Task.Model';
-import type { SwarmitDeviceView } from '../../screens/Simulation/SimGateway';
-import type { BackendRobotInfo } from '../../screens/Simulation/useSimulation';
+import type { SwarmitDeviceView } from '../../screens/Simulation/Service/SimGateway';
+import type { BackendRobotInfo } from '../../screens/Simulation/hooks/useSimulation';
 
 // ---------------------------------------------------------------------------
 // Modo Simular — telemetria + comandos. A tela faz o papel do backend: cada

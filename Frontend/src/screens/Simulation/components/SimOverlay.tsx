@@ -1,12 +1,12 @@
 import { Fragment } from 'react';
-import { RobotPath } from '../../components/RobotPath/RobotPath';
-import { Waypoint } from '../../components/Waypoint/Waypoint';
-import { DotBotControlMode } from '../../enums/DotBotControlMode.enum';
-import { SimRobotMapper } from '../../mapper/SimRobot.Mapper';
-import type { SimMapRobotModel } from '../../model/SimRobot.Model';
-import type { Vec2Model } from '../../model/SimWorld.Model';
-import type { MapScale } from './useMapGeometry';
-import { toPx } from './useMapGeometry';
+import { RobotPath } from '../../../components/RobotPath/RobotPath';
+import { Waypoint } from '../../../components/Waypoint/Waypoint';
+import { DotBotControlMode } from '../../../enums/DotBotControlMode.enum';
+import { SimRobotMapper } from '../../../mapper/SimRobot.Mapper';
+import type { SimMapRobotModel } from '../../../model/SimRobot.Model';
+import type { Vec2Model } from '../../../model/SimWorld.Model';
+import type { MapScale } from '../hooks/useMapGeometry';
+import { toPx } from '../hooks/useMapGeometry';
 import styles from './SimulationMap.module.css';
 
 interface SimOverlayProps {

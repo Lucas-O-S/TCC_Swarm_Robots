@@ -26,14 +26,14 @@ import { VisRobotMapper } from '../../mapper/VisRobot.Mapper';
 import type { SimMapRobotModel } from '../../model/SimRobot.Model';
 import type { SimObstacleModel, Vec2Model } from '../../model/SimWorld.Model';
 import type { VisRobotModel } from '../../model/VisRobot.Model';
-import { collidesAny } from '../Simulation/SimPhysics';
-import { DraftPointPreview } from '../Simulation/SimRobotsLayer';
-import { cellPointToWorld, clampPointToArena } from '../Simulation/useMapGeometry';
-import { POINT_IN_OBSTACLE_NOTICE, routeToolTitle, useRouteDraft } from '../Simulation/useRouteDraft';
-import { useStickyFocus } from '../Simulation/useSimSelection';
-import mapStyles from '../Simulation/SimulationMap.module.css';
-import { useVisualizer } from './useVisualizer';
-import { VisualizerMap } from './VisualizerMap';
+import { collidesAny } from '../Simulation/Service/SimPhysics';
+import { DraftPointPreview } from '../Simulation/components/SimRobotsLayer';
+import { cellPointToWorld, clampPointToArena } from '../Simulation/hooks/useMapGeometry';
+import { POINT_IN_OBSTACLE_NOTICE, routeToolTitle, useRouteDraft } from '../Simulation/hooks/useRouteDraft';
+import { useStickyFocus } from '../Simulation/hooks/useSimSelection';
+import mapStyles from '../Simulation/components/SimulationMap.module.css';
+import { useVisualizer } from './hooks/useVisualizer';
+import { VisualizerMap } from './components/VisualizerMap';
 
 type Tool = BaseTool | 'waypoint';
 

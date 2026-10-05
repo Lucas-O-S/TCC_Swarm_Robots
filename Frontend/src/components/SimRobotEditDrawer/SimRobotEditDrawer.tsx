@@ -5,7 +5,7 @@ import { Segmented } from '../Segmented/Segmented';
 import { DEFAULT_WAYPOINT_THRESHOLD_MM } from '../../Consts/SimulationConsts';
 import { DotBotControlMode } from '../../enums/DotBotControlMode.enum';
 import type { ScenarioRobotModel } from '../../model/Scenario.Model';
-import { useCommitField } from '../../screens/Simulation/useCommitField';
+import { useCommitField } from '../../screens/Simulation/hooks/useCommitField';
 import { num } from '../Drawer/numInput';
 import { DrawerActions, DrawerBody, DrawerDivider, DrawerError, DrawerField, DrawerHint, DrawerRow, DrawerSection } from '../Drawer/DrawerForm';
 import styles from './SimRobotEditDrawer.module.css';

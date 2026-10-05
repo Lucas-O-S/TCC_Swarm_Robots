@@ -10,7 +10,7 @@ import type { ServiceResult } from '../services/Robot.Service';
 
 // Contrato entre a tela do Visualizador e a API (backend NestJS). Faz o
 // mesmo papel do FleetLink na Simulação: a tela e o hook
-// (screens/Visualizer/useVisualizer.ts) só falam com a API por aqui, em
+// (screens/Visualizer/hooks/useVisualizer.ts) só falam com a API por aqui, em
 // tipos neutros. Quem conhece URL, socket e envelope é a implementação:
 //   - DisconnectedApiLink (a única por enquanto): não conecta em nada. A
 //     conexão com a API ainda não existe, então a tela abre sem robôs e

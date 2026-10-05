@@ -1,4 +1,4 @@
-import type { SimConfigModel } from '../../model/Scenario.Model';
+import type { SimConfigModel } from '../../../model/Scenario.Model';
 
 // Fidelidade de rede (PDR + latência de slot) — porte do RobotSwarmSimulator
 // (src/net/netmodel.ts).

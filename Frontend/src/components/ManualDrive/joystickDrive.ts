@@ -1,6 +1,6 @@
 import { DEG_TO_RAD, PWM_MAX, RAD_TO_DEG } from '../../Consts/SimulationConsts';
-import { clamp } from '../../screens/Simulation/SimPhysics';
-import { normalizeAngle } from '../../screens/Simulation/SimRobot';
+import { clamp } from '../../screens/Simulation/Service/SimPhysics';
+import { normalizeAngle } from '../../screens/Simulation/Service/SimRobot';
 
 // Controlador do joystick "de jogo" do ManualDrive — o mesmo na Simulação
 // (robô simulado) e no Visualizador (robô da API).

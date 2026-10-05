@@ -7,7 +7,7 @@ import { ScenarioMapper } from '../mapper/Scenario.Mapper';
 import type { ScenarioModel, ScenarioRobotModel } from '../model/Scenario.Model';
 import type { SimObstacleModel, Vec2Model } from '../model/SimWorld.Model';
 import type { TaskModel } from '../model/Task.Model';
-import { collidesAny } from '../screens/Simulation/SimPhysics';
+import { collidesAny } from '../screens/Simulation/Service/SimPhysics';
 
 // Cenários que a tela de Simulação oferece sem banco de dados (a conexão com
 // a API ainda não existe — mesmo espírito do CenarioService.createMockMap

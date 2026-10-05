@@ -24,11 +24,11 @@ import {
   createWaypointFromRect,
   flattenRoute,
   moveAreaCorner,
-} from "./useTaskEditor";
-import type { AreaCorner, AreaTraversalSettings, TaskStopDraft, TaskWaypointDraft } from "./useTaskEditor";
-import { useTaskRobot } from "./useTaskRobot";
-import type { PathPoint, Wall } from "./useTaskRobot";
-import { TaskRobot } from "./TaskRobot";
+} from "./hooks/useTaskEditor";
+import type { AreaCorner, AreaTraversalSettings, TaskStopDraft, TaskWaypointDraft } from "./hooks/useTaskEditor";
+import { useTaskRobot } from "./hooks/useTaskRobot";
+import type { PathPoint, Wall } from "./hooks/useTaskRobot";
+import { TaskRobot } from "./components/TaskRobot";
 import styles from "./TaskBuilder.module.css";
 
 const AREA_COLOR = "var(--color-yellow)";

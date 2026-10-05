@@ -1,17 +1,17 @@
 import type { ReactNode } from 'react';
-import { MapCanvas } from '../../components/MapCanvas/MapCanvas';
-import type { CellSelectRect } from '../../components/MapCanvas/MapCanvas';
-import type { BaseTool } from '../../components/MapViewport/MapViewport';
-import { Obstacle } from '../../components/Obstacle/Obstacle';
-import { CELL_MM } from '../../Consts/SimulationConsts';
-import type { MapElementsController } from '../../hooks/useMapElements';
-import type { ElementBounds } from '../../hooks/useSelectableElements';
-import type { CenarioModel } from '../../model/Cenario.Model';
-import type { SimMapRobotModel } from '../../model/SimRobot.Model';
-import type { Vec2Model } from '../../model/SimWorld.Model';
-import { SimRobotsLayer } from '../Simulation/SimRobotsLayer';
-import { makeScale } from '../Simulation/useMapGeometry';
-import type { RouteDraft } from '../Simulation/useRouteDraft';
+import { MapCanvas } from '../../../components/MapCanvas/MapCanvas';
+import type { CellSelectRect } from '../../../components/MapCanvas/MapCanvas';
+import type { BaseTool } from '../../../components/MapViewport/MapViewport';
+import { Obstacle } from '../../../components/Obstacle/Obstacle';
+import { CELL_MM } from '../../../Consts/SimulationConsts';
+import type { MapElementsController } from '../../../hooks/useMapElements';
+import type { ElementBounds } from '../../../hooks/useSelectableElements';
+import type { CenarioModel } from '../../../model/Cenario.Model';
+import type { SimMapRobotModel } from '../../../model/SimRobot.Model';
+import type { Vec2Model } from '../../../model/SimWorld.Model';
+import { SimRobotsLayer } from '../../Simulation/components/SimRobotsLayer';
+import { makeScale } from '../../Simulation/hooks/useMapGeometry';
+import type { RouteDraft } from '../../Simulation/hooks/useRouteDraft';
 
 interface VisualizerMapProps {
   /** Cenário pronto, no formato do Construtor: células, Y pra baixo. */

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Vec2Model } from '../../model/SimWorld.Model';
+import type { Vec2Model } from '../../../model/SimWorld.Model';
 
 /** Rota avulsa em montagem: de qual robô e os pontos (mm). */
 export interface RouteDraft {

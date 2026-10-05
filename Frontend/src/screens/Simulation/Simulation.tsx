@@ -33,11 +33,11 @@ import type { ScenarioModel } from '../../model/Scenario.Model';
 import type { SimMapRobotModel, SimRobotRowModel } from '../../model/SimRobot.Model';
 import type { SimObstacleModel, Vec2Model } from '../../model/SimWorld.Model';
 import { SimulationService } from '../../services/Simulation.Service';
-import { collidesAny } from './SimPhysics';
-import { DraftPointPreview } from './SimRobotsLayer';
-import { SimulationMap } from './SimulationMap';
-import { cellPointToWorld, cellRectToWorld, clampPointToArena, snap } from './useMapGeometry';
-import { POINT_IN_OBSTACLE_NOTICE, routeToolTitle, useRouteDraft } from './useRouteDraft';
+import { collidesAny } from './Service/SimPhysics';
+import { DraftPointPreview } from './components/SimRobotsLayer';
+import { SimulationMap } from './components/SimulationMap';
+import { cellPointToWorld, cellRectToWorld, clampPointToArena, snap } from './hooks/useMapGeometry';
+import { POINT_IN_OBSTACLE_NOTICE, routeToolTitle, useRouteDraft } from './hooks/useRouteDraft';
 import {
   addObstacle,
   addRobot,
@@ -50,11 +50,11 @@ import {
   removeObstacle,
   removeRobot,
   setRobotStart,
-} from './useScenarioEditor';
-import { useSimulation } from './useSimulation';
-import type { SimMode } from './useSimulation';
-import { obstacleSelId, obstaclesFromSelection, robotSelId, useStickyFocus } from './useSimSelection';
-import mapStyles from './SimulationMap.module.css';
+} from './hooks/useScenarioEditor';
+import { useSimulation } from './hooks/useSimulation';
+import type { SimMode } from './hooks/useSimulation';
+import { obstacleSelId, obstaclesFromSelection, robotSelId, useStickyFocus } from './hooks/useSimSelection';
+import mapStyles from './components/SimulationMap.module.css';
 
 const PRESETS = SimulationService.listPresets();
 

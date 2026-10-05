@@ -1,6 +1,6 @@
-import { useMapElement } from "../../hooks/useMapElements";
-import { Robot, ROBOT_SIZE } from "../../components/Robot/RobotProp";
-import { RobotStatus } from "../../enums/RobotStatus.enum";
+import { useMapElement } from "../../../hooks/useMapElements";
+import { Robot, ROBOT_SIZE } from "../../../components/Robot/RobotProp";
+import { RobotStatus } from "../../../enums/RobotStatus.enum";
 
 /** Id fixo no registro de seleção do mapa — só existe 1 robô nesta tela. */
 export const TASK_ROBOT_ID = "task-robot";

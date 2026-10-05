@@ -8,7 +8,7 @@ import type { RobotTelemetryModel } from '../../model/RobotTelemetry.Model';
 import type { Vec2Model } from '../../model/SimWorld.Model';
 import type { TaskModel } from '../../model/Task.Model';
 import type { VisRobotModel } from '../../model/VisRobot.Model';
-import { pushTrailPoint } from '../Simulation/useTrails';
+import { pushTrailPoint } from '../Simulation/hooks/useTrails';
 
 /** O backend grava o address em hex minúsculo; a chave interna ignora a caixa pra casar REST e socket. */
 const keyOf = (address: string) => address.toLowerCase();

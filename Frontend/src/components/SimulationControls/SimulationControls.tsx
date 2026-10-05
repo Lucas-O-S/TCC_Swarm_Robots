@@ -5,7 +5,7 @@ import { HeaderBar, HeaderGroup, HeaderLabel, HeaderNotice, HeaderRow } from '..
 import type { Notice } from '../HeaderBar/HeaderBar';
 import { Segmented } from '../Segmented/Segmented';
 import { StatusLine, StatusSep } from '../StatusLine/StatusLine';
-import type { SimMode } from '../../screens/Simulation/useSimulation';
+import type { SimMode } from '../../screens/Simulation/hooks/useSimulation';
 import styles from './SimulationControls.module.css';
 
 interface SimulationControlsProps {

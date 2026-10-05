@@ -1,4 +1,4 @@
-import type { SimArenaModel, SimObstacleModel, Vec2Model } from '../../model/SimWorld.Model';
+import type { SimArenaModel, SimObstacleModel, Vec2Model } from '../../../model/SimWorld.Model';
 
 // Colisão de baixa fidelidade — porte do RobotSwarmSimulator
 // (src/core/physics.ts): robô = círculo, obstáculo = AABB. Se a posição

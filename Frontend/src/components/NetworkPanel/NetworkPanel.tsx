@@ -1,8 +1,8 @@
 import type { ChangeEvent } from 'react';
 import type { FleetUplink } from '../../Integration/FleetLink';
 import type { SimConfigModel } from '../../model/Scenario.Model';
-import type { NetChannelStats } from '../../screens/Simulation/SimNetModel';
-import type { NetConfigValues, SimMode } from '../../screens/Simulation/useSimulation';
+import type { NetChannelStats } from '../../screens/Simulation/Service/SimNetModel';
+import type { NetConfigValues, SimMode } from '../../screens/Simulation/hooks/useSimulation';
 import styles from './NetworkPanel.module.css';
 
 interface NetworkPanelProps {

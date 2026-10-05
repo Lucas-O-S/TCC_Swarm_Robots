@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { RobotControlMode } from '../../enums/RobotControlMode.enum';
-import { SocketEvents } from '../../enums/SocketEvents.enum';
-import type { ApiLink, ApiLinkState } from '../../Integration/ApiLink';
-import { API_NOT_CONNECTED, DisconnectedApiLink } from '../../Integration/DisconnectedApiLink';
-import { controlModeLabel } from '../../Integration/LocalOrchestrator';
-import type { CenarioModel } from '../../model/Cenario.Model';
-import type { RgbColorModel } from '../../model/SimRobot.Model';
-import type { Vec2Model } from '../../model/SimWorld.Model';
-import { CenarioService } from '../../services/Cenario.Service';
-import type { ServiceResult } from '../../services/Robot.Service';
-import { VisFleet } from './VisFleet';
+import type { RobotControlMode } from '../../../enums/RobotControlMode.enum';
+import { SocketEvents } from '../../../enums/SocketEvents.enum';
+import type { ApiLink, ApiLinkState } from '../../../Integration/ApiLink';
+import { API_NOT_CONNECTED, DisconnectedApiLink } from '../../../Integration/DisconnectedApiLink';
+import { controlModeLabel } from '../../../Integration/LocalOrchestrator';
+import type { CenarioModel } from '../../../model/Cenario.Model';
+import type { RgbColorModel } from '../../../model/SimRobot.Model';
+import type { Vec2Model } from '../../../model/SimWorld.Model';
+import { CenarioService } from '../../../services/Cenario.Service';
+import type { ServiceResult } from '../../../services/Robot.Service';
+import { VisFleet } from '../VisFleet';
 
 // Ponte entre a API (pelo ApiLink) e o estado React da tela do
 // Visualizador — o equivalente do useSimulation, sem motor: aqui nada é

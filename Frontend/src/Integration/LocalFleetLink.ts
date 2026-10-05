@@ -26,7 +26,7 @@ import { LocalOrchestrator } from './LocalOrchestrator';
 //     Auto e a atribuição automática da fila, como o OrchestratorService.
 // Tudo em TEMPO SIMULADO (relógio do World): pausar congela os timers.
 // Quando a API existir, é trocar este link pelo MqttFleetLink em
-// screens/Simulation/useSimulation.ts — o gateway, o motor e a tela não mudam.
+// screens/Simulation/hooks/useSimulation.ts — o gateway, o motor e a tela não mudam.
 
 const OTA_RETRY_S = 0.5;
 const OTA_MAX_ROUNDS = 20;

@@ -1,8 +1,8 @@
-import { MAX_WHEEL_SPEED_MM_S, PWM_MAX, WHEEL_BASE_MM } from '../../Consts/SimulationConsts';
-import { DotBotControlMode } from '../../enums/DotBotControlMode.enum';
-import { RobotApplication } from '../../enums/RobotApplication.enum';
-import type { RgbColorModel, SimRobotModel } from '../../model/SimRobot.Model';
-import type { Vec2Model } from '../../model/SimWorld.Model';
+import { MAX_WHEEL_SPEED_MM_S, PWM_MAX, WHEEL_BASE_MM } from '../../../Consts/SimulationConsts';
+import { DotBotControlMode } from '../../../enums/DotBotControlMode.enum';
+import { RobotApplication } from '../../../enums/RobotApplication.enum';
+import type { RgbColorModel, SimRobotModel } from '../../../model/SimRobot.Model';
+import type { Vec2Model } from '../../../model/SimWorld.Model';
 
 // Robô simulado — porte do RobotSwarmSimulator (src/core/Robot.ts).
 // Cinemática SIMPLES de tração diferencial (constantes em

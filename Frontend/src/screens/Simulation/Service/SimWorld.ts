@@ -1,7 +1,7 @@
-import { ROBOT_RADIUS_MM } from '../../Consts/SimulationConsts';
-import { DotBotControlMode } from '../../enums/DotBotControlMode.enum';
-import type { NetworkConfigModel, SimConfigModel } from '../../model/Scenario.Model';
-import type { SimArenaModel, SimObstacleModel } from '../../model/SimWorld.Model';
+import { ROBOT_RADIUS_MM } from '../../../Consts/SimulationConsts';
+import { DotBotControlMode } from '../../../enums/DotBotControlMode.enum';
+import type { NetworkConfigModel, SimConfigModel } from '../../../model/Scenario.Model';
+import type { SimArenaModel, SimObstacleModel } from '../../../model/SimWorld.Model';
 import type { SimRobot } from './SimRobot';
 import { applyWaypointController } from './SimWaypoints';
 import { resolveMovement, separateRobots } from './SimPhysics';

@@ -1,4 +1,4 @@
-import { DotBotControlMode } from '../../enums/DotBotControlMode.enum';
+import { DotBotControlMode } from '../../../enums/DotBotControlMode.enum';
 import { clamp } from './SimPhysics';
 import { normalizeAngle } from './SimRobot';
 import type { SimRobot } from './SimRobot';

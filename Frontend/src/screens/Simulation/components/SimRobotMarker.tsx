@@ -1,11 +1,11 @@
-import { useMapElement } from '../../hooks/useMapElements';
-import { Robot, ROBOT_SIZE } from '../../components/Robot/RobotProp';
-import { RobotStatus } from '../../enums/RobotStatus.enum';
-import { SimRobotMapper } from '../../mapper/SimRobot.Mapper';
-import type { SimMapRobotModel } from '../../model/SimRobot.Model';
-import type { MapScale } from './useMapGeometry';
-import { fromPx, thetaToDirection, toPx } from './useMapGeometry';
-import { robotSelId } from './useSimSelection';
+import { useMapElement } from '../../../hooks/useMapElements';
+import { Robot, ROBOT_SIZE } from '../../../components/Robot/RobotProp';
+import { RobotStatus } from '../../../enums/RobotStatus.enum';
+import { SimRobotMapper } from '../../../mapper/SimRobot.Mapper';
+import type { SimMapRobotModel } from '../../../model/SimRobot.Model';
+import type { MapScale } from '../hooks/useMapGeometry';
+import { fromPx, thetaToDirection, toPx } from '../hooks/useMapGeometry';
+import { robotSelId } from '../hooks/useSimSelection';
 import styles from './SimulationMap.module.css';
 
 interface SimRobotMarkerProps {
