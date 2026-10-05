@@ -11,11 +11,11 @@ interface NavItem {
 // "Robôs" removida a pedido (2026-09-01): a tela saiu do projeto por
 // enquanto (só a estrutura de integração com o backend ficou). Devolver
 // aqui quando a tela voltar. "Tarefas" voltou como TaskBuilder.
+// "Mapa & Conexão" (/dashboard) e "Teste Mapa" (/mapa-teste) sem acesso a
+// pedido (2026-10-05); as telas continuam no projeto.
 const NAV_ITEMS: NavItem[] = [
-  { to: '/dashboard', label: 'Mapa & Conexão' },
   { to: '/simulacao', label: 'Simulação' },
   { to: '/visualizador', label: 'Visualizador' },
-  { to: '/mapa-teste', label: 'Teste Mapa' },
   { to: '/CenarioBuilder', label: 'Construtor de Cenários' },
   { to: '/TaskBuilder', label: 'Tarefas' },
 ];
