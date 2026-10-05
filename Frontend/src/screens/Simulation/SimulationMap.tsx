@@ -12,9 +12,9 @@ import type { SimMapRobotModel } from '../../model/SimRobot.Model';
 import type { SimObstacleModel, Vec2Model } from '../../model/SimWorld.Model';
 import { fromPx, makeScale, toPx } from './useMapGeometry';
 import type { MapScale } from './useMapGeometry';
-import { draftSelId, obstacleSelId, waypointSelId } from './useSimSelection';
-import { SimOverlay } from './SimOverlay';
-import { SimRobotMarker } from './SimRobotMarker';
+import type { RouteDraft } from './useRouteDraft';
+import { obstacleSelId, waypointSelId } from './useSimSelection';
+import { SimRobotsLayer } from './SimRobotsLayer';
 import styles from './SimulationMap.module.css';
 
 interface SimulationMapProps {
@@ -24,7 +24,7 @@ interface SimulationMapProps {
   trails?: ReadonlyMap<string, readonly Vec2Model[]>;
   editable: boolean;
   focusAddress: string | null;
-  routeDraft: { address: string; points: Vec2Model[] } | null;
+  routeDraft: RouteDraft | null;
   /** Rota de uma task em destaque (só desenho, rosa) — `from` = posição do robô que vai fazer. */
   taskPreview?: { from: Vec2Model | null; points: Vec2Model[] } | null;
   maxHeight?: number;
@@ -53,7 +53,8 @@ interface SimulationMapProps {
 // conversão pra px fica em useMapGeometry.ts. Obstáculos e robôs "derivam"
 // da entidade de seleção compartilhada (ver src/hooks/useMapElements.tsx):
 // no modo Editar dá pra mover/apagar; no Simular só selecionar (a posição
-// vem da física).
+// vem da física). Robôs, rotas e rascunho vêm do SimRobotsLayer (o mesmo do
+// Visualizador).
 export function SimulationMap({
   arena,
   obstacles,
@@ -112,7 +113,7 @@ export function SimulationMap({
           );
         })}
 
-        <SimOverlay
+        <SimRobotsLayer
           scale={scale}
           robots={robots}
           trails={trails}
@@ -120,60 +121,32 @@ export function SimulationMap({
           focusAddress={focusAddress}
           routeDraft={routeDraft}
           taskPreview={taskPreview}
-        />
-
-        {/* Rota do robô em foco no modo Editar: marcadores numerados, arrastáveis e apagáveis (TaskBuilder). */}
-        {editable &&
-          focusRobot?.waypoints.map((wp, index) => {
-            const c = toPx(scale, wp);
-            return (
-              <Waypoint
-                key={waypointSelId(focusRobot.address, index)}
-                id={waypointSelId(focusRobot.address, index)}
-                order={index + 1}
-                color={SimRobotMapper.displayColor(focusRobot)}
-                x={c.x}
-                y={c.y}
-                movable
-                onMove={(next) => onMoveWaypoint(focusRobot.address, index, fromPx(scale, next))}
-                removable
-                onRemove={() => onRemoveWaypoint(focusRobot.address, index)}
-                className={styles.draggable}
-              />
-            );
-          })}
-
-        {/* Rota em montagem no modo Simular (vira LH2_WAYPOINTS quando enviada pelo drawer do robô). */}
-        {!editable &&
-          routeDraft?.points.map((p, index) => {
-            const c = toPx(scale, p);
-            return (
-              <Waypoint
-                key={draftSelId(index)}
-                id={draftSelId(index)}
-                order={index + 1}
-                color="var(--color-orange)"
-                x={c.x}
-                y={c.y}
-                movable
-                onMove={(next) => onMoveDraftPoint(index, fromPx(scale, next))}
-                removable
-                onRemove={() => onRemoveDraftPoint(index)}
-                className={styles.draggable}
-              />
-            );
-          })}
-
-        {robots.map((robot) => (
-          <SimRobotMarker
-            key={robot.address}
-            robot={robot}
-            scale={scale}
-            editable={editable}
-            onMove={onMoveRobot}
-            onRemove={onRemoveRobot}
-          />
-        ))}
+          onMoveRobot={onMoveRobot}
+          onRemoveRobot={onRemoveRobot}
+          onMoveDraftPoint={onMoveDraftPoint}
+          onRemoveDraftPoint={onRemoveDraftPoint}
+        >
+          {/* Rota do robô em foco no modo Editar: marcadores numerados, arrastáveis e apagáveis (TaskBuilder). */}
+          {editable &&
+            focusRobot?.waypoints.map((wp, index) => {
+              const c = toPx(scale, wp);
+              return (
+                <Waypoint
+                  key={waypointSelId(focusRobot.address, index)}
+                  id={waypointSelId(focusRobot.address, index)}
+                  order={index + 1}
+                  color={SimRobotMapper.displayColor(focusRobot)}
+                  x={c.x}
+                  y={c.y}
+                  movable
+                  onMove={(next) => onMoveWaypoint(focusRobot.address, index, fromPx(scale, next))}
+                  removable
+                  onRemove={() => onRemoveWaypoint(focusRobot.address, index)}
+                  className={styles.draggable}
+                />
+              );
+            })}
+        </SimRobotsLayer>
       </>
     );
   }

@@ -1,7 +1,9 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { GatewayLog } from '../../components/GatewayLog/GatewayLog';
+import type { Notice } from '../../components/HeaderBar/HeaderBar';
 import type { CellSelectRect } from '../../components/MapCanvas/MapCanvas';
 import { MapMenuLayout } from '../../components/MapMenuLayout/MapMenuLayout';
+import { MapPlaceholder } from '../../components/MapPlaceholder/MapPlaceholder';
 import { MapToolButton } from '../../components/MapToolButton/MapToolButton';
 import { ObstacleIcon, PauseIcon, PlayIcon, RobotIcon, StopIcon, WaypointIcon } from '../../components/MapToolButton/icons';
 import type { BaseTool } from '../../components/MapViewport/MapViewport';
@@ -15,32 +17,27 @@ import { SimObstacleDrawer } from '../../components/SimObstacleDrawer/SimObstacl
 import { SimRobotDrawer } from '../../components/SimRobotDrawer/SimRobotDrawer';
 import { SimRobotEditDrawer } from '../../components/SimRobotEditDrawer/SimRobotEditDrawer';
 import { SimRobotList } from '../../components/SimRobotList/SimRobotList';
-import { SimTaskPanel } from '../../components/SimTaskPanel/SimTaskPanel';
 import { SimulationControls } from '../../components/SimulationControls/SimulationControls';
-import type { Notice } from '../../components/SimulationControls/SimulationControls';
 import { SwarmitPanel } from '../../components/SwarmitPanel/SwarmitPanel';
-import { Waypoint } from '../../components/Waypoint/Waypoint';
-import {
-  ADDRESS_RE,
-  CELL_MM,
-  DEFAULT_WAYPOINT_THRESHOLD_MM,
-  OBSTACLE_SNAP_MM,
-  POINT_SNAP_MM,
-  ROBOT_RADIUS_MM,
-} from '../../Consts/SimulationConsts';
+import { TaskPanel } from '../../components/TaskPanel/TaskPanel';
+import { ADDRESS_RE, CELL_MM, DEFAULT_WAYPOINT_THRESHOLD_MM, OBSTACLE_SNAP_MM, ROBOT_RADIUS_MM } from '../../Consts/SimulationConsts';
 import { RobotControlMode } from '../../enums/RobotControlMode.enum';
 import { RobotStatus } from '../../enums/RobotStatus.enum';
 import { TaskStatus } from '../../enums/TaskStatus.enum';
 import { MapElementsProvider, useMapElementsState } from '../../hooks/useMapElements';
 import type { ElementBounds } from '../../hooks/useSelectableElements';
+import { ORCHESTRATOR_RUN_S } from '../../Integration/LocalOrchestrator';
 import { SimRobotMapper } from '../../mapper/SimRobot.Mapper';
+import { TaskMapper } from '../../mapper/Task.Mapper';
 import type { ScenarioModel } from '../../model/Scenario.Model';
 import type { SimMapRobotModel, SimRobotRowModel } from '../../model/SimRobot.Model';
 import type { SimObstacleModel, Vec2Model } from '../../model/SimWorld.Model';
 import { SimulationService } from '../../services/Simulation.Service';
 import { collidesAny } from './SimPhysics';
+import { DraftPointPreview } from './SimRobotsLayer';
 import { SimulationMap } from './SimulationMap';
-import { cellRectToWorld, snap } from './useMapGeometry';
+import { cellPointToWorld, cellRectToWorld, clampPointToArena, snap } from './useMapGeometry';
+import { POINT_IN_OBSTACLE_NOTICE, routeToolTitle, useRouteDraft } from './useRouteDraft';
 import {
   addObstacle,
   addRobot,
@@ -56,9 +53,8 @@ import {
 } from './useScenarioEditor';
 import { useSimulation } from './useSimulation';
 import type { SimMode } from './useSimulation';
-import { hasDraftSelection, obstacleSelId, obstaclesFromSelection, robotFromSelection, robotSelId } from './useSimSelection';
+import { obstacleSelId, obstaclesFromSelection, robotSelId, useStickyFocus } from './useSimSelection';
 import mapStyles from './SimulationMap.module.css';
-import styles from './Simulation.module.css';
 
 const PRESETS = SimulationService.listPresets();
 
@@ -86,7 +82,7 @@ export function Simulation() {
   const [pickerOpen, setPickerOpen] = useState(true);
   const [pickerError, setPickerError] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
-  const [routeDraft, setRouteDraft] = useState<{ address: string; points: Vec2Model[] } | null>(null);
+  const routeDraft = useRouteDraft();
   /** Task cuja rota aparece no mapa (escolhida no cartão Tarefas ou no seletor do Semi-auto). */
   const [previewTaskId, setPreviewTaskId] = useState<string | null>(null);
 
@@ -122,17 +118,12 @@ export function Simulation() {
 
   // ---- robô em foco (drawer + ferramenta Waypoint) ------------------------------
   // Selecionar o robô (ou um ponto da rota dele) põe ele em foco. Com a
-  // ferramenta Waypoint ligada o foco "gruda": clicar no mapa pra criar
-  // ponto não pode perder o robô-alvo.
-  const fromSelection =
-    robotFromSelection(selectedIds) ?? (hasDraftSelection(selectedIds) ? (routeDraft?.address ?? null) : null);
-  const stickyFocus = useRef<string | null>(null);
-  if (fromSelection) stickyFocus.current = fromSelection;
-  else if (tool !== 'waypoint') stickyFocus.current = null;
-  const focusIndex = mapRobots.findIndex((r) => r.address === stickyFocus.current);
+  // ferramenta Waypoint ligada o foco "gruda" (useStickyFocus).
+  const stickyAddress = useStickyFocus(selectedIds, routeDraft.draft?.address ?? null, tool === 'waypoint');
+  const focusIndex = mapRobots.findIndex((r) => r.address === stickyAddress);
   const focusAddress = focusIndex >= 0 ? mapRobots[focusIndex].address : null;
   const selectedObstacleIds = obstaclesFromSelection(selectedIds);
-  const visibleDraft = routeDraft && routeDraft.address === focusAddress ? routeDraft : null;
+  const visibleDraft = routeDraft.visibleFor(focusAddress);
   // Simular: a rota avulsa (LH2_WAYPOINTS montado no mapa) é só do modo
   // Manual; em Semi-auto/Auto o robô segue tasks puxadas do backend.
   const focusBackend = !editing && focusAddress ? (sim.backend.get(focusAddress) ?? null) : null;
@@ -144,7 +135,7 @@ export function Simulation() {
   function resetInteraction() {
     selection.clearSelection();
     setTool('move');
-    setRouteDraft(null);
+    routeDraft.clear();
     setPreviewTaskId(null);
   }
 
@@ -186,14 +177,11 @@ export function Simulation() {
   }
 
   function clampPoint(p: Vec2Model): Vec2Model {
-    return {
-      x: Math.max(ROBOT_RADIUS_MM, Math.min(arena.width - ROBOT_RADIUS_MM, snap(p.x, POINT_SNAP_MM))),
-      y: Math.max(ROBOT_RADIUS_MM, Math.min(arena.height - ROBOT_RADIUS_MM, snap(p.y, POINT_SNAP_MM))),
-    };
+    return clampPointToArena(p, arena);
   }
 
   function pointFromCell(rect: CellSelectRect): Vec2Model {
-    return clampPoint({ x: rect.startPointX * CELL_MM, y: arena.height - rect.startPointY * CELL_MM });
+    return clampPoint(cellPointToWorld(rect, arena.height));
   }
 
   function robotFits(p: Vec2Model): boolean {
@@ -230,18 +218,9 @@ export function Simulation() {
     const owner = editing || canDraftForRobot ? focusAddress : null;
     if (tool === 'waypoint' && owner) {
       const p = pointFromCell(rect);
-      setNotice(
-        robotFits(p)
-          ? null
-          : { kind: 'error', text: 'Esse ponto fica dentro de uma barreira — o robô vai parar encostado nela.' },
-      );
-      if (editing) {
-        sim.updateDraft((s) => addRobotWaypoint(s, owner, p));
-      } else {
-        setRouteDraft((prev) =>
-          prev && prev.address === owner ? { ...prev, points: [...prev.points, p] } : { address: owner, points: [p] },
-        );
-      }
+      setNotice(robotFits(p) ? null : { kind: 'error', text: POINT_IN_OBSTACLE_NOTICE });
+      if (editing) sim.updateDraft((s) => addRobotWaypoint(s, owner, p));
+      else routeDraft.add(owner, p);
     }
   }
 
@@ -249,11 +228,11 @@ export function Simulation() {
     if (tool === 'obstacle') {
       return <Obstacle x={rect.x} y={rect.y} width={rect.width} height={rect.height} className={mapStyles.preview} />;
     }
-    const center = { left: rect.x + rect.width / 2, top: rect.y + rect.height / 2 };
     if (tool === 'robot') {
+      const center = { left: rect.x + rect.width / 2, top: rect.y + rect.height / 2 };
       return <Robot label="+" status={RobotStatus.Active} className={mapStyles.preview} style={{ position: 'absolute', ...center }} />;
     }
-    return <Waypoint x={center.left} y={center.top} color="var(--color-orange)" className={mapStyles.preview} />;
+    return <DraftPointPreview rect={rect} />;
   }
 
   // ---- edição de elementos (modo Editar) -------------------------------------------
@@ -294,18 +273,6 @@ export function Simulation() {
     );
   }
 
-  function removeDraftPointAt(index: number) {
-    const target = routeDraft?.points[index];
-    if (!target) return;
-    setRouteDraft((prev) => {
-      if (!prev) return prev;
-      const points = [...prev.points];
-      const k = points.findIndex((p) => p.x === target.x && p.y === target.y);
-      if (k >= 0) points.splice(k, 1);
-      return { ...prev, points };
-    });
-  }
-
   function closeDrawer() {
     selection.clearSelection();
     if (tool === 'waypoint') setTool('move');
@@ -318,14 +285,10 @@ export function Simulation() {
     ? focusAddress
       ? `Adicionar waypoint à rota de ${SimRobotMapper.label(focusIndex)} (clique no mapa)`
       : 'Selecione um robô pra adicionar waypoints'
-    : canDraftForRobot
-      ? `Montar rota LH2_WAYPOINTS pra ${SimRobotMapper.label(focusIndex)} (clique no mapa; envie pelo drawer)`
-      : focusAddress
-        ? 'Rota avulsa só no modo Manual — em Semi-auto/Auto o robô segue tarefas'
-        : 'Selecione um robô em Manual pra montar uma rota';
+    : routeToolTitle(canDraftForRobot, focusIndex >= 0 ? SimRobotMapper.label(focusIndex) : '', focusAddress !== null);
 
   function stopDraft() {
-    setRouteDraft(null);
+    routeDraft.clear();
     setTool('move');
   }
 
@@ -381,7 +344,7 @@ export function Simulation() {
           focusSimRobot && focusMode === RobotControlMode.SemiAuto
             ? { x: focusSimRobot.pos_x, y: focusSimRobot.pos_y }
             : null,
-        points: [...previewTask.waypoints].sort((a, b) => a.orderIndex - b.orderIndex).map((w) => ({ x: w.x, y: w.y })),
+        points: TaskMapper.routePoints(previewTask),
       }
     : null;
 
@@ -437,7 +400,7 @@ export function Simulation() {
         sim.sendWaypoints(focusAddress, visibleDraft.points, threshold);
         stopDraft();
       }}
-      onClearRoute={() => setRouteDraft(null)}
+      onClearRoute={routeDraft.clear}
       onResendRoute={() =>
         focusSimRobot &&
         sim.sendWaypoints(focusSimRobot.address, focusSimRobot.waypoints, focusSimRobot.waypoint_threshold || DEFAULT_WAYPOINT_THRESHOLD_MM)
@@ -478,18 +441,22 @@ export function Simulation() {
   );
 
   const menu = (
-    <MenuColumns className={styles.menuColumn}>
+    <MenuColumns>
       <Menu title={`Robôs (${mapRobots.length})`}>
         <SimRobotList robots={rows} editing={editing} />
       </Menu>
 
       {!editing && sim.orchestrator && (
         <Menu title={`Tarefas (${sim.orchestrator.tasks.length})`}>
-          <SimTaskPanel
+          <TaskPanel
             tasks={sim.orchestrator.tasks}
-            robotLabel={robotLabelOf}
-            nextRunIn={sim.orchestrator.nextRunIn}
-            freeAuto={sim.orchestrator.freeAuto}
+            summary={`próxima rodada em ${sim.orchestrator.nextRunIn.toFixed(1)} s · ${
+              sim.orchestrator.tasks.filter((t) => t.status === TaskStatus.Pending).length
+            } pendente(s) · ${sim.orchestrator.freeAuto} robô(s) Auto livre(s)`}
+            summaryTitle={`assignPending roda a cada ${ORCHESTRATOR_RUN_S} s (tempo simulado)`}
+            hint="Puxadas do backend (mock enquanto não há API). Clique numa pra ver a rota no mapa; pra atribuir, abra um robô em Semi-auto."
+            emptyText="Nenhuma tarefa cabe neste cenário."
+            robotOf={(t) => (t.robots[0] ? robotLabelOf(t.robots[0].address) : null)}
             selectedId={previewTaskId}
             onSelect={setPreviewTaskId}
           />
@@ -595,15 +562,11 @@ export function Simulation() {
               onRemoveRobot={(address) => sim.updateDraft((s) => removeRobot(s, address))}
               onMoveWaypoint={(address, index, pos) => sim.updateDraft((s) => moveRobotWaypoint(s, address, index, clampPoint(pos)))}
               onRemoveWaypoint={removeWaypointAt}
-              onMoveDraftPoint={(index, pos) =>
-                setRouteDraft((prev) =>
-                  prev ? { ...prev, points: prev.points.map((p, i) => (i === index ? clampPoint(pos) : p)) } : prev,
-                )
-              }
-              onRemoveDraftPoint={removeDraftPointAt}
+              onMoveDraftPoint={(index, pos) => routeDraft.move(index, clampPoint(pos))}
+              onRemoveDraftPoint={routeDraft.remove}
             />
           ) : (
-            <div className={styles.placeholder} style={{ height: maxMapHeight }} />
+            <MapPlaceholder height={maxMapHeight} />
           )
         }
       </MapMenuLayout>

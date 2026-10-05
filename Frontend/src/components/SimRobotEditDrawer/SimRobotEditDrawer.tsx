@@ -1,9 +1,9 @@
 import { Button } from '../Button/Button';
+import { ColorInput } from '../ColorInput/ColorInput';
 import { Drawer } from '../Drawer/Drawer';
 import { Segmented } from '../Segmented/Segmented';
 import { DEFAULT_WAYPOINT_THRESHOLD_MM } from '../../Consts/SimulationConsts';
 import { DotBotControlMode } from '../../enums/DotBotControlMode.enum';
-import { SimRobotMapper } from '../../mapper/SimRobot.Mapper';
 import type { ScenarioRobotModel } from '../../model/Scenario.Model';
 import { useCommitField } from '../../screens/Simulation/useCommitField';
 import { num } from '../Drawer/numInput';
@@ -102,12 +102,7 @@ function EditRobotForm({ robot, onRename, onPatch, onStart, onRemoveWaypoint, on
 
       <DrawerRow>
         <DrawerField label="LED">
-          <input
-            type="color"
-            className={styles.colorInput}
-            value={SimRobotMapper.rgbToHex(rgb)}
-            onChange={(e) => onPatch({ rgb: SimRobotMapper.hexToRgb(e.target.value) })}
-          />
+          <ColorInput value={rgb} onChange={(color) => onPatch({ rgb: color })} />
         </DrawerField>
         <DrawerField as="div" label={'\u00a0'}>
           <Button variant="outline" onClick={() => onPatch({ rgb: undefined })} disabled={!robot.rgb}>

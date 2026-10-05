@@ -1,5 +1,6 @@
 import { RobotStatus } from '../../enums/RobotStatus.enum';
-import type { LinkLogEntry } from '../../Integration/LocalFleetLink';
+import { LinkLog } from '../../Integration/LinkLog';
+import type { LinkLogEntry } from '../../Integration/LinkLog';
 import { SimRobotMapper } from '../../mapper/SimRobot.Mapper';
 import { VisRobotMapper } from '../../mapper/VisRobot.Mapper';
 import type { RobotModel } from '../../model/Robot.Model';
@@ -7,21 +8,10 @@ import type { RobotTelemetryModel } from '../../model/RobotTelemetry.Model';
 import type { Vec2Model } from '../../model/SimWorld.Model';
 import type { TaskModel } from '../../model/Task.Model';
 import type { VisRobotModel } from '../../model/VisRobot.Model';
-
-const TRAIL_MAX_POINTS = 400;
-const TRAIL_MIN_DIST_MM = 8;
-const LOG_MAX = 150;
-/** Quantas linhas pra trás procurar uma do mesmo fluxo (comando e erro se alternam). */
-const STREAM_LOOKBACK = 4;
+import { pushTrailPoint } from '../Simulation/useTrails';
 
 /** O backend grava o address em hex minúsculo; a chave interna ignora a caixa pra casar REST e socket. */
 const keyOf = (address: string) => address.toLowerCase();
-
-/** Fluxo do joystick (CMD_MOVE_RAW a 20 Hz) vira uma linha só, com contador — mesma regra do log do LocalFleetLink. */
-function streamKey(text: string): string | undefined {
-  if (!text.includes('CMD_MOVE_RAW')) return undefined;
-  return text.replace(/L=-?\d+ R=-?\d+/, 'L=# R=#');
-}
 
 function newEntry(robot: RobotModel): VisRobotModel {
   return { robot, telemetry: null, receivedAt: null, theta: 0, rgb: null, route: null };
@@ -31,15 +21,15 @@ function newEntry(robot: RobotModel): VisRobotModel {
 // LocalFleetLink na Simulação, mas sem nada simulado: o registro de cada
 // robô (API), a última telemetria, o rastro recente, as tarefas e o log.
 // Quem alimenta é o useVisualizer (eventos e respostas do ApiLink); cada
-// mudança chama `onChange`, e o hook agenda um render.
+// mudança chama `onChange`, e o hook agenda um render. O log (LinkLog) e o
+// rastro (pushTrailPoint) são os mesmos da Simulação.
 export class VisFleet {
   /** Na ordem em que os robôs apareceram: os rótulos R1, R2… não mudam quando a lista recarrega. */
   private robotMap = new Map<string, VisRobotModel>();
   private taskList: TaskModel[] = [];
-  /** Chave = address como a API manda (é o que o SimulationMap procura). */
+  /** Chave = address como a API manda (é o que o SimOverlay procura). */
   private trailMap = new Map<string, Vec2Model[]>();
-  private logEntries: LinkLogEntry[] = [];
-  private logSeq = 0;
+  private readonly linkLog = new LinkLog();
   private startedAt = Date.now();
   private readonly onChange: () => void;
 
@@ -63,7 +53,7 @@ export class VisFleet {
 
   /** Log (mais recente primeiro), no formato do GatewayLog; `t` = segundos desde que a tela abriu. */
   get entries(): readonly LinkLogEntry[] {
-    return this.logEntries;
+    return this.linkLog.entries;
   }
 
   get(address: string): VisRobotModel | null {
@@ -77,23 +67,13 @@ export class VisFleet {
     this.robotMap = new Map();
     this.taskList = [];
     this.trailMap = new Map();
-    this.logEntries = [];
+    this.linkLog.clear();
     this.startedAt = Date.now();
     this.onChange();
   }
 
   log(text: string): void {
-    const t = (Date.now() - this.startedAt) / 1000;
-    const key = streamKey(text);
-    const k = key ? this.logEntries.findIndex((e, i) => i < STREAM_LOOKBACK && e.key === key) : -1;
-    if (k >= 0) {
-      const prev = this.logEntries[k];
-      const merged: LinkLogEntry = { ...prev, id: ++this.logSeq, t, text, count: prev.count + 1 };
-      this.logEntries = [merged, ...this.logEntries.filter((_, i) => i !== k)];
-    } else {
-      const entry: LinkLogEntry = { id: ++this.logSeq, t, source: 'backend', text, count: 1, key };
-      this.logEntries = [entry, ...this.logEntries].slice(0, LOG_MAX);
-    }
+    this.linkLog.add('backend', text, (Date.now() - this.startedAt) / 1000);
     this.onChange();
   }
 
@@ -142,7 +122,7 @@ export class VisFleet {
     this.robotMap.set(k, { ...v, telemetry, receivedAt, theta: theta ?? v.theta });
 
     const pos = VisRobotMapper.position(telemetry);
-    if (pos) this.recordTrail(v.robot.address, pos);
+    if (pos) pushTrailPoint(this.trailMap, v.robot.address, pos);
     this.onChange();
     return true;
   }
@@ -163,18 +143,5 @@ export class VisFleet {
     if (!v) return;
     this.robotMap.set(k, fn(v));
     this.onChange();
-  }
-
-  private recordTrail(address: string, p: Vec2Model): void {
-    let trail = this.trailMap.get(address);
-    if (!trail) {
-      trail = [];
-      this.trailMap.set(address, trail);
-    }
-    const last = trail[trail.length - 1];
-    if (!last || Math.hypot(p.x - last.x, p.y - last.y) >= TRAIL_MIN_DIST_MM) {
-      trail.push(p);
-      if (trail.length > TRAIL_MAX_POINTS) trail.splice(0, trail.length - TRAIL_MAX_POINTS);
-    }
   }
 }

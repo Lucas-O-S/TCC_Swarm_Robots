@@ -1,55 +1,50 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { GatewayLog } from '../../components/GatewayLog/GatewayLog';
+import type { Notice } from '../../components/HeaderBar/HeaderBar';
 import type { CellSelectRect } from '../../components/MapCanvas/MapCanvas';
 import { MapMenuLayout } from '../../components/MapMenuLayout/MapMenuLayout';
+import { MapPlaceholder } from '../../components/MapPlaceholder/MapPlaceholder';
 import { MapToolButton } from '../../components/MapToolButton/MapToolButton';
 import { WaypointIcon } from '../../components/MapToolButton/icons';
 import type { BaseTool } from '../../components/MapViewport/MapViewport';
 import { Menu } from '../../components/Menu/Menu';
 import { MenuColumns } from '../../components/MenuColumns/MenuColumns';
-import { SelectVisualizerScenarioModal } from '../../components/SelectVisualizerScenarioModal/SelectVisualizerScenarioModal';
-import type { Notice } from '../../components/SimulationControls/SimulationControls';
+import { SelectReadyMapModal } from '../../components/SelectReadyMapModal/SelectReadyMapModal';
+import { TaskPanel } from '../../components/TaskPanel/TaskPanel';
 import { VisRobotDrawer } from '../../components/VisRobotDrawer/VisRobotDrawer';
 import { VisRobotList } from '../../components/VisRobotList/VisRobotList';
-import { VisTaskPanel } from '../../components/VisTaskPanel/VisTaskPanel';
 import { VisualizerControls } from '../../components/VisualizerControls/VisualizerControls';
-import { Waypoint } from '../../components/Waypoint/Waypoint';
-import { CELL_MM, POINT_SNAP_MM, ROBOT_RADIUS_MM } from '../../Consts/SimulationConsts';
+import { CELL_MM, ROBOT_RADIUS_MM } from '../../Consts/SimulationConsts';
 import { RobotControlMode } from '../../enums/RobotControlMode.enum';
-import { RobotStatus } from '../../enums/RobotStatus.enum';
 import { TaskStatus } from '../../enums/TaskStatus.enum';
 import { MapElementsProvider, useMapElementsState } from '../../hooks/useMapElements';
-import type { ElementBounds } from '../../hooks/useSelectableElements';
+import { ORCHESTRATOR_RUN_S } from '../../Integration/LocalOrchestrator';
 import { ScenarioMapper } from '../../mapper/Scenario.Mapper';
 import { SimRobotMapper } from '../../mapper/SimRobot.Mapper';
+import { TaskMapper } from '../../mapper/Task.Mapper';
 import { VisRobotMapper } from '../../mapper/VisRobot.Mapper';
 import type { SimMapRobotModel } from '../../model/SimRobot.Model';
 import type { SimObstacleModel, Vec2Model } from '../../model/SimWorld.Model';
-import type { TaskModel } from '../../model/Task.Model';
 import type { VisRobotModel } from '../../model/VisRobot.Model';
 import { collidesAny } from '../Simulation/SimPhysics';
-import { snap } from '../Simulation/useMapGeometry';
-import { hasDraftSelection, robotFromSelection } from '../Simulation/useSimSelection';
+import { DraftPointPreview } from '../Simulation/SimRobotsLayer';
+import { cellPointToWorld, clampPointToArena } from '../Simulation/useMapGeometry';
+import { POINT_IN_OBSTACLE_NOTICE, routeToolTitle, useRouteDraft } from '../Simulation/useRouteDraft';
+import { useStickyFocus } from '../Simulation/useSimSelection';
 import mapStyles from '../Simulation/SimulationMap.module.css';
 import { useVisualizer } from './useVisualizer';
 import { VisualizerMap } from './VisualizerMap';
-import styles from './Visualizer.module.css';
 
 type Tool = BaseTool | 'waypoint';
 
-/** Pontos da tarefa na ordem, ou null sem tarefa (a lista da API hoje vem sem pontos: fica vazia). */
-function taskPoints(task: TaskModel | null): Vec2Model[] | null {
-  if (!task) return null;
-  return [...task.waypoints].sort((a, b) => a.orderIndex - b.orderIndex).map((w) => ({ x: w.x, y: w.y }));
-}
-
-// Tela do Visualizador — parecida com a Simulação (mesmo MapMenuLayout,
-// header, cartões e drawer do robô), mas sem customização nenhuma e sem
-// simular nada: roda ligada na rede, só com cenário pronto (por enquanto o
-// mapa mock) e só com os robôs que vierem da API, que dá pra acompanhar e
-// comandar do mesmo jeito que na Simulação (modo, joystick, rota avulsa,
-// tarefa no Semi-auto, LED). Os blocos do mapa seguem a tela de gerar mapa
-// (ver VisualizerMap).
+// Tela do Visualizador — parecida com a Simulação e montada com as mesmas
+// peças (MapMenuLayout, HeaderBar, camada de robôs do mapa, lista de robôs,
+// painel de tarefas, log e as seções do drawer do robô), mas sem
+// customização nenhuma e sem simular nada: roda ligada na rede, só com
+// cenário pronto (por enquanto o mapa mock) e só com os robôs que vierem da
+// API, que dá pra acompanhar e comandar do mesmo jeito que na Simulação
+// (modo, joystick, rota avulsa, tarefa no Semi-auto, LED). Os blocos do
+// mapa seguem a tela de gerar mapa (ver VisualizerMap).
 //
 // A conexão com a API ainda não existe: o useVisualizer usa o
 // DisconnectedApiLink, então a tela abre só com o mapa e sem robôs.
@@ -57,12 +52,11 @@ export function Visualizer() {
   const vis = useVisualizer();
   const mapElements = useMapElementsState();
   const selection = mapElements.contextValue;
-  const selectedIds = selection.selectedIds;
+  const routeDraft = useRouteDraft();
 
   const [tool, setTool] = useState<Tool>('move');
   const [pickerOpen, setPickerOpen] = useState(true);
   const [notice, setNotice] = useState<Notice | null>(null);
-  const [routeDraft, setRouteDraft] = useState<{ address: string; points: Vec2Model[] } | null>(null);
   /** Tarefa cuja rota aparece no mapa (cartão Tarefas ou seletor do Semi-auto). */
   const [previewTaskId, setPreviewTaskId] = useState<string | null>(null);
 
@@ -75,45 +69,34 @@ export function Visualizer() {
     ? ScenarioMapper.fromMap({ cenario, robots: [] }).obstacles.map((o) => ({ id: o.id, x: o.x_mm, y: o.y_mm, w: o.w_mm, h: o.h_mm }))
     : [];
   const connected = vis.link.status === 'connected';
+  const clampPoint = (p: Vec2Model) => clampPointToArena(p, arena);
 
   const tasksById = new Map(vis.tasks.map((t) => [t.uuid, t]));
   const taskOf = (v: VisRobotModel) => (v.robot.taskId ? (tasksById.get(v.robot.taskId) ?? null) : null);
 
   const mapRobots: SimMapRobotModel[] = vis.robots.flatMap((v, i) => {
-    const robot = VisRobotMapper.toMap(v, i, arena, taskPoints(taskOf(v)));
+    const task = taskOf(v);
+    const robot = VisRobotMapper.toMap(v, i, arena, task ? TaskMapper.routePoints(task) : null);
     return robot ? [robot] : [];
   });
   const rows = vis.robots.map((v, i) => VisRobotMapper.toRow(v, i, cenario ? arena : null, taskOf(v)?.name ?? null));
 
   // ---- robô em foco (drawer + ferramenta Waypoint) — mesma regra da Simulação ----------
-  // Com a ferramenta Waypoint ligada o foco "gruda": clicar no mapa pra criar
-  // ponto não pode perder o robô-alvo.
-  const fromSelection =
-    robotFromSelection(selectedIds) ?? (hasDraftSelection(selectedIds) ? (routeDraft?.address ?? null) : null);
-  const stickyFocus = useRef<string | null>(null);
-  if (fromSelection) stickyFocus.current = fromSelection;
-  else if (tool !== 'waypoint') stickyFocus.current = null;
-  const focusIndex = vis.robots.findIndex((v) => v.robot.address === stickyFocus.current);
+  const stickyAddress = useStickyFocus(selection.selectedIds, routeDraft.draft?.address ?? null, tool === 'waypoint');
+  const focusIndex = vis.robots.findIndex((v) => v.robot.address === stickyAddress);
   const focus = focusIndex >= 0 ? vis.robots[focusIndex] : null;
   const focusAddress = focus?.robot.address ?? null;
   const focusLabel = focusIndex >= 0 ? SimRobotMapper.label(focusIndex) : '';
   // Rota avulsa (LH2_WAYPOINTS montado no mapa) só no modo Manual; em Semi-auto/Auto o robô segue tarefas.
   const canDraftForRobot = focus !== null && focus.robot.mode === RobotControlMode.Manual;
-  const visibleDraft = routeDraft && routeDraft.address === focusAddress ? routeDraft : null;
+  const visibleDraft = routeDraft.visibleFor(focusAddress);
 
   // ---- helpers ------------------------------------------------------------------------
-
-  function clampPoint(p: Vec2Model): Vec2Model {
-    return {
-      x: Math.max(ROBOT_RADIUS_MM, Math.min(arena.width - ROBOT_RADIUS_MM, snap(p.x, POINT_SNAP_MM))),
-      y: Math.max(ROBOT_RADIUS_MM, Math.min(arena.height - ROBOT_RADIUS_MM, snap(p.y, POINT_SNAP_MM))),
-    };
-  }
 
   function pickMockScenario() {
     selection.clearSelection();
     setTool('move');
-    setRouteDraft(null);
+    routeDraft.clear();
     setPreviewTaskId(null);
     setNotice(null);
     vis.loadMockScenario();
@@ -122,36 +105,13 @@ export function Visualizer() {
 
   function handleCreate(rect: CellSelectRect) {
     if (tool !== 'waypoint' || !canDraftForRobot || !focusAddress) return;
-    const p = clampPoint({ x: rect.startPointX * CELL_MM, y: arena.height - rect.startPointY * CELL_MM });
-    setNotice(
-      collidesAny(p, ROBOT_RADIUS_MM, obstacles)
-        ? { kind: 'error', text: 'Esse ponto fica dentro de uma barreira — o robô vai parar encostado nela.' }
-        : null,
-    );
-    setRouteDraft((prev) =>
-      prev && prev.address === focusAddress ? { ...prev, points: [...prev.points, p] } : { address: focusAddress, points: [p] },
-    );
-  }
-
-  function renderCreatePreview(rect: ElementBounds) {
-    return <Waypoint x={rect.x + rect.width / 2} y={rect.y + rect.height / 2} color="var(--color-orange)" className={mapStyles.preview} />;
-  }
-
-  function removeDraftPointAt(index: number) {
-    // Remove pelo PONTO (não pelo índice): apagar vários selecionados chama isto uma vez por ponto.
-    const target = routeDraft?.points[index];
-    if (!target) return;
-    setRouteDraft((prev) => {
-      if (!prev) return prev;
-      const points = [...prev.points];
-      const k = points.findIndex((p) => p.x === target.x && p.y === target.y);
-      if (k >= 0) points.splice(k, 1);
-      return { ...prev, points };
-    });
+    const p = clampPoint(cellPointToWorld(rect, arena.height));
+    setNotice(collidesAny(p, ROBOT_RADIUS_MM, obstacles) ? { kind: 'error', text: POINT_IN_OBSTACLE_NOTICE } : null);
+    routeDraft.add(focusAddress, p);
   }
 
   function stopDraft() {
-    setRouteDraft(null);
+    routeDraft.clear();
     setTool('move');
   }
 
@@ -167,18 +127,12 @@ export function Visualizer() {
 
   // ---- ferramenta no canto do mapa (só a rota avulsa: o mapa não se edita aqui) -----------
 
-  const waypointTitle = canDraftForRobot
-    ? `Montar rota LH2_WAYPOINTS pra ${focusLabel} (clique no mapa; envie pelo drawer)`
-    : focus
-      ? 'Rota avulsa só no modo Manual — em Semi-auto/Auto o robô segue tarefas'
-      : 'Selecione um robô em Manual pra montar uma rota';
-
   const tools = (
     <MapToolButton
       active={tool === 'waypoint'}
       onClick={() => setTool(tool === 'waypoint' ? 'move' : 'waypoint')}
       disabled={!canDraftForRobot}
-      title={waypointTitle}
+      title={routeToolTitle(canDraftForRobot, focusLabel, focus !== null)}
     >
       <WaypointIcon />
     </MapToolButton>
@@ -193,7 +147,7 @@ export function Visualizer() {
   const taskPreview = previewTask
     ? {
         from: focusPos && focus?.robot.mode === RobotControlMode.SemiAuto ? focusPos : null,
-        points: taskPoints(previewTask) ?? [],
+        points: TaskMapper.routePoints(previewTask),
       }
     : null;
 
@@ -224,7 +178,7 @@ export function Visualizer() {
         if (!error) stopDraft();
         return error;
       }}
-      onClearRoute={() => setRouteDraft(null)}
+      onClearRoute={routeDraft.clear}
       onResendRoute={() =>
         focus?.route ? vis.sendWaypoints(focus.robot.address, focus.route.points, focus.route.threshold) : Promise.resolve(null)
       }
@@ -233,7 +187,8 @@ export function Visualizer() {
 
   // ---- render ------------------------------------------------------------------------------
 
-  const count = (status: RobotStatus) => vis.robots.filter((v) => v.robot.status === status).length;
+  const pending = vis.tasks.filter((t) => t.status === TaskStatus.Pending).length;
+  const running = vis.tasks.filter((t) => t.status === TaskStatus.InProgress).length;
 
   const header = (
     <VisualizerControls
@@ -243,22 +198,26 @@ export function Visualizer() {
       onChangeScenario={() => setPickerOpen(true)}
       link={vis.link}
       robotCount={vis.robots.length}
-      counts={{ active: count(RobotStatus.Active), inactive: count(RobotStatus.Inactive), lost: count(RobotStatus.Lost) }}
+      fleetSummary={SimRobotMapper.statusSummary(vis.robots.map((v) => v.robot.status))}
       notice={notice}
     />
   );
 
   const menu = (
-    <MenuColumns className={styles.menuColumn}>
+    <MenuColumns>
       <Menu title={`Robôs (${rows.length})`}>
         <VisRobotList robots={rows} connected={connected} />
       </Menu>
 
       <Menu title={`Tarefas (${vis.tasks.length})`}>
-        <VisTaskPanel
+        <TaskPanel
           tasks={vis.tasks}
-          connected={connected}
-          robotOfTask={robotOfTask}
+          summary={`${pending} pendente(s) · ${running} em andamento · fila do backend a cada ${ORCHESTRATOR_RUN_S} s`}
+          summaryTitle={`O orquestrador do backend distribui a fila a cada ${ORCHESTRATOR_RUN_S} s`}
+          summaryTone={connected ? 'on' : 'off'}
+          hint="Vêm da API (GET /tasks). Clique numa pra ver a rota no mapa; pra atribuir, abra um robô em Semi-auto."
+          emptyText={connected ? 'Nenhuma tarefa na API.' : 'Sem tarefas: elas vêm da API, que está sem conexão.'}
+          robotOf={(t) => robotOfTask(t.uuid)}
           selectedId={previewTaskId}
           onSelect={setPreviewTaskId}
         />
@@ -272,11 +231,17 @@ export function Visualizer() {
 
   return (
     <MapElementsProvider value={selection}>
-      <SelectVisualizerScenarioModal
+      <SelectReadyMapModal
         open={pickerOpen || !cenario}
         closable={!!cenario}
         onClose={() => setPickerOpen(false)}
-        onPickMock={pickMockScenario}
+        title="Selecionar cenário do visualizador"
+        description="O visualizador não monta nem edita cenário: escolha um pronto (arena e barreiras). Os robôs vêm só da API."
+        savedTitle="Cenários salvos"
+        savedEmptyText="Nenhum cenário disponível — a API ainda não tem rota de cenários."
+        savedButtonLabel="Selecionar cenário"
+        mockText="O mapa fixo do Construtor de Cenários (12×10 blocos, 2 obstáculos), sem robôs — eles aparecem conforme a API manda."
+        onSelectMock={pickMockScenario}
       />
 
       <MapMenuLayout header={header} menu={menu} stickyMap>
@@ -296,18 +261,14 @@ export function Visualizer() {
               onToolChange={setTool}
               createTool={tool === 'waypoint' ? tool : undefined}
               onCreate={handleCreate}
-              renderCreatePreview={renderCreatePreview}
+              renderCreatePreview={(rect) => <DraftPointPreview rect={rect} />}
               tools={tools}
               panel={panel}
-              onMoveDraftPoint={(index, pos) =>
-                setRouteDraft((prev) =>
-                  prev ? { ...prev, points: prev.points.map((p, i) => (i === index ? clampPoint(pos) : p)) } : prev,
-                )
-              }
-              onRemoveDraftPoint={removeDraftPointAt}
+              onMoveDraftPoint={(index, pos) => routeDraft.move(index, clampPoint(pos))}
+              onRemoveDraftPoint={routeDraft.remove}
             />
           ) : (
-            <div className={styles.placeholder} style={{ height: maxMapHeight }} />
+            <MapPlaceholder height={maxMapHeight} />
           )
         }
       </MapMenuLayout>

@@ -27,7 +27,7 @@ export interface VisRobotModel {
   route: VisRouteModel | null;
 }
 
-/** Linha da lista de robôs do Visualizador (ver `VisRobotCard`). */
+/** Linha da lista de robôs do Visualizador (vira cartão no `VisRobotList`). */
 export interface VisRobotRowModel {
   address: string;
   label: string;

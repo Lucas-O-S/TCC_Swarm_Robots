@@ -156,7 +156,7 @@ Onde fica cada peça:
 ### Peças compartilhadas (limpeza de duplicados, feita item a item)
 
 - `clamp` exportada do `SimPhysics.ts`.
-- `num` (lê campo numérico) em `components/SimRobotDrawer/numInput.ts`.
+- `num` (lê campo numérico) em `components/Drawer/numInput.ts`.
 - `SimRobotMapper.statusLabel()` pros rótulos Active/Inactive/Lost.
 - `useCommitField` (campo que confirma no blur/Enter e volta o valor se der
   erro): nome da barreira e endereço do robô.
@@ -169,6 +169,19 @@ Onde fica cada peça:
   `SimObstacleDrawer` (Simulação, em mm). Os campos continuam com cada um.
 - `RobotPath` ganhou `units`, `from`, `reachedCount` e `markers`. O padrão
   continua igual pro TaskBuilder e pro MapTestScreen.
+- Usadas pela Simulação e pelo Visualizador (nada copiado entre as duas):
+  - `components/`: `StatusLine`, `KeyValueList`, `ProgressBar`, `ColorInput`,
+    `MapPlaceholder`, `HeaderBar` (+ tipo `Notice`), `ManualDrive`
+    (+ `joystickDrive.ts`), `RobotModeField`, `RouteDraftSection`,
+    `RobotTaskSection`, `LedControl`, `RobotCard`, `RobotList`, `TaskPanel` e
+    `SelectReadyMapModal` (também no TaskBuilder);
+  - `DrawerForm`: `DrawerHint mono` e `DrawerFieldHint`;
+  - `Integration/LinkLog.ts` (log do GatewayLog: LocalFleetLink e VisFleet);
+  - `screens/Simulation/`: `useTrails` (`pushTrailPoint`), `useRouteDraft`,
+    `SimRobotsLayer` (robôs, rastros, rotas e rascunho no mapa),
+    `useMapGeometry` (`screenTheta`, `clampPointToArena`, `cellPointToWorld`),
+    `useSimSelection` (`useStickyFocus`);
+  - `SimRobot.Mapper.statusSummary` e `TaskMapper.routePoints`.
 
 ### Drawers unificados
 
@@ -212,11 +225,11 @@ Onde fica cada peça:
 - `screens/Visualizer/` — `Visualizer.tsx` (tela), `useVisualizer.ts` (ponte
   API ↔ React), `VisFleet.ts` (a frota como a API mostra, fora do React:
   registro, telemetria, rastro, tarefas e log) e `VisualizerMap.tsx` (mapa).
-- `components/` — `VisualizerControls` (header), `SelectVisualizerScenarioModal`,
-  `VisRobotList`/`VisRobotCard`, `VisTaskPanel`, `VisRobotDrawer` (+
-  `joystickDrive.ts`). Da Simulação reaproveita `SimOverlay`, `SimRobotMarker`,
-  `useMapGeometry`, `useSimSelection`, `GatewayLog` (vira o log da API),
-  `Joystick`, `Segmented` e `Badge`.
+- `components/` — `VisualizerControls` (header), `VisRobotList` e
+  `VisRobotDrawer`, montados com as peças compartilhadas listadas em "Peças
+  compartilhadas" da Simulação (`RobotList`, `RobotCard`, `TaskPanel`,
+  `ManualDrive`, `SelectReadyMapModal`, `SimRobotsLayer`, `GatewayLog` como log
+  da API etc.).
 - `Integration/ApiLink.ts` (contrato) + `Integration/DisconnectedApiLink.ts`
   (o link que não conecta), `enums/SocketEvents.enum.ts` (espelho do backend),
   `model/RobotTelemetry.Model.ts`, `model/VisRobot.Model.ts` e
@@ -239,7 +252,7 @@ Onde fica cada peça:
   célula esticando pra preencher a altura (`fitWidth` + `maxHeight`) e
   obstáculos por célula. A telemetria (mm, Y pra cima) vira px pela escala de
   cada eixo, e a seta do robô é corrigida pro esticamento (`screenTheta` no
-  `VisualizerMap`) pra apontar pra onde ele anda na tela. No celular o mapa
+  `useMapGeometry`) pra apontar pra onde ele anda na tela. No celular o mapa
   passa da largura, igual ao Construtor e às Tarefas.
 - **Robôs:** só os da API (`GET /robots` + `robot:new`), com rótulos R1, R2…
   na ordem em que aparecem. Pose, rumo (`direction`; -1 = sem leitura),
@@ -268,9 +281,6 @@ Onde fica cada peça:
   Manual pro orquestrador.
 - Backend: `GET /tasks` não inclui os waypoints (o `getAll` não faz include),
   então o mapa não desenha a rota da tarefa e não dá pra filtrar "tem pontos".
-- Front: o controlador do joystick está duplicado (`SimRobotDrawer` e
-  `VisRobotDrawer/joystickDrive.ts`). Unificar é uma limpeza pendente
-  (perguntar antes).
 
 ## Ambiente (Cowork)
 
