@@ -3,7 +3,7 @@ export const ControlModeSchema = {
     schema: {
         type: 'object',
         properties: {
-            mode: { type: 'number', enum: [0, 1], example: 0 },
+            mode: { type: 'number', enum: [0, 1, 2], example: 0 },
         },
         required: ['mode'],
     },

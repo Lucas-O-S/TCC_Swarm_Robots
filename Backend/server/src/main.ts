@@ -10,6 +10,10 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
 
+  // CORS liberado pra dev: permite o dashboard (Frontend/dashboard.html, aberto
+  // como arquivo) chamar as rotas REST. O WebSocket já tem cors:'*' no gateway.
+  app.enableCors();
+
   const config = new DocumentBuilder()
   .setTitle('TCC Swarm Robots')
   .setDescription('API for the TCC Swarm Robots project')

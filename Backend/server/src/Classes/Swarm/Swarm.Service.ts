@@ -242,7 +242,7 @@ export class SwarmService implements OnModuleInit {
         const data = decoder.decodePayload(frame.body);
 
         // Quem mandou = campo `source` do header (offset 10, 8 bytes) -> hex.
-        const address = frame.header.readBigUInt64LE(10).toString(16).padStart(16, "0");
+        const address = Protocol.readAddress(frame.header, 10);
 
         this.verifyCreateRobot(address, frame.payloadType);
 
@@ -348,7 +348,7 @@ export class SwarmService implements OnModuleInit {
 
     /** Último estado conhecido de um robô (ou null se nunca chegou nada dele). */
     getState(address: string): RobotState | null {
-        return this.states.get(address) ?? null;
+        return this.states.get(Protocol.normalizeAddress(address)) ?? null;
     }
 
     /** Estado de toda a frota. */
