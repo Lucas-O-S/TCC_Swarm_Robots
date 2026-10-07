@@ -1,46 +1,94 @@
-import { Callout } from '../Integration/Callout';
-import { robotDtoSchema } from '../dto/robot.dto';
+import { robotCreateRequestSchema } from '../dto/robot.create.dto';
+import { robotUpdateRequestSchema } from '../dto/robot.update.dto';
+import {
+  robotControlModeRequestSchema,
+  robotMoveRawRequestSchema,
+  robotRgbLedRequestSchema,
+  robotWaypointsRequestSchema,
+  robotXgoActionRequestSchema,
+} from '../dto/robot.command.dto';
+import type { RobotControlMode } from '../enums/RobotControlMode.enum';
 import { RobotMapper } from '../mapper/Robot.Mapper';
-import type { RobotModel } from '../model/Robot.Model';
+import type {
+  RobotCommandReceiptModel,
+  RobotInput,
+  RobotModel,
+  RobotMoveInput,
+  RobotRgbInput,
+  RobotUpdateInput,
+  RobotWaypointsInput,
+} from '../model/Robot.Model';
 import { RobotRepository } from '../repository/RobotRepository';
-
-export type ServiceResult<T> = { ok: true; data: T } | { ok: false; message: string };
+import { fromList, fromUnit, fromVoid, parseRequest } from './ServiceResult';
+import type { ServiceResult } from './ServiceResult';
 
 /**
- * SUPOSIÇÃO (rotas não confirmadas contra um `RobotController` real):
- * `GET /robots` e `DELETE /robots/:uuid`, por analogia com o padrão REST já
- * usado em `Auth`/`Users` (ver ARQUITETURA_API.md). Ajustar aqui se o
- * backend usar outro prefixo.
+ * Robôs: CRUD por uuid + comandos por address (ver `RobotRepository`).
  *
- * Só lista + exclui: não existe formulário de "novo robô" na tela hoje
- * (diferente de Tarefas), então `create`/`update` não foram construídos —
- * é fácil adicionar seguindo o mesmo padrão de `TaskService.create` se
- * precisar.
- *
- * `robotDtoSchema` passado aqui é o schema de **um** robô — `ApiEnvelope`
- * já embrulha isso num array pro campo `data` (ver `ApiEnvelope.ts`,
- * `apiEnvelopeSchema`), então não precisa (nem deve) passar
- * `z.array(robotDtoSchema)` aqui.
+ * Padrão de todo método de escrita: valida o que vai ser enviado
+ * (`parseRequest`) -> chama o repository -> converte a resposta (`fromUnit`).
+ * Se a validação falhar, NENHUMA chamada de rede é feita.
  */
 export const RobotService = {
   async list(): Promise<ServiceResult<RobotModel[]>> {
-    const result = await Callout.get('/robots', robotDtoSchema);
-    if (!result.ok) return { ok: false, message: result.message };
-    return { ok: true, data: (result.envelope.data ?? []).map(RobotMapper.fromDto) };
+    return fromList(await RobotRepository.findAll(), RobotMapper.fromDto);
   },
-  
+
   async getByUuid(uuid: string): Promise<ServiceResult<RobotModel>> {
-    const result = await RobotRepository.findByUuid(uuid);
-    if (!result.ok) return { ok: false, message: result.message };
-    if (!result.envelope.dataUnit) {
-      return { ok: false, message: `Robô ${uuid} não encontrado na resposta da API.` };
-    }
-    return { ok: true, data: RobotMapper.fromDto(result.envelope.dataUnit) };
+    return fromUnit(await RobotRepository.findByUuid(uuid), RobotMapper.fromDto);
+  },
+
+  async create(input: RobotInput): Promise<ServiceResult<RobotModel>> {
+    const body = parseRequest(robotCreateRequestSchema, RobotMapper.toCreateDto(input));
+    if (!body.ok) return body;
+    return fromUnit(await RobotRepository.create(body.data), RobotMapper.fromDto);
+  },
+
+  async update(uuid: string, input: RobotUpdateInput): Promise<ServiceResult<RobotModel>> {
+    const body = parseRequest(robotUpdateRequestSchema, RobotMapper.toUpdateDto(input));
+    if (!body.ok) return body;
+    return fromUnit(await RobotRepository.update(uuid, body.data), RobotMapper.fromDto);
   },
 
   async remove(uuid: string): Promise<ServiceResult<void>> {
-    const result = await Callout.delete(`/robots/${uuid}`);
-    if (!result.ok) return { ok: false, message: result.message };
-    return { ok: true, data: undefined };
+    return fromVoid(await RobotRepository.remove(uuid));
+  },
+
+  // ------------------------------------------------------------- comandos (por address)
+  async moveRaw(address: string, input: RobotMoveInput): Promise<ServiceResult<RobotCommandReceiptModel>> {
+    const body = parseRequest(robotMoveRawRequestSchema, RobotMapper.toMoveRawDto(input));
+    if (!body.ok) return body;
+    const target = RobotMapper.normalizeAddress(address);
+    return fromUnit(await RobotRepository.moveRaw(target, body.data), RobotMapper.commandReceiptFromDto);
+  },
+
+  async setRgbLed(address: string, input: RobotRgbInput): Promise<ServiceResult<RobotCommandReceiptModel>> {
+    const body = parseRequest(robotRgbLedRequestSchema, RobotMapper.toRgbLedDto(input));
+    if (!body.ok) return body;
+    const target = RobotMapper.normalizeAddress(address);
+    return fromUnit(await RobotRepository.setRgbLed(target, body.data), RobotMapper.commandReceiptFromDto);
+  },
+
+  /** Troca o modo (Manual/Auto/SemiAuto): o backend grava em `robots.mode` e para o robô. */
+  async setControlMode(address: string, mode: RobotControlMode): Promise<ServiceResult<RobotCommandReceiptModel>> {
+    const body = parseRequest(robotControlModeRequestSchema, RobotMapper.toControlModeDto(mode));
+    if (!body.ok) return body;
+    const target = RobotMapper.normalizeAddress(address);
+    return fromUnit(await RobotRepository.setControlMode(target, body.data), RobotMapper.commandReceiptFromDto);
+  },
+
+  async sendWaypoints(address: string, input: RobotWaypointsInput): Promise<ServiceResult<RobotCommandReceiptModel>> {
+    const body = parseRequest(robotWaypointsRequestSchema, RobotMapper.toWaypointsDto(input));
+    if (!body.ok) return body;
+    const target = RobotMapper.normalizeAddress(address);
+    return fromUnit(await RobotRepository.sendWaypoints(target, body.data), RobotMapper.commandReceiptFromDto);
+  },
+
+  /** Só robôs XGO. */
+  async sendXgoAction(address: string, action: number): Promise<ServiceResult<RobotCommandReceiptModel>> {
+    const body = parseRequest(robotXgoActionRequestSchema, RobotMapper.toXgoActionDto(action));
+    if (!body.ok) return body;
+    const target = RobotMapper.normalizeAddress(address);
+    return fromUnit(await RobotRepository.sendXgoAction(target, body.data), RobotMapper.commandReceiptFromDto);
   },
 };

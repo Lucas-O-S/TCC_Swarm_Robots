@@ -11,7 +11,7 @@ import type { CalloutResult } from '../Integration/Callout';
  * Camada de acesso a dados do usuário: só fala com a API via `Callout` e devolve o `CalloutResult` cru
  */
 const genericRepository = createBaseRepository<UserDto, UserCreateRequest, UserUpdateRequest>(
-    '/user',
+    '/users',
     userDtoSchema,
 );
 

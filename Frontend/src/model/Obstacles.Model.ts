@@ -10,6 +10,4 @@ export interface ObstaclesModel  {
     startPointX : number;
     startPointY : number;
     cenarioId : string;
-
-
 }

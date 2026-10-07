@@ -6,8 +6,16 @@
  */
 export interface AuthSessionModel {
   accessToken: string;
-  user: {
-    uuid: string;
-    username: string;
-  };
+  user: AuthUserModel;
+}
+
+export interface AuthUserModel {
+  uuid: string;
+  username: string;
+}
+
+/** Credenciais digitadas na tela de login. */
+export interface LoginInput {
+  username: string;
+  password: string;
 }

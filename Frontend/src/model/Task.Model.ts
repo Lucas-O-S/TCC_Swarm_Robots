@@ -27,3 +27,13 @@ export interface TaskModel {
   robots: TaskRobotSummaryModel[];
   isDeleted: boolean;
 }
+
+/** Dados pra criar uma task (`POST /tasks`). `status` não entra: quem gere é o Orchestrator. */
+export interface TaskInput {
+  name: string;
+  /** Quanto menor, mais prioritária. Default 0 no backend. */
+  priority?: number;
+}
+
+/** Edição parcial (`PUT /tasks/:uuid`). */
+export type TaskUpdateInput = Partial<TaskInput>;
