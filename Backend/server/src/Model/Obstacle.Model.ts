@@ -1,9 +1,9 @@
 import { BelongsTo, Column, DataType, ForeignKey, Table } from "sequelize-typescript";
 import { BaseModel } from "./Base.Model";
-import { CenarioModel } from "./Cenario.Model";
+import { ScenarioModel } from "./Scenario.Model";
 
 /**
- * Obstáculo dentro de um Cenário (tabela `obstacle`). Um Cenário tem vários.
+ * Obstáculo dentro de um Scenario (tabela `obstacle`). Um Scenario tem vários.
  */
 @Table({ tableName: "obstacle", underscored: true, paranoid: true })
 export class ObstacleModel extends BaseModel<ObstacleModel> {
@@ -26,10 +26,10 @@ export class ObstacleModel extends BaseModel<ObstacleModel> {
     @Column({ type: DataType.INTEGER, allowNull: false })
     startPointY: number;
 
-    @ForeignKey(() => CenarioModel)
+    @ForeignKey(() => ScenarioModel)
     @Column({ type: DataType.UUID, allowNull: false })
-    cenarioId: string;
+    scenarioId: string;
 
-    @BelongsTo(() => CenarioModel)
-    cenario: CenarioModel;
+    @BelongsTo(() => ScenarioModel)
+    scenario: ScenarioModel;
 }

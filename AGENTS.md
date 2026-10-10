@@ -224,6 +224,10 @@ separação em módulos NestJS:
   - `Position.Model.ts` - tabela `position`, `@BelongsTo(() => RobotModel)`.
   - `User.Model.ts` - tabela `users` (conceito nosso, auth - não existe no
     DotBot/protocolo).
+  - `Scenario.Model.ts` - tabela `scenario` (área `sizeX`/`sizeY` +
+    obstáculos), conceito nosso. `@HasMany(() => ObstacleModel)`.
+  - `Obstacle.Model.ts` - tabela `obstacle`, `@BelongsTo(() => ScenarioModel)`
+    via `scenarioId`. Ver "Scenario e Obstacle" abaixo.
 - `src/Classes/Robots/` - camada de API do robô, seguindo o padrão
   Controller → Service → Repository (ver seção "Padrão de código de
   referência" acima). `Robot.Repository.ts`, `Robot.Service.ts` e
@@ -563,6 +567,25 @@ periódico (1s, mesmo timer do `checkLost`), espelhando o
 `SwarmModule` importa `RobotModule` + `PositionModule` (pra injetar
 `RobotService`/`PositionService`); sem ciclo, porque nenhum deles importa o
 `SwarmModule`.
+
+### Scenario e Obstacle (`src/Classes/Scenario/`) - FEITO
+
+CRUD em `/scenarios` no padrão Base* (Controller → Service → Repository, DTO com
+class-validator pt-br, `ScenarioSchema` pro `@ApiBody`, `JwtAuthGuard`). Obstacle
+**não tem rota nem módulo próprios**: sempre existe dentro de um Scenario.
+
+- Os obstáculos vão no body do Scenario (`obstacles: ObstacleDto[]`, opcional). O
+  `ObstacleDto` não tem `scenarioId`: o Repository preenche a FK, e o whitelist
+  recusa o campo se ele vier no body.
+- `ScenarioRepository` sobrescreve o CRUD do `BaseRepository`: `get`/`getAll`
+  sempre com `include: [ObstacleModel]`; `insert` cria tudo junto (`include`) numa
+  transação; no `update`, se `obstacles` vier, **substitui a lista inteira** (soft
+  delete das antigas + `bulkCreate`); se não vier, os obstáculos ficam como estão.
+  `delete` apaga (soft) os obstáculos junto, porque o paranoid não cascateia.
+- `BaseController<T, D = Partial<T>>`: o 2º genérico (tipo do body) existe por
+  causa do Scenario. Sem ele, `ObstacleDto[]` não é compatível com o
+  `ObstacleModel[]` do `Partial<ScenarioModel>` e a sobrescrita de
+  `create`/`update` não compila. Os outros controllers usam o default.
 
 ### Armadilha resolvida: `useDefineForClassFields`
 
