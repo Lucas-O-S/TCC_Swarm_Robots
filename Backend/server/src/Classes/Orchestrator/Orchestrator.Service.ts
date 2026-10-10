@@ -5,7 +5,6 @@ import { RobotService } from "../Robots/Robot.Service";
 import { TaskService } from "../Tasks/Task.Service";
 import { RobotModel } from "src/Model/Robot.Model";
 import { TaskStatus } from "src/Enums/TaskStatus.Enum";
-import { PayloadType } from "src/Enums/PayloadType.enum";
 import { Command } from "src/Enums/Command.enum";
 import { OnEvent } from "@nestjs/event-emitter";
 import { EventsCommands } from "src/Enums/Events.Enum";
@@ -177,7 +176,6 @@ export class OrchestratorService implements OnModuleInit {
         try {
             await this.robotService.sendCommand(
                 robot.address,
-                PayloadType.LH2_WAYPOINTS,
                 Command.Waypoints,
                 {
                     threshold: robot.waypointsThreshold,
