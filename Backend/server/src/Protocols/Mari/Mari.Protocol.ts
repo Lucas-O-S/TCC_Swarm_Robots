@@ -1,6 +1,7 @@
 import { NextProto } from "src/Enums/NextProto.enum";
 import { MariFrame, MariHeader } from "./Mari.Payload";
 import { EdgeEvent } from "src/Enums/EdgeEvent.enum";
+import { Protocol } from "src/Protocols/Protocol";
 
 
 export class MariProtocol {
@@ -25,8 +26,8 @@ export class MariProtocol {
             version: buffer.readUInt8(0),
             type: buffer.readUInt8(1),
             networkId: buffer.readUInt16LE(2),
-            destination: buffer.readBigUInt64LE(4).toString(16).padStart(16, "0"),
-            source: buffer.readBigUInt64LE(12).toString(16).padStart(16, "0"),
+            destination: Protocol.readAddress(buffer, 4),
+            source: Protocol.readAddress(buffer, 12),
             nextProto: buffer.readUInt8(20) as NextProto
         }
         return header;

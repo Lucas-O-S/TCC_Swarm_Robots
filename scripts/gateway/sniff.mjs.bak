@@ -66,22 +66,9 @@ const PAYLOAD_TYPE = {
   0x0e: "LH2_CALIBRATION_HOMOGRAPHY", 0x10: "RAW_DATA", 0xfa: "DOTBOT_SIMULATOR_DATA",
 };
 
-const stats = { bytes: 0, frames: 0, bad: 0, junk: 0, events: new Map(), nets: new Set(), nodes: new Set(), seenIds: new Set() };
+const stats = { bytes: 0, frames: 0, bad: 0, junk: 0, events: new Map(), nets: new Set(), nodes: new Set() };
 const bump = (map, key) => map.set(key, (map.get(key) ?? 0) + 1);
 const ts = () => new Date().toISOString().slice(11, 23);
-
-// --- ids conhecidos: procurados byte a byte DENTRO do frame, nas duas endianness ---
-// Independe de saber o layout do evento: se os 8 bytes do robô aparecem em qualquer
-// posição, o gateway ouviu o robô. Sobrescrever com WATCH_IDS=aaa...,bbb...
-const WATCH = (process.env.WATCH_IDS ?? "DAC609B86A7DB915,EA4DA953CA7D3C2F")
-  .split(",").map((x) => x.trim()).filter((x) => /^[0-9a-fA-F]{16}$/.test(x))
-  .map((hex) => {
-    const be = Buffer.from(hex, "hex");
-    const le = Buffer.from(be); le.reverse();
-    return { hex: hex.toUpperCase(), be, le };
-  });
-const findIds = (buf) => WATCH.filter((w) => buf.includes(w.be) || buf.includes(w.le)).map((w) => w.hex);
-let lastGwInfo = null;
 
 // --- state machine (espelha HdlcHandler) ---
 let out = [], fcs = FCS_INIT, escape = false, receiving = false;
@@ -125,31 +112,6 @@ function onFrame(payload) {
   bump(stats.events, name);
 
   const body = payload.subarray(1);
-
-  for (const id of findIds(payload)) {
-    if (!stats.seenIds.has(id)) {
-      stats.seenIds.add(id);
-      console.log(`${ts()}  >>> id ${id} visto pela 1a vez (dentro de ${name})`);
-    }
-  }
-
-  // GATEWAY_INFO NAO e frame de no: tem corpo proprio, sem header Mari de 21B.
-  // Parsear como header produzia net=0xca7d/src=...07, que eram bytes do proprio
-  // endereco do gateway lidos no offset errado. Imprime so quando o corpo MUDA —
-  // o robo entrando na rede aparece como uma mudanca instantanea.
-  if (event === 5) {
-    const gw = body.length >= 8
-      ? body.readBigUInt64LE(0).toString(16).padStart(16, "0").toUpperCase()
-      : "?";
-    const hex = body.toString("hex");
-    if (hex !== lastGwInfo) {
-      const first = lastGwInfo === null;
-      lastGwInfo = hex;
-      console.log(`${ts()}  GATEWAY_INFO    gw=${gw} ${body.length}B ${first ? "(inicial)" : "MUDOU"}: ${hex}`);
-    }
-    return;
-  }
-
   if (body.length < 21) { console.log(`${ts()}  ${name.padEnd(15)} (sem header Mari, ${body.length}B)`); return; }
 
   const header = {
@@ -194,8 +156,7 @@ port.on("error", (e) => {
 const summary = setInterval(() => {
   const events = [...stats.events].map(([k, v]) => `${k}=${v}`).join(" ") || "nenhum";
   const nets = [...stats.nets].map((n) => `0x${n.toString(16).padStart(4, "0")}`).join(",") || "-";
-  const ids = [...stats.seenIds].join(",") || "-";
-  console.log(`--- ${stats.bytes}B lidos | ${stats.frames} frames ok | ${stats.bad} com FCS ruim | eventos: ${events} | networks: ${nets} | nós: ${stats.nodes.size} | ids: ${ids}`);
+  console.log(`--- ${stats.bytes}B lidos | ${stats.frames} frames ok | ${stats.bad} com FCS ruim | eventos: ${events} | networks: ${nets} | nós: ${stats.nodes.size}`);
 }, 5000);
 
 const bye = () => {
@@ -207,7 +168,6 @@ const bye = () => {
   console.log(`eventos           : ${[...stats.events].map(([k, v]) => `${k}=${v}`).join(" ") || "nenhum"}`);
   console.log(`network ids vistos: ${[...stats.nets].map((n) => `0x${n.toString(16).padStart(4, "0")}`).join(", ") || "nenhum"}`);
   console.log(`nós vistos        : ${[...stats.nodes].join(", ") || "nenhum"}`);
-  console.log(`ids procurados vistos: ${[...stats.seenIds].join(", ") || "nenhum"}`);
   if (stats.bytes === 0) console.log("\nDIAGNÓSTICO: nada chegou. Porta errada, gateway não flashado ou cabo no conector de debug em vez do nRF USB.");
   else if (stats.frames === 0) console.log("\nDIAGNÓSTICO: chegaram bytes mas nenhum frame válido. Baudrate errado (tem que ser 1000000) ou app core sem o firmware do gateway.");
   else if (stats.nodes.size === 0) console.log("\nDIAGNÓSTICO: gateway OK, nenhum nó na rede. Robô desligado ou network_id diferente.");

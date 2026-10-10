@@ -58,7 +58,10 @@ INSERT INTO task_waypoints (task_id, order_index, x, y) VALUES
 CREATE TABLE robots (
     uuid UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 
-    address VARCHAR(16) NOT NULL UNIQUE,
+    -- Sempre em MAIÚSCULAS (Protocol.normalizeAddress): o Postgres compara com
+    -- caixa, então 'CCD2...' e 'ccd2...' seriam dois robôs diferentes.
+    address VARCHAR(16) NOT NULL UNIQUE
+        CONSTRAINT robots_address_upper CHECK (address = UPPER(address)),
 
     name VARCHAR(255) NOT NULL,
 
