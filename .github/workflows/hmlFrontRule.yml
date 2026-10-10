@@ -1,10 +1,10 @@
-name: Deploy to Preproduction Backend
+name: Deploy to Homologation Frontend
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
     branches:
-      - main-Back
+      - hml-Front
 
 jobs:
   deploy:
@@ -18,8 +18,8 @@ jobs:
         env:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
-          if [[ "$HEAD_REF" != "hml-Back" ]]; then
-            echo "❌ ERRO: A branch de origem ('$HEAD_REF') não é 'hml-Back'. Merge bloqueado!"
+          if [[ "$HEAD_REF" != "dev-Front" ]]; then
+            echo "❌ ERRO: A branch de origem ('$HEAD_REF') não é 'dev-Front'. Merge bloqueado!"
             exit 1
           fi
           echo "✅ Branch de origem é '$HEAD_REF' — liberado."
