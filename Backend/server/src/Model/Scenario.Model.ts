@@ -6,8 +6,8 @@ import { ObstacleModel } from "./Obstacle.Model";
  * Cenário de simulação (área + obstáculos), conceito da nossa aplicação -
  * não existe no protocolo DotBot.
  */
-@Table({ tableName: "cenario", underscored: true, paranoid: true })
-export class CenarioModel extends BaseModel<CenarioModel> {
+@Table({ tableName: "scenario", underscored: true, paranoid: true })
+export class ScenarioModel extends BaseModel<ScenarioModel> {
 
     @Column({ type: DataType.STRING, allowNull: false })
     name: string;
