@@ -1,29 +1,25 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { BaseService } from 'src/Classes/Base/Base.Service';
 import { RobotModel } from 'src/Model/Robot.Model';
 import { RobotRepository } from './Robot.Repository';
-import { GATEWAY_ADAPTER } from 'src/adapter/GatewayAdapter.interface';
-import type { GatewayAdapter } from 'src/adapter/GatewayAdapter.interface';
-import { PayloadType } from 'src/Enums/PayloadType.enum';
 import { Command } from 'src/Enums/Command.enum';
-import { PayloadSelector } from 'src/Protocols/PayloadSelector';
-import { PayloadCoder } from 'src/Protocols/Wrappers/PayloadProtocol';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { RobotControlMode } from 'src/Enums/RobotControlMode.enum';
 import { EventsCommands } from 'src/Enums/Events.Enum';
+import { EdgeClient } from 'src/Classes/Edge/Edge.Client';
 
 /**
  * CRUD básico (create/getOne/getAll/update/remove) vem do BaseService; aqui
- * só o que é específico do Robot - inclusive os comandos de protocolo, que
- * codificam o payload e mandam pro robô via GatewayAdapter (endereçado por
- * `address`, não pelo uuid).
+ * só o que é específico do Robot - inclusive os comandos, que vão pro robô
+ * pela borda (EdgeClient), endereçados por `address`, não pelo uuid. A API não
+ * codifica mais nada: quem conhece o protocolo é a borda.
  */
 @Injectable()
 export class RobotService extends BaseService<RobotModel> {
 
     constructor(
         private readonly robotRepository: RobotRepository,
-        @Inject(GATEWAY_ADAPTER) private readonly gateway: GatewayAdapter,
+        private readonly edge: EdgeClient,
         private readonly events: EventEmitter2,
     ) {
         super(robotRepository);
@@ -43,32 +39,23 @@ export class RobotService extends BaseService<RobotModel> {
     }
 
     /**
-     * Escolhe o codec pelo tipo (via PayloadSelector), codifica o payload e
-     * envia pro robô. Um ponto único cuida do "não achei codec" e do envio.
+     * Ponto único por onde todo comando sai da API: entrega à borda, que
+     * codifica e manda pelo rádio. Erro da borda (fora do ar, payload
+     * recusado) sobe como HttpException.
      */
-    private dispatch(address: string, payloadType: PayloadType, payload: any): void {
-        const codec: PayloadCoder<any> | null = PayloadSelector.getPayloadCoder(payloadType);
-        if (!codec) {
-            throw new Error(`Nenhum codec registrado para o payload type ${payloadType}`);
-        }
-        const body = codec.encodePayload(payload);
-        this.gateway.send(address, payloadType, body);
+    private async dispatch(address: string, command: Command, payload: any): Promise<void> {
+        await this.edge.sendCommand(address, command, payload);
     }
 
     /**
-     * Fluxo comum de todo comando: confere se o robô existe, codifica+envia
-     * (via dispatch) e devolve um recibo. As rotas do Controller só informam o
-     * tipo do payload e o rótulo do comando.
+     * Fluxo comum de todo comando: confere se o robô existe, envia (via
+     * dispatch) e devolve um recibo. As rotas do Controller só informam o
+     * comando.
      */
-    async sendCommand(
-        address: string,
-        payloadType: PayloadType,
-        command: Command,
-        payload: any
-    ) {
-        await this.requireByAddress(address);
-        this.dispatch(address, payloadType, payload);
-        return { address, command, payload };
+    async sendCommand(address: string, command: Command, payload: any) {
+        const robot = await this.requireByAddress(address);
+        await this.dispatch(robot.address, command, payload);
+        return { address: robot.address, command, payload };
     }
 
     /**
@@ -82,7 +69,7 @@ export class RobotService extends BaseService<RobotModel> {
         const robot = await this.requireByAddress(address);
         // SemiAuto não existe no robô: pra ele é Auto (segue waypoints).
         const wireMode = mode === RobotControlMode.Manual ? RobotControlMode.Manual : RobotControlMode.Auto;
-        this.dispatch(robot.address, PayloadType.CONTROL_MODE, { mode: wireMode });
+        await this.dispatch(robot.address, Command.ControlMode, { mode: wireMode });
         await this.update(robot.uuid, { mode });
         this.events.emit(EventsCommands.modeChanged, { address: robot.address, mode });
         return { address: robot.address, command: Command.ControlMode, payload: { mode } };

@@ -81,9 +81,74 @@ resposta é "depende do nível", ainda nenhum foi implementado:
 
 ## Stack
 
-- **Backend**: NestJS 11, Sequelize (`@nestjs/sequelize` + `sequelize-typescript`), PostgreSQL (`pg`)
+- **Backend** (API do front, `Backend/server`): NestJS 11, Sequelize (`@nestjs/sequelize` + `sequelize-typescript`), PostgreSQL (`pg`)
+- **Borda** (`Edge/server`): NestJS 11 sem banco - serial/HDLC/Mari, MQTT do simulador, socket.io. Ver "Divisão API × borda"
 - **Frontend**: pasta existe (`Frontend/`), ainda vazia - será decidido depois (o PyDotBot usa React + TypeScript + Vite, mapa via react-leaflet, joystick)
 - **Repo**: [github.com/Lucas-O-S/TCC_Swarm_Robots](https://github.com/Lucas-O-S/TCC_Swarm_Robots), branch de trabalho atual `Merge/Back/ClasseRobot`
+
+## Divisão API × borda (`Edge/`) - FEITO em 2026-10-10
+
+Pedido do dono: separar em dois processos, cada um na sua pasta (como
+`Frontend/` e `Backend/`), com a **borda independente** - "se a pessoa quiser só
+a edge ela deve ser independente", pensando em outros sistemas acessando no
+futuro. Branch `Merge/Back/EdgeSeparation`.
+
+**O corte**: tudo que é do DISPOSITIVO está em `Edge/server`; tudo que é
+NEGÓCIO do nosso sistema ficou em `Backend/server`.
+
+- `Edge/server` (porta 3001): `Protocols/`, `adapter/` (Mari, Mqtt, Simulator),
+  `GatewayModule` (`GATEWAY_MODE`), configs `MARI_*`/`MQTT_*`/
+  `SIMULATOR_FAKE_ADVERTISEMENT`, enums de protocolo, teste do HDLC. Código
+  novo: `Swarm` (estado vivo em memória, status por silêncio 5 s/60 s,
+  descoberta, posição já extraída), `Commands` (ponto único de envio
+  `CommandService.send`), socket.io e token opcional. Detalhes e contrato em
+  `Edge/README.md`.
+- `Backend/server` (porta 3000): Auth, Users, Robots (CRUD + rotas de comando),
+  Tasks, Positions, Scenario, Orchestrator, socket.io pro front. Não fala mais
+  binário: `src/Classes/Edge/Edge.Client.ts` é o único ponto que conversa com a
+  borda (`EDGE_URL`, `EDGE_TOKEN`).
+
+**Contrato API↔borda** (sem MQTT entre elas):
+- Comandos: HTTP `POST /v1/robots/:address/commands/<comando>` com os mesmos
+  campos dos DTOs (move-raw, rgb-led, control-mode, waypoints, xgo-action).
+  Na borda o control-mode só aceita 0/1; SemiAuto→Auto e `robots.mode` seguem
+  na API (`RobotService.setControlMode`).
+- Telemetria: socket.io da borda, eventos `robot:state` / `robot:status` /
+  `robot:joined`. A API conecta como cliente e, a cada (re)conexão, puxa
+  `GET /v1/robots` para não perder robô que anunciou com ela fora.
+- O MQTT `/mari/{NETID}/to_edge|to_cloud` ficou só entre a borda e o
+  RobotSwarmSimulator.
+
+**O que mudou na API**:
+- `RobotService.dispatch` → `EdgeClient.sendCommand` (era codec +
+  `gateway.send`). `sendCommand(address, command, payload)` não recebe mais
+  `PayloadType`; o Orchestrator manda waypoints por ele igual antes.
+- `SwarmService.handleFrame` → `handleState` (estado já decodificado vindo da
+  borda) + `handleStatus` (status calculado pela borda). Sair de Active gera o
+  evento interno `robot.lost` uma vez por período de silêncio - mesmo
+  momento de antes (5 s). Cadastro automático, histórico de posição (throttle
+  por distância), persistência de status/bateria e `robot:update/status/new`
+  pro front continuam aqui, com o mesmo formato.
+- Erros da borda viram HTTP na API: borda fora = `503`, corpo recusado = `400`,
+  token errado/erro interno da borda = `502`.
+- `normalizeAddress` local em `src/Helpers/Address.ts`.
+- Saíram `serialport` e `mqtt` do `package.json`; entrou `socket.io-client`.
+  Os scripts `swarm:up`/`swarm:status`/`start:hw` foram para `Edge/server`.
+
+**Regras que valem a partir daqui**:
+- Entre `Edge/` e `Backend/` **pode copiar** código (enums, DTOs, tipos de
+  evento, `normalizeAddress`): nenhum dos dois importa o outro nem um pacote
+  compartilhado. Dentro de cada projeto, continua valendo não copiar.
+- Premissa: **um** sistema usando a borda por vez. Sem lease/arbitragem/escopos
+  até o dono pedir; se precisar, entra em `CommandService.send`, sem mudar rota.
+- As seções abaixo que falam de `src/Protocols/`, `src/adapter/`,
+  `GatewayModule`, `GATEWAY_MODE`, `MARI_*`, `MQTT_*` e "backend abrindo a
+  serial" descrevem código que **mudou de casa sem mudar** - hoje é
+  `Edge/server/src/...` e "a borda".
+
+**Subir tudo**: Postgres (`cd Backend && docker compose up -d`) → borda
+(`cd Edge/server && npm run start:dev`) → API (`cd Backend/server && npm run
+start:dev`). A API sobe mesmo com a borda fora e reconecta sozinha.
 
 ## Padrão de código de referência: `ApiGameHit`
 
@@ -300,6 +365,9 @@ Esta seção descreve o que já existe de verdade no código (supera as descriç
 antigas em "Correspondência com o DotBot", que eram planejamento). **Nota de
 pasta**: a implementação ficou em `src/Protocols/` (plural) e os enums de
 protocolo em `src/Enums/` (não `src/Protocol/Enums/` como o texto antigo dizia).
+**Desde 2026-10-10 tudo desta seção (Protocols, adapter, Gateway) mora em
+`Edge/server/src/`** - ver "Divisão API × borda". As rotas de comando da API
+continuam em `Backend/server/src/Classes/Robots/`, mas repassam à borda.
 
 Tudo foi conferido **byte a byte contra o PyDotBot original** (move, rgb,
 control-mode, waypoints, xgo-action e dotbot-advertisement), e o round-trip do
@@ -814,6 +882,9 @@ de verdade, não só retornar erro)
 
 ## Rede Mari (transporte real - EM ESCOPO)
 
+> Desde 2026-10-10 quem abre a serial é a **borda** (`Edge/server`, `GATEWAY_MODE=mari`
+> no `.env` dela), não a API - ver "Divisão API × borda".
+
 Decidido pelo dono do projeto: o sistema **tem** que funcionar com o robô e o
 gateway **reais** - a Mari está no escopo, não é "trabalho futuro". Pesquisa
 feita na fonte (pacotes `marilib` e repo `DotBots/mari`):
@@ -965,6 +1036,9 @@ Validar o `send` (cadeia inteira até o HDLC) contra o marilib, como no HDLC/pro
 > network_id dinamicamente, e usar `NODE_JOINED`/`NODE_LEFT` pra presença de nós.
 
 ## Conexão com o RobotSwarmSimulator (transporte MQTT — EM ESCOPO)
+
+> Desde 2026-10-10 quem conecta no broker é a **borda** (`Edge/server`, `GATEWAY_MODE=mqtt`
+> no `.env` dela); a API só fala com a borda - ver "Divisão API × borda".
 
 Além do gateway FÍSICO (serial/HDLC, seção "Rede Mari"), existe um repo
 separado — **RobotSwarmSimulator** (TypeScript/Vite) — que **impersona gateway
@@ -1155,15 +1229,19 @@ cd RobotSwarmSimulator && docker compose up -d      # Mosquitto: 1883 (TCP) + 90
 npm install                                          # 1ª vez
 MQTT_URL=mqtt://localhost:1883 npm run gateway       # usa scenarios/exemplo.json (NETID 1200)
 
-# 4) Backend NestJS no modo MQTT
-cd Backend/server
+# 4) Borda no modo MQTT
+cd Edge/server
 # .env: GATEWAY_MODE=mqtt, MARI_NETWORK_ID=0x1200, MQTT_URL=mqtt://localhost:1883
+npm install && npm run start:dev
+
+# 5) API (fala só com a borda: EDGE_URL=http://localhost:3001)
+cd Backend/server
 npm install && npm run start:dev
 ```
 
-Validação: o log do backend deve mostrar `[MQTT] conectado ... assinando
-/mari/1200/to_cloud`; em segundos o `SwarmService` decodifica os advertisements
-da frota e o auto-cadastro cria os robôs. Conferir em `GET /robots/:address/status`
+Validação: o log da borda deve mostrar `[MQTT] conectado ... assinando
+/mari/1200/to_cloud` e o da API `[EDGE] conectado na borda`; em segundos a borda
+decodifica os advertisements da frota e o auto-cadastro da API cria os robôs. Conferir em `GET /robots/:address/status`
 (ex.: `BDF2B04BC00D2725`, do `exemplo.json`) e mandar um comando de volta com
 `PUT /robots/:address/move-raw` — o log do gateway simulado deve mostrar o
 `⇩ move-raw` chegando.
@@ -1180,7 +1258,7 @@ da frota e o auto-cadastro cria os robôs. Conferir em `GET /robots/:address/sta
 >    antes). É por isso que o Mosquitto expõe 1883 (TCP, gateway/backend) **e**
 >    9001 (WebSocket, browser).
 >
-> Nos dois casos o backend precisa estar em `GATEWAY_MODE=mqtt` e com o
+> Nos dois casos a borda precisa estar em `GATEWAY_MODE=mqtt` e com o
 > `MARI_NETWORK_ID` batendo com o `network.id` do cenário (0x1200 no exemplo).
 
 > **Swarmit (orquestração) fica de fora por ora**: o `onCloudMessage` filtra
@@ -1199,8 +1277,9 @@ da frota e o auto-cadastro cria os robôs. Conferir em `GET /robots/:address/sta
   recalculada o tempo todo a partir de `lastSync`, não escolhida.
 - Não confundir `uuid` (chave interna do Postgres) com `address` (chave
   física do protocolo) - frames de rádio são endereçados por `address`.
-- Não gravar nem comparar `address` sem passar por `Protocol.normalizeAddress`
-  (ou `Protocol.readAddress`, ao ler dos bytes). A forma canônica é hex em
+- Não gravar nem comparar `address` sem passar por `normalizeAddress`
+  (`src/Helpers/Address.ts` na API; `Protocol.normalizeAddress`/`Protocol.readAddress`
+  na borda, ao ler dos bytes). A forma canônica é hex em
   **MAIÚSCULAS** (igual swarmit/CLI). O `toString(16)` devolve minúsculas e o
   Postgres compara com caixa: antes disso, robô cadastrado em maiúsculas não
   casava com o que chegava da rede, o auto-cadastro criava uma duplicata em
