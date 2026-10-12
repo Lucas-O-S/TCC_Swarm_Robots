@@ -1,14 +1,14 @@
 import type { ChangeEvent } from 'react';
-import type { ObstaclesModel } from '../../model/Obstacles.Model';
+import type { ObstacleModel } from '../../model/Obstacle.Model';
 import { ObstacleDrawerBase } from './ObstacleDrawerBase';
 import { Button } from '../Button/Button';
 import { DrawerBody, DrawerField, DrawerRow } from '../Drawer/DrawerForm';
 
 interface ObstacleDrawerProps {
   /** Todos os obstáculos do cenário — o drawer filtra sozinho quem está selecionado (ver useMapSelection). */
-  allObstacles: ObstaclesModel[];
+  allObstacles: ObstacleModel[];
   /** Só chamado com exatamente 1 selecionado (editar campos de vários de uma vez não faz sentido aqui) — o drawer já resolve o id, a tela só aplica o patch. */
-  onChange: (id: string, patch: Partial<ObstaclesModel>) => void;
+  onChange: (id: string, patch: Partial<ObstacleModel>) => void;
 }
 
 // Painel de edição da seleção de obstáculos no grid (ferramentas
@@ -37,8 +37,8 @@ function ObstacleFields({
   onChange,
   onRemove,
 }: {
-  obstacle: ObstaclesModel;
-  onChange: (patch: Partial<ObstaclesModel>) => void;
+  obstacle: ObstacleModel;
+  onChange: (patch: Partial<ObstacleModel>) => void;
   onRemove: () => void;
 }) {
   function handleNumberChange(field: 'sizeX' | 'sizeY') {

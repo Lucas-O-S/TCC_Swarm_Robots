@@ -46,7 +46,7 @@ const MIN_ARROW_SEGMENT = 28;
 // Rota planejada do robô (TaskModel.waypoints, src/model/Task.Model.ts)
 // desenhada sobre o <Map>: um ponto por parada (<circle>) ligado por uma
 // linha tracejada (<polyline>). x/y do TaskWaypointModel são célula do grid
-// (mesma convenção de ObstaclesModel.startPointX/Y), não mm — por isso usam
+// (mesma convenção de ObstacleModel.startPointX/Y), não mm — por isso usam
 // cellSize igual <Obstacle>/<Robot>. É um overlay do tamanho do mapa
 // inteiro, por isso não recebe left/top como os outros — quem posiciona
 // cada ponto é a lista `points`, não quem usa o componente.

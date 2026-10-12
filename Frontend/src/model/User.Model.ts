@@ -17,3 +17,14 @@ export interface UserSummaryModel {
   uuid: string;
   username: string;
 }
+
+/** Dados pra registrar um usuário (`POST /auth/register`). Senha: mínimo 6 caracteres. */
+export interface UserRegisterInput {
+  username: string;
+  password: string;
+}
+
+/** Edição (`PUT /users/:uuid`). Só o `username`: trocar senha é um fluxo à parte (ainda não existe no backend). */
+export interface UserUpdateInput {
+  username?: string;
+}

@@ -1,7 +1,7 @@
-import type { CenarioModel } from "./Cenario.Model";
+import type { ScenarioModel } from "./Scenario.Model";
 import type { RobotModel } from "./Robot.Model";
 
 export interface MapModel {
-    cenario: CenarioModel;
+    scenario: ScenarioModel;
     robots: RobotModel[];
 }

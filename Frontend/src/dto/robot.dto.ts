@@ -4,14 +4,13 @@ import { z } from 'zod';
  * Espelha a forma exposta de `RobotModel` no backend (`Robot.Model.ts` +
  * `Base.Model.ts`) — é o que vem em `GET /robots` e `GET /robots/:uuid`.
  *
- * `battery` vem em **Volts** (o model do backend já guarda convertido — "o
- * protocolo manda em mV; converta ao gravar", ver comentário lá). A UI
+ * `battery` vem em **Volts** (o model do backend já guarda convertido). A UI
  * converte pra percentual só na hora de exibir — ver `Robot.Mapper.ts`.
  *
- * SUPOSIÇÃO: `deletedAt` vem `null` enquanto o robô não foi removido
- * (soft-delete via `paranoid: true`); se o backend omitir o campo em vez
- * de mandar `null`, trocar para `.nullable().optional()`.
+ * `deletedAt` (confirmado: `paranoid: true` + `@DeletedAt`) vem `null` enquanto o
+ * robô existe; o schema também aceita ausência (`nullish`).
  */
+
 export const robotDtoSchema = z.object({
   uuid: z.string().uuid(),
   address: z.string(),
@@ -27,7 +26,7 @@ export const robotDtoSchema = z.object({
   taskId: z.string().uuid().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
-  deletedAt: z.string().nullable(),
+  deletedAt: z.string().nullish(),
 });
 
 export type RobotDto = z.infer<typeof robotDtoSchema>;

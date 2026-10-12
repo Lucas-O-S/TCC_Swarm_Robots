@@ -1,6 +1,5 @@
-// Tipos locais provisórios desta tela (UI). Substituir pelos modelos reais
-// (`RobotModel`, `robot:update`/`robot:status` do WebSocket) quando a
-// integração com o backend existir.
+// Tipos desta tela (UI). Os robôs vêm do backend (`RobotModel` + última
+// `PositionModel`), convertidos em `robotConnections.ts`.
 
 export type ConnectionStatus = 'online' | 'selecionado' | 'offline';
 
@@ -8,9 +7,17 @@ export type ConnectionStatus = 'online' | 'selecionado' | 'offline';
 export interface RobotConnection {
   id: string;
   label: string;
-  col: number;
-  row: number;
+  /** `null` = o backend ainda não registrou nenhuma posição desse robô. */
+  col: number | null;
+  row: number | null;
   status: ConnectionStatus;
+}
+
+/** Robô que já tem posição e, portanto, pode ser desenhado no mapa. */
+export type PositionedRobot = RobotConnection & { col: number; row: number };
+
+export function hasPosition(robot: RobotConnection): robot is PositionedRobot {
+  return robot.col !== null && robot.row !== null;
 }
 
 // Barreira retangular no mapa (em células de grid).

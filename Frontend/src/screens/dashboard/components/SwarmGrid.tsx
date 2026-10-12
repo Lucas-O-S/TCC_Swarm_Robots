@@ -2,7 +2,8 @@ import type { MouseEvent } from 'react';
 import { MapCanvas } from '../../../components/MapCanvas/MapCanvas';
 import { useMapElement } from '../../../hooks/useMapElements';
 import type { MapElementsController } from '../../../hooks/useMapElements';
-import type { ChargePoint, Obstacle, RobotConnection } from '../types';
+import { hasPosition } from '../types';
+import type { ChargePoint, Obstacle, PositionedRobot, RobotConnection } from '../types';
 import { GRID_COLS, GRID_ROWS } from '../hooks/useSwarmGrid';
 import styles from './SwarmGrid.module.css';
 
@@ -24,7 +25,7 @@ interface SwarmGridProps {
 // do mapa usa (ver src/hooks/useMapElements.tsx): clique seleciona,
 // Ctrl/Cmd+clique soma à seleção, arrastar em área seleciona vários. Sem
 // `movable` — posição de robô aqui é dado do enxame, não algo pra arrastar.
-function RobotMarker({ robot }: { robot: RobotConnection }) {
+function RobotMarker({ robot }: { robot: PositionedRobot }) {
   const centerX = robot.col * CELL + CELL / 2;
   const centerY = robot.row * CELL + CELL / 2;
   const { selected } = useMapElement({
@@ -98,7 +99,7 @@ export function SwarmGrid({
         title="Ponto de recarregamento"
       />
 
-      {robots.map((robot) => (
+      {robots.filter(hasPosition).map((robot) => (
         <RobotMarker key={robot.id} robot={robot} />
       ))}
     </MapCanvas>

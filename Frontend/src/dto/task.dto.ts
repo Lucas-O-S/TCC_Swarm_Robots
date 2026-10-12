@@ -11,11 +11,12 @@ const taskRobotSummarySchema = z.object({
 /**
  * Espelha a forma exposta de `TaskModel` (+ `TaskWaypointModel` aninhado).
  *
- * `robots`/`waypoints` são opcionais/tolerantes: SUPOSIÇÃO de que
- * `GET /tasks` inclui as associações (`@HasMany`) por padrão — se o
- * backend não trouxer, chegam `undefined` e a UI trata como lista vazia
- * (ver `Task.Mapper.ts`). Mesma suposição de `deletedAt` de `robot.dto.ts`.
- */
+ * `robots`/`waypoints` são opcionais: `GET /tasks` e
+ * `GET /tasks/:uuid` usam o `getAll`/`getOne` genérico do backend, SEM
+ * `include` das associações — então chegam `undefined` e a UI trata como
+ * lista vazia. Só o uso interno do Orchestrator carrega os waypoints.
+ * `deletedAt`: tolerante (`nullish`) — o Sequelize (paranoid) manda `null`
+ * enquanto a task existe. */
 export const taskDtoSchema = z.object({
   uuid: z.string().uuid(),
   name: z.string(),
@@ -25,7 +26,7 @@ export const taskDtoSchema = z.object({
   robots: z.array(taskRobotSummarySchema).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
-  deletedAt: z.string().nullable(),
+  deletedAt: z.string().nullish(),
 });
 
 export type TaskDto = z.infer<typeof taskDtoSchema>;

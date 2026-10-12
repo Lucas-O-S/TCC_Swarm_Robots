@@ -19,7 +19,7 @@ interface MapMenuLayoutProps {
 
 // Layout de duas colunas (mapa + menu lateral) reutilizado pelas telas que
 // combinam um <MapCanvas> com um painel de configuração/controle ao lado
-// (ex.: CenarioBuilder). Mede a altura disponível da coluna do mapa e
+// (ex.: ScenarioBuilder). Mede a altura disponível da coluna do mapa e
 // repassa pro conteúdo, pra ele preencher a tela sem estourar o rodapé.
 // Com `header`, a faixa fica em cima das duas colunas; se ela mudar de
 // altura (quebra de linha, aviso aparecendo), a altura do mapa é recalculada.

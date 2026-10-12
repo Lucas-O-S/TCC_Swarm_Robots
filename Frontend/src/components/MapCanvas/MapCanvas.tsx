@@ -31,7 +31,7 @@ interface MapCanvasProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'
   cellSize?: number;
   minZoom?: number;
   maxZoom?: number;
-  /** Quando presente, `cenario.sizeX/sizeY` prevalecem sobre `cols`/`rows`. */
+  /** Quando presente, `scenario.sizeX/sizeY` prevalecem sobre `cols`/`rows`. */
   mapModel?: MapModel;
   /** Quando true, ignora `cellSize` e calcula a célula a partir da largura disponível do container pai, então o mapa cresce/encolhe pra preencher o espaço em vez de ficar em tamanho fixo. */
   fitWidth?: boolean;
@@ -56,7 +56,7 @@ interface MapCanvasProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'
    * elemento): quando `tool === createTool`, arrastar numa célula vazia
    * (sem nenhum elemento registrado ali) desenha esse retângulo e chama
    * `onCreateElement` ao soltar, em vez de cair no pan/seleção padrão do
-   * mapa — ex.: a ferramenta "obstáculo" do CenarioBuilder.
+   * mapa — ex.: a ferramenta "obstáculo" do ScenarioBuilder.
    */
   createTool?: string;
   onCreateElement?: (rect: CellSelectRect) => void;
@@ -109,8 +109,8 @@ export function MapCanvas({
   elements: elementsProp,
   ...rest
 }: MapCanvasProps) {
-  const effectiveCols = Math.max(1, mapModel?.cenario.sizeX ?? cols);
-  const effectiveRows = Math.max(1, mapModel?.cenario.sizeY ?? rows);
+  const effectiveCols = Math.max(1, mapModel?.scenario.sizeX ?? cols);
+  const effectiveRows = Math.max(1, mapModel?.scenario.sizeY ?? rows);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number | null>(null);

@@ -16,7 +16,7 @@ import { AreaDrawer } from "../../components/AreaDrawer/AreaDrawer";
 import { SelectReadyMapModal } from "../../components/SelectReadyMapModal/SelectReadyMapModal";
 import { Button } from "../../components/Button/Button";
 import { TaskService } from "../../services/Task.Service";
-import { CenarioService } from "../../services/Cenario.Service";
+import { ScenarioService } from "../../services/Scenario.Service";
 import {
   areaCorners,
   areaTraversal,
@@ -39,11 +39,11 @@ const PLAYBACK_SPEED = 5;
 type Tool = "move" | "select" | "waypoint" | "area" | "robot";
 type SaveState = { status: "idle" | "saving" | "error" | "success"; message?: string };
 
-// Construtor de tasks (rota de waypoints) — mesmo padrão do CenarioBuilder:
+// Construtor de tasks (rota de waypoints) — mesmo padrão do ScenarioBuilder:
 // <MapCanvas> com uma ferramenta extra (aqui "waypoint" em vez de
 // "obstáculo") que desenha um elemento novo em célula vazia, e o resto
 // (mover/selecionar/arrastar/apagar) de graça via useMapElement (ver
-// <Waypoint>). Diferente do CenarioBuilder: a rota precisa saber o tamanho
+// <Waypoint>). Diferente do ScenarioBuilder: a rota precisa saber o tamanho
 // do grid e os obstáculos de um mapa já existente (pra desviar deles), então
 // selecionar um mapa é obrigatório antes de liberar o mapa — ver
 // SelectReadyMapModal. Sem conexão com o banco ainda, a única opção é o mock
@@ -69,7 +69,7 @@ export function TaskBuilder() {
   const canMoveWaypoint = tool === "select" || createTool;
 
   function handleSelectMockMap() {
-    setMapConfig(CenarioService.createMockMap());
+    setMapConfig(ScenarioService.createMockMap());
     setStops([]);
     removeRobot();
   }
@@ -124,14 +124,13 @@ export function TaskBuilder() {
     }
 
     setSaveState({ status: "saving" });
-    const result = await TaskService.create(
-      name,
-      waypoints.map((w) => ({ x: w.x, y: w.y })),
-    );
+    // ATENÇÃO: o backend (POST /tasks) só aceita `name` e `priority`. Os
+    // waypoints desenhados ainda NÃO são enviados — falta rota no backend.
+    const result = await TaskService.create({ name: name.trim() });
 
     setSaveState(
       result.ok
-        ? { status: "success", message: `Task "${result.data.name}" salva.` }
+        ? { status: "success", message: `Task "${result.data.name}" salva (os pontos do trajeto ainda não são enviados ao servidor).` }
         : { status: "error", message: result.message },
     );
   }
@@ -142,7 +141,7 @@ export function TaskBuilder() {
   const { order: orderById, points } = flattenRoute(stops);
   const routePoints = points.map((p, index) => ({ orderIndex: index, x: p.x, y: p.y }));
   // Paredes = obstáculos do mapa escolhido, no formato da colisão do robô.
-  const walls: Wall[] = (mapConfig?.cenario.Obstacles ?? []).map((o) => ({
+  const walls: Wall[] = (mapConfig?.scenario.obstacles ?? []).map((o) => ({
     id: o.id,
     name: o.name,
     x: o.startPointX,
@@ -181,7 +180,7 @@ export function TaskBuilder() {
               <>
                 <div className={styles.mapSummary}>
                   <span>
-                    {mapConfig.cenario.name} ({mapConfig.cenario.sizeX}×{mapConfig.cenario.sizeY})
+                    {mapConfig.scenario.name} ({mapConfig.scenario.sizeX}×{mapConfig.scenario.sizeY})
                   </span>
                   <Button variant="outline" onClick={handleChangeMap}>
                     Trocar mapa
@@ -239,7 +238,7 @@ export function TaskBuilder() {
             return <div className={styles.placeholder} style={{ height: maxMapHeight }} />;
           }
 
-          const { cenario } = mapConfig;
+          const { scenario } = mapConfig;
 
           return (
             <MapCanvas
@@ -252,9 +251,9 @@ export function TaskBuilder() {
               createTool={createTool ? tool : undefined}
               onCreateElement={(rect) => {
                 if (waypointTool) {
-                  setStops((prev) => [...prev, createWaypointFromRect(rect, cenario.sizeX, cenario.sizeY)]);
+                  setStops((prev) => [...prev, createWaypointFromRect(rect, scenario.sizeX, scenario.sizeY)]);
                 } else if (areaTool) {
-                  const next = createAreaFromRect(rect, cenario.sizeX, cenario.sizeY, points.at(-1));
+                  const next = createAreaFromRect(rect, scenario.sizeX, scenario.sizeY, points.at(-1));
                   if (next) setStops((prev) => [...prev, next]);
                 } else if (robotTool) {
                   // Célula sob o clique (floor, não round) travada no grid.
@@ -262,8 +261,8 @@ export function TaskBuilder() {
                   // ferramenta desliga sozinha depois de posicionar (numa
                   // parede não posiciona e continua ligada).
                   const placed = moveRobotTo({
-                    x: Math.max(0, Math.min(cenario.sizeX - 1, Math.floor(rect.startPointX))),
-                    y: Math.max(0, Math.min(cenario.sizeY - 1, Math.floor(rect.startPointY))),
+                    x: Math.max(0, Math.min(scenario.sizeX - 1, Math.floor(rect.startPointX))),
+                    y: Math.max(0, Math.min(scenario.sizeY - 1, Math.floor(rect.startPointY))),
                   });
                   if (placed) setTool("move");
                 }
@@ -347,7 +346,7 @@ export function TaskBuilder() {
             >
               {(cellWidth, cellHeight) => (
                 <>
-                  {cenario.Obstacles.map((obstacle) => (
+                  {scenario.obstacles.map((obstacle) => (
                     <Obstacle
                       key={obstacle.id}
                       label={obstacle.name}
@@ -415,8 +414,8 @@ export function TaskBuilder() {
                           updateAreaCorner(
                             area.id,
                             point.corner,
-                            Math.max(0, Math.min(cenario.sizeX - 1, Math.round(next.x / cellWidth - 0.5))),
-                            Math.max(0, Math.min(cenario.sizeY - 1, Math.round(next.y / cellHeight - 0.5))),
+                            Math.max(0, Math.min(scenario.sizeX - 1, Math.round(next.x / cellWidth - 0.5))),
+                            Math.max(0, Math.min(scenario.sizeY - 1, Math.round(next.y / cellHeight - 0.5))),
                           )
                         }
                         removable
@@ -436,8 +435,8 @@ export function TaskBuilder() {
                       movable
                       onMove={(next) =>
                         updateWaypoint(waypoint.id, {
-                          x: Math.max(0, Math.min(cenario.sizeX - 1, Math.round(next.x / cellWidth - 0.5))),
-                          y: Math.max(0, Math.min(cenario.sizeY - 1, Math.round(next.y / cellHeight - 0.5))),
+                          x: Math.max(0, Math.min(scenario.sizeX - 1, Math.round(next.x / cellWidth - 0.5))),
+                          y: Math.max(0, Math.min(scenario.sizeY - 1, Math.round(next.y / cellHeight - 0.5))),
                         })
                       }
                       removable
@@ -460,8 +459,8 @@ export function TaskBuilder() {
                       blocked={blockedBy !== null}
                       onMove={(next) =>
                         moveRobotTo({
-                          x: Math.max(0, Math.min(cenario.sizeX - 1, Math.round(next.x / cellWidth - 0.5))),
-                          y: Math.max(0, Math.min(cenario.sizeY - 1, Math.round(next.y / cellHeight - 0.5))),
+                          x: Math.max(0, Math.min(scenario.sizeX - 1, Math.round(next.x / cellWidth - 0.5))),
+                          y: Math.max(0, Math.min(scenario.sizeY - 1, Math.round(next.y / cellHeight - 0.5))),
                         })
                       }
                       onRemove={removeRobot}
