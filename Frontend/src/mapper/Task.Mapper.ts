@@ -3,6 +3,7 @@ import type { TaskCreateRequest } from '../dto/task.create.dto';
 import type { TaskUpdateRequest } from '../dto/task.update.dto';
 import type { TaskInput, TaskModel, TaskUpdateInput } from '../model/Task.Model';
 import { compact } from './compact';
+import type { Vec2Model } from '../model/SimWorld.Model';
 
 export const TaskMapper = {
   fromDto(dto: TaskDto): TaskModel {
@@ -27,5 +28,10 @@ export const TaskMapper = {
 
   toUpdateDto(input: TaskUpdateInput): TaskUpdateRequest {
     return compact({ name: input.name, priority: input.priority });
+  },
+
+  /** Pontos da rota da tarefa na ordem (orderIndex), em mm — o que o mapa desenha (Simulação e Visualizador). */
+  routePoints(task: TaskModel): Vec2Model[] {
+    return [...task.waypoints].sort((a, b) => a.orderIndex - b.orderIndex).map((w) => ({ x: w.x, y: w.y }));
   },
 };

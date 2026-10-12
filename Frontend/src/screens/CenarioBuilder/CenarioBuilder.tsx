@@ -1,7 +1,7 @@
 import type { ChangeEvent } from "react";
 import { useState } from "react";
-import type { CenarioModel } from "../../model/Scenario.Model";
-import type { ObstaclesModel } from "../../model/Obstacles.Model";
+import type { ScenarioModel } from "../../model/Scenario.Model";
+import type { ObstacleModel } from "../../model/Obstacle.Model";
 import type { MapModel } from "../../model/Map.Model";
 import { MapCanvas } from "../../components/MapCanvas/MapCanvas";
 import { MapMenuLayout } from "../../components/MapMenuLayout/MapMenuLayout";
@@ -12,8 +12,8 @@ import { ObstacleIcon } from "../../components/MapToolButton/icons";
 import { SelectMapModal } from "../../components/SelectMapModal/SelectMapModal";
 import { ObstacleDrawer } from "../../components/ObstacleDrawer/ObstacleDrawer";
 import { Button } from "../../components/Button/Button";
-import { CenarioService } from "../../services/Scenario.Service";
-import { createObstacleFromRect } from "./useObstacleEditor";
+import { ScenarioService } from "../../services/Scenario.Service";
+import { createObstacleFromRect } from "./hooks/useObstacleEditor";
 import styles from "./CenarioBuilder.module.css";
 
 type Tool = "move" | "select" | "obstacle";
@@ -21,10 +21,10 @@ type Tool = "move" | "select" | "obstacle";
 export function CenarioBuilder() {
 
     const [isSelectMapOpen, setIsSelectMapOpen] = useState(true);
-    const [mapConfig, setMapConfig] = useState<MapModel>(CenarioService.createBlankMap);
+    const [mapConfig, setMapConfig] = useState<MapModel>(ScenarioService.createBlankMap);
 
-    function updateCenario<K extends keyof CenarioModel>(field: K, value: CenarioModel[K]) {
-        setMapConfig((prev) => ({ ...prev, cenario: { ...prev.cenario, [field]: value } }));
+    function updateCenario<K extends keyof ScenarioModel>(field: K, value: ScenarioModel[K]) {
+        setMapConfig((prev) => ({ ...prev, scenario: { ...prev.scenario, [field]: value } }));
     }
 
     function handleNumberChange(field: "sizeX" | "sizeY") {
@@ -34,16 +34,16 @@ export function CenarioBuilder() {
         };
     }
 
-    function handleObstaclesChange(obstacles: ObstaclesModel[]) {
-        updateCenario("Obstacles", obstacles);
+    function handleObstaclesChange(obstacles: ObstacleModel[]) {
+        updateCenario("obstacles", obstacles);
     }
 
-    function updateObstacle(id: string, patch: Partial<ObstaclesModel>) {
-        handleObstaclesChange(mapConfig.cenario.Obstacles.map((o) => (o.id === id ? { ...o, ...patch } : o)));
+    function updateObstacle(id: string, patch: Partial<ObstacleModel>) {
+        handleObstaclesChange(mapConfig.scenario.obstacles.map((o) => (o.id === id ? { ...o, ...patch } : o)));
     }
 
     function removeObstacle(id: string) {
-        handleObstaclesChange(mapConfig.cenario.Obstacles.filter((o) => o.id !== id));
+        handleObstaclesChange(mapConfig.scenario.obstacles.filter((o) => o.id !== id));
     }
 
     const [tool, setTool] = useState<Tool>("move");
@@ -51,7 +51,7 @@ export function CenarioBuilder() {
     const canMoveObstacle = tool === "select" || tool === "obstacle";
 
     function handleCreateBlank() {
-        setMapConfig(CenarioService.createBlankMap());
+        setMapConfig(ScenarioService.createBlankMap());
         setIsSelectMapOpen(false);
     }
 
@@ -73,7 +73,7 @@ export function CenarioBuilder() {
                         Nome
                         <input
                             type="text"
-                            value={mapConfig.cenario.name}
+                            value={mapConfig.scenario.name}
                             onChange={(e) => updateCenario("name", e.target.value)}
                         />
                     </label>
@@ -81,7 +81,7 @@ export function CenarioBuilder() {
                     <label className={styles.field}>
                         Descrição
                         <textarea
-                            value={mapConfig.cenario.description}
+                            value={mapConfig.scenario.description}
                             onChange={(e) => updateCenario("description", e.target.value)}
                         />
                     </label>
@@ -92,7 +92,7 @@ export function CenarioBuilder() {
                             <input
                                 type="number"
                                 min={1}
-                                value={mapConfig.cenario.sizeX}
+                                value={mapConfig.scenario.sizeX}
                                 onChange={handleNumberChange("sizeX")}
                             />
                         </label>
@@ -102,7 +102,7 @@ export function CenarioBuilder() {
                             <input
                                 type="number"
                                 min={1}
-                                value={mapConfig.cenario.sizeY}
+                                value={mapConfig.scenario.sizeY}
                                 onChange={handleNumberChange("sizeY")}
                             />
                         </label>
@@ -124,7 +124,7 @@ export function CenarioBuilder() {
                     onToolChange={setTool}
                     createTool="obstacle"
                     onCreateElement={(rect) =>
-                        handleObstaclesChange([...mapConfig.cenario.Obstacles, createObstacleFromRect(rect, mapConfig.cenario.Obstacles)])
+                        handleObstaclesChange([...mapConfig.scenario.obstacles, createObstacleFromRect(rect, mapConfig.scenario.obstacles)])
                     }
                     renderCreatePreview={(rect) => (
                         <Obstacle
@@ -144,11 +144,11 @@ export function CenarioBuilder() {
                             <ObstacleIcon />
                         </MapToolButton>
                     }
-                    panel={<ObstacleDrawer allObstacles={mapConfig.cenario.Obstacles} onChange={updateObstacle} />}
+                    panel={<ObstacleDrawer allObstacles={mapConfig.scenario.obstacles} onChange={updateObstacle} />}
                 >
                     {(cellWidth, cellHeight) => (
                         <>
-                            {mapConfig.cenario.Obstacles.map((obstacle) => (
+                            {mapConfig.scenario.obstacles.map((obstacle) => (
                                 <Obstacle
                                     key={obstacle.id}
                                     id={obstacle.id}
@@ -177,5 +177,4 @@ export function CenarioBuilder() {
         </MapMenuLayout>
         </>
     )
-
 }

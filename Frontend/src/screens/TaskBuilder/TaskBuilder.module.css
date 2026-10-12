@@ -15,6 +15,20 @@
   pointer-events: none;
 }
 
+.innerAreaPoint {
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.areaOutline {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--color-yellow) 22%, transparent);
+  pointer-events: none;
+}
+
 .field {
   display: flex;
   flex-direction: column;

@@ -71,4 +71,14 @@
 
 .content {
   flex: 1;
+  transition: padding-right 0.2s ease;
+}
+
+/* Drawer aberto (ver <Drawer>, à direita): empurra o conteúdo da tela pra
+   esquerda, na mesma largura e no mesmo tempo da animação dele. Em tela
+   estreita o drawer continua por cima, senão sobraria pouco espaço pro resto. */
+@media (min-width: 781px) {
+  .content:has([data-drawer-open='true']) {
+    padding-right: var(--drawer-width, 280px);
+  }
 }

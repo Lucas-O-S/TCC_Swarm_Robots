@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { AuthService } from '../../services/Auth.Service';
 import styles from './AppLayout.module.css';
@@ -11,10 +12,11 @@ interface NavItem {
 // "Robôs" removida a pedido (2026-09-01): a tela saiu do projeto por
 // enquanto (só a estrutura de integração com o backend ficou). Devolver
 // aqui quando a tela voltar. "Tarefas" voltou como TaskBuilder.
+// "Mapa & Conexão" (/dashboard) e "Teste Mapa" (/mapa-teste) sem acesso a
+// pedido (2026-10-05); as telas continuam no projeto.
 const NAV_ITEMS: NavItem[] = [
-  { to: '/dashboard', label: 'Mapa & Conexão' },
   { to: '/simulacao', label: 'Simulação' },
-  { to: '/mapa-teste', label: 'Teste Mapa' },
+  { to: '/visualizador', label: 'Visualizador' },
   { to: '/CenarioBuilder', label: 'Construtor de Cenários' },
   { to: '/TaskBuilder', label: 'Tarefas' },
 ];
@@ -24,6 +26,33 @@ const NAV_ITEMS: NavItem[] = [
 // renderizado no lugar do <Outlet /> (ver AppRoutes.tsx).
 export function AppLayout() {
   const navigate = useNavigate();
+  const layoutRef = useRef<HTMLDivElement>(null);
+  const topbarRef = useRef<HTMLElement>(null);
+
+  // Os drawers abrem logo abaixo da barra (a altura dela muda quando as abas
+  // quebram de linha); rolando a página, sobem junto até o topo da janela.
+  useEffect(() => {
+    let frame = 0;
+    function update() {
+      frame = 0;
+      const bottom = topbarRef.current?.getBoundingClientRect().bottom ?? 0;
+      layoutRef.current?.style.setProperty('--drawer-top', `${Math.max(0, bottom)}px`);
+    }
+    function schedule() {
+      if (!frame) frame = requestAnimationFrame(update);
+    }
+    update();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    const observer = topbarRef.current ? new ResizeObserver(schedule) : null;
+    if (observer && topbarRef.current) observer.observe(topbarRef.current);
+    return () => {
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+      observer?.disconnect();
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
 
   function handleLogout() {
     AuthService.logout();
@@ -31,8 +60,8 @@ export function AppLayout() {
   }
 
   return (
-    <div className={styles.layout}>
-      <header className={styles.topbar}>
+    <div className={styles.layout} ref={layoutRef}>
+      <header className={styles.topbar} ref={topbarRef}>
         <span className={styles.brand}>
           <svg viewBox="0 0 24 24" className={styles.brandIcon} aria-hidden="true">
             <path

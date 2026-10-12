@@ -10,14 +10,11 @@ import { ScenarioBuilder } from '../screens/ScenarioBuilder/ScenarioBuilder';
 const LoginScreen = lazy(() =>
   import('../screens/auth/LoginScreen').then((m) => ({ default: m.LoginScreen })),
 );
-const DashboardScreen = lazy(() =>
-  import('../screens/dashboard/DashboardScreen').then((m) => ({ default: m.DashboardScreen })),
+const Simulation = lazy(() =>
+  import('../screens/Simulation/Simulation').then((m) => ({ default: m.Simulation })),
 );
-const SimulationScreen = lazy(() =>
-  import('../screens/simulator/ui/SimulationScreen').then((m) => ({ default: m.SimulationScreen })),
-);
-const MapTestScreen = lazy(() =>
-  import('../screens/map-test/MapTestScreen').then((m) => ({ default: m.MapTestScreen })),
+const Visualizer = lazy(() =>
+  import('../screens/Visualizer/Visualizer').then((m) => ({ default: m.Visualizer })),
 );
 const TaskBuilder = lazy(() =>
   import('../screens/TaskBuilder/TaskBuilder').then((m) => ({ default: m.TaskBuilder })),
@@ -29,7 +26,10 @@ const TaskBuilder = lazy(() =>
 // /robos removida a pedido (2026-09-01): só a estrutura de integração com o
 // backend (src/dto, src/model, src/mapper, src/services/RobotService)
 // deveria existir nesta rodada, sem tela ainda. /tarefas voltou como
-// TaskBuilder (mesmo padrão do ScenarioBuilder, ver src/screens/TaskBuilder).
+// TaskBuilder (mesmo padrão do CenarioBuilder, ver src/screens/TaskBuilder).
+//
+// /dashboard e /mapa-teste sem acesso a pedido (2026-10-05): as telas
+// continuam em src/screens (dashboard, map-test), só sem rota e sem menu.
 export function AppRoutes() {
   return (
     <BrowserRouter>
@@ -38,16 +38,12 @@ export function AppRoutes() {
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginScreen />} />
 
-          <Route element={<RequireAuth />}>
-            <Route element={<AppLayout />}>
-              <Route path="/dashboard" element={<DashboardScreen />} />
-              <Route path="/simulacao" element={<SimulationScreen />} />
-              <Route path="/mapa-teste" element={<MapTestScreen />} />
-              <Route path="/ScenarioBuilder" element={<ScenarioBuilder />} />
-              {/* Rota antiga (antes do rename Cenario -> Scenario): mantém links salvos funcionando. */}
-              <Route path="/CenarioBuilder" element={<Navigate to="/ScenarioBuilder" replace />} />
-              <Route path="/TaskBuilder" element={<TaskBuilder />} />
-            </Route>
+          <Route element={<AppLayout />}>
+            <Route path="/simulacao" element={<Simulation />} />
+            <Route path="/visualizador" element={<Visualizer />} />
+            {/* Rota antiga (antes do rename Cenario -> Scenario): mantém links salvos funcionando. */}
+            <Route path="/CenarioBuilder" element={<Navigate to="/ScenarioBuilder" replace />} />
+            <Route path="/TaskBuilder" element={<TaskBuilder />} />
           </Route>
         </Routes>
       </Suspense>

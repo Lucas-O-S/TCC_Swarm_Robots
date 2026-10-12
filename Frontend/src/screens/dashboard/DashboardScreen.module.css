@@ -5,6 +5,8 @@
 
 .headerRow {
   display: flex;
+  /* Página espelhada: botões à esquerda, título à direita. */
+  flex-direction: row-reverse;
   justify-content: space-between;
   align-items: flex-start;
   flex-wrap: wrap;
@@ -27,7 +29,8 @@
 
 .body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
+  /* Página espelhada: lista à esquerda, mapa à direita. */
+  grid-template-columns: 220px minmax(0, 1fr);
   gap: 32px;
   align-items: start;
 }
@@ -35,7 +38,10 @@
 .mapColumn {
   display: flex;
   flex-direction: column;
+  /* Página espelhada: mapa, botões e dica encostados na direita. */
+  align-items: flex-end;
   gap: 12px;
+  order: 2;
 }
 
 .mapActions {
@@ -47,10 +53,28 @@
   font-size: 12px;
   color: var(--color-text-muted);
   max-width: 460px;
+  text-align: right;
 }
 
 @media (max-width: 780px) {
+  /* Tela estreita: título e botões empilham na ordem normal (espelhado, os
+     botões que não cabem vazariam pela esquerda, fora do alcance do scroll). */
+  .headerRow {
+    flex-direction: row;
+  }
+
   .body {
     grid-template-columns: 1fr;
+  }
+
+  /* Uma coluna só: o mapa continua vindo primeiro, alinhado como antes
+     (encostar na direita cortaria um mapa mais largo que a tela). */
+  .mapColumn {
+    order: 0;
+    align-items: stretch;
+  }
+
+  .hint {
+    text-align: left;
   }
 }
