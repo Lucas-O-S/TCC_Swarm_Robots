@@ -10,27 +10,26 @@ import styles from './MapTestScreen.module.css';
 
 const CELL_SIZE = 32;
 
-// Mock de CenarioModel — sizeX/sizeY definem o grid (em células) e cada
+// Mock de ScenarioModel — sizeX/sizeY definem o grid (em células) e cada
 // item de Obstacles.startPointX/startPointY + sizeX/sizeY posiciona e
 // dimensiona um obstáculo dentro dele.
 const MOCK_MAP: MapModel = {
-  cenario: {
+  scenario: {
+    uuid: null,
     name: 'Cenário de teste',
     description: 'Mock local só pra validar Map + Obstacle',
     sizeX: 10,
     sizeY: 8,
-    obstacles: true,
-    Obstacles: [
+    obstacles: [
       {
         id: 'mock-obstacle-1',
         name: 'Parede 1',
         description: 'Obstáculo mock',
         sizeX: 2,
         sizeY: 1,
-        obstacles: true,
         startPointX: 3,
         startPointY: 3,
-        cenarioId: 'mock-cenario',
+        scenarioId: 'mock-scenario',
       },
       {
         id: 'mock-obstacle-2',
@@ -38,10 +37,9 @@ const MOCK_MAP: MapModel = {
         description: 'Obstáculo mock',
         sizeX: 1,
         sizeY: 3,
-        obstacles: true,
         startPointX: 7,
         startPointY: 1,
-        cenarioId: 'mock-cenario',
+        scenarioId: 'mock-scenario',
       },
     ],
   },
@@ -91,8 +89,8 @@ export function MapTestScreen() {
     <Card className={styles.card}>
       <h1 className={styles.title}>Teste: Map + Robot (mock)</h1>
 
-      <MapCanvas cols={MOCK_MAP.cenario.sizeX} rows={MOCK_MAP.cenario.sizeY} cellSize={CELL_SIZE}>
-        {MOCK_MAP.cenario.Obstacles.map((obstacle) => (
+      <MapCanvas cols={MOCK_MAP.scenario.sizeX} rows={MOCK_MAP.scenario.sizeY} cellSize={CELL_SIZE}>
+        {MOCK_MAP.scenario.obstacles.map((obstacle) => (
           <Obstacle
             key={obstacle.id}
             id={obstacle.id}

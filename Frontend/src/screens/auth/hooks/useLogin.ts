@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AuthService } from '../../../services/Auth.Service';
 
 // "Controller" da tela de login: guarda o estado dos campos e trata o submit.
-// Quando o backend existir de verdade, o handleSubmit chamará o authService
-// (POST /auth/login) e guardará o JWT retornado.
+// O handleSubmit chama o AuthService (POST /auth/login), que guarda o JWT.
 export function useLogin() {
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
@@ -23,8 +23,11 @@ export function useLogin() {
 
     setLoading(true);
     try {
-      // TODO: integrar com authService.login({ username, password }) assim
-      // que a rota POST /auth/login estiver ligada no AUTH_ACTIVATED=true.
+      const result = await AuthService.login({ username: username.trim(), password });
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
       navigate('/dashboard');
     } finally {
       setLoading(false);

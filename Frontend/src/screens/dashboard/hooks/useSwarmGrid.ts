@@ -1,22 +1,9 @@
 import { useCallback, useState } from 'react';
-import type { ChargePoint, Obstacle, RobotConnection } from '../types';
+import type { ChargePoint, Obstacle } from '../types';
 
 // Dimensões do grid do mapa (em células).
 export const GRID_COLS = 14;
 export const GRID_ROWS = 8;
-
-const INITIAL_ROBOTS: RobotConnection[] = [
-  { id: 'R01', label: 'R01', col: 2, row: 1, status: 'online' },
-  { id: 'R02', label: 'R02', col: 5, row: 1, status: 'online' },
-  { id: 'R03', label: 'R03', col: 7, row: 1, status: 'online' },
-  { id: 'R04', label: 'R04', col: 4, row: 2, status: 'online' },
-  { id: 'R05', label: 'R05', col: 6, row: 3, status: 'online' },
-  { id: 'R06', label: 'R06', col: 9, row: 2, status: 'online' },
-  { id: 'R07', label: 'R07', col: 12, row: 3, status: 'online' },
-  { id: 'R08', label: 'R08', col: 2, row: 5, status: 'selecionado' },
-  { id: 'R09', label: 'R09', col: 3, row: 4, status: 'offline' },
-  { id: 'R10', label: 'R10', col: 8, row: 5, status: 'offline' },
-];
 
 const INITIAL_OBSTACLES: Obstacle[] = [
   { id: 'obs-1', col: 6, row: 5, width: 4, height: 2 },
@@ -26,10 +13,10 @@ const INITIAL_CHARGE_POINT: ChargePoint = { col: 2, row: 4 };
 
 // Concentra o estado e as interações do mapa do enxame: seleção de robô,
 // posicionamento do ponto de recarregamento e edição (simplificada) de
-// obstáculos. Fica fora do componente de UI para o SwarmGrid.tsx ficar
+// obstáculos (ainda locais: não há rotas de cenário no backend). Os robôs
+// vêm de `useRobotConnections`. Fica fora do componente de UI para o SwarmGrid.tsx ficar
 // só com o desenho.
 export function useSwarmGrid() {
-  const [robots] = useState<RobotConnection[]>(INITIAL_ROBOTS);
   const [obstacles, setObstacles] = useState<Obstacle[]>(INITIAL_OBSTACLES);
   const [chargePoint, setChargePoint] = useState<ChargePoint>(INITIAL_CHARGE_POINT);
   const [placingCharge, setPlacingCharge] = useState(false);
@@ -78,7 +65,6 @@ export function useSwarmGrid() {
   }, []);
 
   return {
-    robots,
     obstacles,
     chargePoint,
     placingCharge,

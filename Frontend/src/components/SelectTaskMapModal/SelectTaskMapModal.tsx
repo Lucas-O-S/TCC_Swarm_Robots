@@ -1,19 +1,21 @@
 import { Modal } from '../Modal/Modal';
-import { Button } from '../Button/Button';
+import { SavedScenarioList } from '../SavedScenarioList/SavedScenarioList';
+import { useScenarioList } from '../../hooks/useScenarioList';
+import type { ScenarioModel } from '../../model/Scenario.Model';
 import styles from './SelectTaskMapModal.module.css';
 
 interface SelectTaskMapModalProps {
   open: boolean;
-  onSelectMock: () => void;
+  onSelect: (scenario: ScenarioModel) => void;
 }
 
 // Passo obrigatório antes do construtor de tasks: a rota é desenhada em
-// cima de um mapa (tamanho do grid + obstáculos a evitar), então precisa de
-// um selecionado. `closable={false}` esconde o "×"/ignora backdrop/Esc —
-// banco de mapas ainda não existe (ver CenarioService.createMockMap), então
-// a única saída daqui é o mock; não dá pra fechar sem escolher nada (mesmo
-// espírito do SelectMapModal do CenarioBuilder, mas sem opção de sair vazio).
-export function SelectTaskMapModal({ open, onSelectMock }: SelectTaskMapModalProps) {
+// cima de um cenário salvo (tamanho do grid + obstáculos a evitar), então
+// precisa de um selecionado. `closable={false}` esconde o "×"/ignora
+// backdrop/Esc — não dá pra fechar sem escolher.
+export function SelectTaskMapModal({ open, onSelect }: SelectTaskMapModalProps) {
+  const { scenarios, state, reload } = useScenarioList(open);
+
   return (
     <Modal open={open} onClose={() => {}} closable={false} title="Selecionar mapa da task">
       <p className={styles.description}>
@@ -22,22 +24,13 @@ export function SelectTaskMapModal({ open, onSelectMock }: SelectTaskMapModalPro
 
       <section className={styles.option}>
         <h3 className={styles.optionTitle}>Mapas salvos</h3>
-        <p className={styles.placeholder}>
-          Nenhum mapa disponível — a conexão com o banco de dados ainda não foi implementada.
-        </p>
-        <Button variant="outline" disabled>
-          Selecionar mapa
-        </Button>
-      </section>
-
-      <section className={styles.option}>
-        <h3 className={styles.optionTitle}>Mapa de teste (mock)</h3>
-        <p className={styles.placeholder}>
-          Sem conexão com o banco ainda — use um mapa fixo (com alguns obstáculos de exemplo) pra testar a tela.
-        </p>
-        <Button variant="accent" onClick={onSelectMock}>
-          Usar mapa de teste
-        </Button>
+        <SavedScenarioList
+          scenarios={scenarios}
+          state={state}
+          onSelect={onSelect}
+          onRetry={reload}
+          emptyMessage="Nenhum cenário salvo ainda — crie um no Construtor de Cenários primeiro."
+        />
       </section>
     </Modal>
   );

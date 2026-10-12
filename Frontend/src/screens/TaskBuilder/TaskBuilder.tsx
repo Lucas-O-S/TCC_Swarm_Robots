@@ -13,7 +13,8 @@ import { WaypointDrawer } from "../../components/WaypointDrawer/WaypointDrawer";
 import { SelectTaskMapModal } from "../../components/SelectTaskMapModal/SelectTaskMapModal";
 import { Button } from "../../components/Button/Button";
 import { TaskService } from "../../services/Task.Service";
-import { CenarioService } from "../../services/Cenario.Service";
+import type { ScenarioModel } from "../../model/Scenario.Model";
+import { ScenarioService } from "../../services/Scenario.Service";
 import { createWaypointFromRect } from "./useTaskEditor";
 import type { TaskWaypointDraft } from "./useTaskEditor";
 import styles from "./TaskBuilder.module.css";
@@ -23,15 +24,14 @@ const AREA_COLOR = "var(--color-yellow)";
 type Tool = "move" | "select" | "waypoint" | "area";
 type SaveState = { status: "idle" | "saving" | "error" | "success"; message?: string };
 
-// Construtor de tasks (rota de waypoints) — mesmo padrão do CenarioBuilder:
+// Construtor de tasks (rota de waypoints) — mesmo padrão do ScenarioBuilder:
 // <MapCanvas> com uma ferramenta extra (aqui "waypoint" em vez de
 // "obstáculo") que desenha um elemento novo em célula vazia, e o resto
 // (mover/selecionar/arrastar/apagar) de graça via useMapElement (ver
-// <Waypoint>). Diferente do CenarioBuilder: a rota precisa saber o tamanho
+// <Waypoint>). Diferente do ScenarioBuilder: a rota precisa saber o tamanho
 // do grid e os obstáculos de um mapa já existente (pra desviar deles), então
-// selecionar um mapa é obrigatório antes de liberar o mapa — ver
-// SelectTaskMapModal. Sem conexão com o banco ainda, a única opção é o mock
-// (CenarioService.createMockMap).
+// selecionar um cenário salvo (GET /scenarios) é obrigatório antes de liberar
+// o mapa — ver SelectTaskMapModal.
 export function TaskBuilder() {
   const [mapConfig, setMapConfig] = useState<MapModel | null>(null);
   const [name, setName] = useState("");
@@ -48,8 +48,8 @@ export function TaskBuilder() {
   const areaTool = tool === "area";
   const canMoveWaypoint = tool === "select" || tool === "waypoint" || tool === "area";
 
-  function handleSelectMockMap() {
-    setMapConfig(CenarioService.createMockMap());
+  function handleSelectScenario(scenario: ScenarioModel) {
+    setMapConfig(ScenarioService.toMap(scenario));
     setWaypoints([]);
     setAreaPoints([]);
   }
@@ -83,14 +83,13 @@ export function TaskBuilder() {
     }
 
     setSaveState({ status: "saving" });
-    const result = await TaskService.create(
-      name,
-      waypoints.map((w) => ({ x: w.x, y: w.y })),
-    );
+    // ATENÇÃO: o backend (POST /tasks) só aceita `name` e `priority`. Os
+    // waypoints desenhados ainda NÃO são enviados — falta rota no backend.
+    const result = await TaskService.create({ name: name.trim() });
 
     setSaveState(
       result.ok
-        ? { status: "success", message: `Task "${result.data.name}" salva.` }
+        ? { status: "success", message: `Task "${result.data.name}" salva (os pontos do trajeto ainda não são enviados ao servidor).` }
         : { status: "error", message: result.message },
     );
   }
@@ -100,7 +99,7 @@ export function TaskBuilder() {
 
   return (
     <>
-      <SelectTaskMapModal open={mapConfig === null} onSelectMock={handleSelectMockMap} />
+      <SelectTaskMapModal open={mapConfig === null} onSelect={handleSelectScenario} />
 
       <MapMenuLayout
         menu={
@@ -111,7 +110,7 @@ export function TaskBuilder() {
               <>
                 <div className={styles.mapSummary}>
                   <span>
-                    {mapConfig.cenario.name} ({mapConfig.cenario.sizeX}×{mapConfig.cenario.sizeY})
+                    {mapConfig.scenario.name} ({mapConfig.scenario.sizeX}×{mapConfig.scenario.sizeY})
                   </span>
                   <Button variant="outline" onClick={handleChangeMap}>
                     Trocar mapa
@@ -167,7 +166,7 @@ export function TaskBuilder() {
             return <div className={styles.placeholder} style={{ height: maxMapHeight }} />;
           }
 
-          const { cenario } = mapConfig;
+          const { scenario } = mapConfig;
 
           return (
             <MapCanvas
@@ -180,9 +179,9 @@ export function TaskBuilder() {
               createTool={waypointTool || areaTool ? tool : undefined}
               onCreateElement={(rect) => {
                 if (waypointTool) {
-                  setWaypoints((prev) => [...prev, createWaypointFromRect(rect, cenario.sizeX, cenario.sizeY)]);
+                  setWaypoints((prev) => [...prev, createWaypointFromRect(rect, scenario.sizeX, scenario.sizeY)]);
                 } else if (areaTool) {
-                  setAreaPoints((prev) => [...prev, createWaypointFromRect(rect, cenario.sizeX, cenario.sizeY)]);
+                  setAreaPoints((prev) => [...prev, createWaypointFromRect(rect, scenario.sizeX, scenario.sizeY)]);
                 }
               }}
               renderCreatePreview={(rect) => (
@@ -215,7 +214,7 @@ export function TaskBuilder() {
             >
               {(cellWidth, cellHeight) => (
                 <>
-                  {cenario.Obstacles.map((obstacle) => (
+                  {scenario.obstacles.map((obstacle) => (
                     <Obstacle
                       key={obstacle.id}
                       label={obstacle.name}
@@ -240,8 +239,8 @@ export function TaskBuilder() {
                       movable
                       onMove={(next) =>
                         updateAreaPoint(point.id, {
-                          x: Math.max(0, Math.min(cenario.sizeX - 1, Math.round(next.x / cellWidth - 0.5))),
-                          y: Math.max(0, Math.min(cenario.sizeY - 1, Math.round(next.y / cellHeight - 0.5))),
+                          x: Math.max(0, Math.min(scenario.sizeX - 1, Math.round(next.x / cellWidth - 0.5))),
+                          y: Math.max(0, Math.min(scenario.sizeY - 1, Math.round(next.y / cellHeight - 0.5))),
                         })
                       }
                       removable
@@ -262,8 +261,8 @@ export function TaskBuilder() {
                       movable
                       onMove={(next) =>
                         updateWaypoint(waypoint.id, {
-                          x: Math.max(0, Math.min(cenario.sizeX - 1, Math.round(next.x / cellWidth - 0.5))),
-                          y: Math.max(0, Math.min(cenario.sizeY - 1, Math.round(next.y / cellHeight - 0.5))),
+                          x: Math.max(0, Math.min(scenario.sizeX - 1, Math.round(next.x / cellWidth - 0.5))),
+                          y: Math.max(0, Math.min(scenario.sizeY - 1, Math.round(next.y / cellHeight - 0.5))),
                         })
                       }
                       removable

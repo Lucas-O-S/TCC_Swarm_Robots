@@ -4,19 +4,13 @@ import { useSwarmGrid } from './hooks/useSwarmGrid';
 import { SwarmGrid } from './components/SwarmGrid';
 import { ConnectionList } from './components/ConnectionList';
 import { ConnectionLog } from './components/ConnectionLog';
-import type { ConnectionLogEntry } from './types';
+import { useRobotConnections } from './hooks/useRobotConnections';
+import { toConnectionLog } from './robotConnections';
 import styles from './DashboardScreen.module.css';
 
-// Dados de exemplo (provisórios). Trocar pelo stream real (`robot:update` /
-// `robot:status` do WebSocket, ver AGENTS.md) quando existir.
-const LOG_ENTRIES: ConnectionLogEntry[] = [
-  { id: 'log-1', message: '⚠ R09 foi desconectado' },
-  { id: 'log-2', message: '⚠ R10 foi desconectado' },
-];
-
 export function DashboardScreen() {
+  const { robots, state, retry } = useRobotConnections();
   const {
-    robots,
     obstacles,
     chargePoint,
     placingCharge,
@@ -53,6 +47,19 @@ export function DashboardScreen() {
           </div>
         </div>
 
+        {state.status === 'loading' && <p className={styles.hint}>Carregando robôs...</p>}
+        {state.status === 'error' && (
+          <p className={styles.hint} role="alert">
+            {state.message}{' '}
+            <Button variant="outline" onClick={retry}>
+              Tentar de novo
+            </Button>
+          </p>
+        )}
+        {state.status === 'ready' && robots.length === 0 && (
+          <p className={styles.hint}>Nenhum robô cadastrado ainda.</p>
+        )}
+
         <div className={styles.body}>
           <div className={styles.mapColumn}>
             <SwarmGrid
@@ -82,7 +89,7 @@ export function DashboardScreen() {
 
           <aside className={styles.painel}>
             <ConnectionList robots={robots} />
-            <ConnectionLog entries={LOG_ENTRIES} />
+            <ConnectionLog entries={toConnectionLog(robots)} />
           </aside>
         </div>
       </div>

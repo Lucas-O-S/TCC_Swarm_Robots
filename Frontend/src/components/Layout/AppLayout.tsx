@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { AuthService } from '../../services/Auth.Service';
 import styles from './AppLayout.module.css';
 
 // Uma aba do menu superior: rota + rótulo exibido.
@@ -25,7 +26,7 @@ export function AppLayout() {
   const navigate = useNavigate();
 
   function handleLogout() {
-    // TODO: limpar sessão/token quando a autenticação real existir.
+    AuthService.logout();
     navigate('/login');
   }
 

@@ -18,7 +18,7 @@ interface MapToolButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 // Botão pro canto de controles do <MapCanvas>/<MapViewport>, no mesmo
 // estilo dos botões de zoom (+/−/⟲) — reutilizável por qualquer tela com
 // mapa que precise de uma ferramenta própria (ex.: alternar modo de
-// desenhar obstáculo no CenarioBuilder), sem alterar o mapa base.
+// desenhar obstáculo no ScenarioBuilder), sem alterar o mapa base.
 export function MapToolButton({
   variant = 'tool',
   active = false,

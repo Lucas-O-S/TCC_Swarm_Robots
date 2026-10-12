@@ -32,7 +32,7 @@ interface MapViewportProps extends PropsWithChildren {
   tools?: ReactNode;
   /**
    * Ferramenta ativa, controlada de fora — só precisa disso quem tem uma
-   * ferramenta extra (ex.: "obstáculo" no CenarioBuilder) que deve entrar
+   * ferramenta extra (ex.: "obstáculo" no ScenarioBuilder) que deve entrar
    * no mesmo grupo exclusivo de Mover/Selecionar (só uma ativa por vez).
    * Sem isso, o componente controla sozinho (começa em "move"). Vem
    * sempre acompanhado de `onToolChange`.
@@ -90,7 +90,7 @@ export function MapViewport({
   // Ferramenta base de todo mapa (mover/pan vs. só clicar/selecionar) — vem
   // pronta em qualquer tela que use <MapCanvas>/<MapViewport>, sem precisar
   // de nada de fora (estado interno). Quando a tela tem uma ferramenta
-  // extra (ex.: obstáculo no CenarioBuilder) que precisa entrar no mesmo
+  // extra (ex.: obstáculo no ScenarioBuilder) que precisa entrar no mesmo
   // grupo exclusivo, ela passa `tool`/`onToolChange` e passa a controlar
   // tudo (inclusive Mover/Selecionar) — padrão controlado/não-controlado,
   // igual um <input value/defaultValue>.

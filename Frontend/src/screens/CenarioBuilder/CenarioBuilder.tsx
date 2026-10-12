@@ -1,6 +1,6 @@
 import type { ChangeEvent } from "react";
 import { useState } from "react";
-import type { CenarioModel } from "../../model/Cenario.Model";
+import type { CenarioModel } from "../../model/Scenario.Model";
 import type { ObstaclesModel } from "../../model/Obstacles.Model";
 import type { MapModel } from "../../model/Map.Model";
 import { MapCanvas } from "../../components/MapCanvas/MapCanvas";
@@ -12,7 +12,7 @@ import { ObstacleIcon } from "../../components/MapToolButton/icons";
 import { SelectMapModal } from "../../components/SelectMapModal/SelectMapModal";
 import { ObstacleDrawer } from "../../components/ObstacleDrawer/ObstacleDrawer";
 import { Button } from "../../components/Button/Button";
-import { CenarioService } from "../../services/Cenario.Service";
+import { CenarioService } from "../../services/Scenario.Service";
 import { createObstacleFromRect } from "./useObstacleEditor";
 import styles from "./CenarioBuilder.module.css";
 

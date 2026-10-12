@@ -10,7 +10,7 @@ interface MenuProps {
 
 // Painel lateral reutilizável (título opcional + conteúdo em coluna) —
 // usado como o "menu" de configuração ao lado do mapa em telas como
-// CenarioBuilder, e reaproveitável em qualquer outro menu de mesma forma.
+// ScenarioBuilder, e reaproveitável em qualquer outro menu de mesma forma.
 export function Menu({ title, children, className = '' }: MenuProps) {
   return (
     <aside className={`${styles.menu} ${className}`}>

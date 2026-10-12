@@ -3,6 +3,8 @@ import type { AxiosError, AxiosRequestConfig } from 'axios';
 import type { z } from 'zod';
 import type { ApiEnvelope } from '../services/ApiEnvelope';
 import { parseApiEnvelope } from '../services/ApiEnvelope';
+import { DEFAULT_ERROR_MESSAGES, kindFromStatus } from './ApiError';
+import type { ErrorKind } from './ApiError';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -28,6 +30,8 @@ export interface CalloutFailure {
     status: number;
     envelope: ApiEnvelope<unknown> | null;
     message: string;
+    /** Categoria do erro (rede, timeout, 404, validação...). Ver `ApiError.ts`. */
+    kind: ErrorKind;
 }
 
 export type CalloutResult<TData> = CalloutSuccess<TData> | CalloutFailure;
@@ -42,6 +46,20 @@ export class Callout {
 };
 
 static #defaultTimeout = 10000;
+
+/** Função chamada quando a API responde 401 COM token ativo (sessão expirada). */
+static #unauthorizedHandler: (() => void) | null = null;
+
+/** Liga (string) ou desliga (null) o header `Authorization: Bearer <token>`. */
+static setAuthToken(token: string | null): void {
+    if (token) Callout.setDefaultHeader('Authorization', `Bearer ${token}`);
+    else Callout.removeDefaultHeader('Authorization');
+}
+
+/** Registra o que fazer quando a sessão expira (ex.: deslogar e ir para /login). */
+static setUnauthorizedHandler(handler: (() => void) | null): void {
+    Callout.#unauthorizedHandler = handler;
+}
 
 static setDefaultHeader(key: string, value: string): void {
     Callout.#defaultHeaders[key] = value;
@@ -69,6 +87,14 @@ static async request<TData = unknown, TBody = unknown>(
     
     try {
         const response = await axios.request(config);
+
+        // Sem corpo (ex.: `DELETE` -> 204 No Content): a operação deu certo, só
+        // não há envelope pra ler. Quem precisa de dado (`fromUnit`/`fromList`)
+        // trata a ausência; `fromVoid` só confere o `ok`.
+        if (response.status === 204 || response.data === '' || response.data == null) {
+            return { ok: true, status: response.status, envelope: { status: response.status, message: '' } };
+        }
+
         const envelope = parseApiEnvelope<TData>(response.data, dataSchema);
 
     if (!envelope) {
@@ -77,6 +103,7 @@ static async request<TData = unknown, TBody = unknown>(
             status: response.status,
             envelope: null,
             message: 'Resposta da API fora do formato esperado (ApiResponseInterface)',
+            kind: 'invalid_response',
         };
     }
     
@@ -125,11 +152,22 @@ static #toFailure(err: AxiosError): CalloutFailure {
     const status = err.response?.status ?? 0;
     const envelope = parseApiEnvelope(err.response?.data);
 
+    // Sem resposta (status 0): ou estourou o tempo, ou nem chegou no servidor.
+    const kind: ErrorKind =
+        status === 0 ? (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT' ? 'timeout' : 'network') : kindFromStatus(status);
+
+    // 401 com token ativo = sessão expirou. Sem token (ex.: senha errada no
+    // login) NÃO dispara, senão o login falho derrubaria a tela.
+    if (kind === 'unauthorized' && Callout.#defaultHeaders['Authorization']) {
+        Callout.#unauthorizedHandler?.();
+    }
+
     return {
-    ok: false,
-    status,
-    envelope,
-    message: envelope?.error ?? envelope?.message ?? err.message ?? 'Erro de requisição',
+        ok: false,
+        status,
+        envelope,
+        kind,
+        message: envelope?.error ?? envelope?.message ?? DEFAULT_ERROR_MESSAGES[kind],
     };
 }
 }

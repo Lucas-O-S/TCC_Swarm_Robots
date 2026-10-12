@@ -1,7 +1,8 @@
 import { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppLayout } from '../components/Layout/AppLayout';
-import { CenarioBuilder } from '../screens/CenarioBuilder/CenarioBuilder';
+import { RequireAuth } from './RequireAuth';
+import { ScenarioBuilder } from '../screens/ScenarioBuilder/ScenarioBuilder';
 
 // Cada tela vira um chunk JS separado, baixado só quando a rota é
 // visitada — evita carregar tudo (inclusive a lib `mqtt`, que só a tela
@@ -28,7 +29,7 @@ const TaskBuilder = lazy(() =>
 // /robos removida a pedido (2026-09-01): só a estrutura de integração com o
 // backend (src/dto, src/model, src/mapper, src/services/RobotService)
 // deveria existir nesta rodada, sem tela ainda. /tarefas voltou como
-// TaskBuilder (mesmo padrão do CenarioBuilder, ver src/screens/TaskBuilder).
+// TaskBuilder (mesmo padrão do ScenarioBuilder, ver src/screens/TaskBuilder).
 export function AppRoutes() {
   return (
     <BrowserRouter>
@@ -37,12 +38,16 @@ export function AppRoutes() {
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginScreen />} />
 
-          <Route element={<AppLayout />}>
-            <Route path="/dashboard" element={<DashboardScreen />} />
-            <Route path="/simulacao" element={<SimulationScreen />} />
-            <Route path="/mapa-teste" element={<MapTestScreen />} />
-            <Route path="/CenarioBuilder" element={<CenarioBuilder />} />
-            <Route path="/TaskBuilder" element={<TaskBuilder />} />
+          <Route element={<RequireAuth />}>
+            <Route element={<AppLayout />}>
+              <Route path="/dashboard" element={<DashboardScreen />} />
+              <Route path="/simulacao" element={<SimulationScreen />} />
+              <Route path="/mapa-teste" element={<MapTestScreen />} />
+              <Route path="/ScenarioBuilder" element={<ScenarioBuilder />} />
+              {/* Rota antiga (antes do rename Cenario -> Scenario): mantém links salvos funcionando. */}
+              <Route path="/CenarioBuilder" element={<Navigate to="/ScenarioBuilder" replace />} />
+              <Route path="/TaskBuilder" element={<TaskBuilder />} />
+            </Route>
           </Route>
         </Routes>
       </Suspense>

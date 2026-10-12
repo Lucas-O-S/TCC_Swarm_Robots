@@ -1,6 +1,6 @@
 import type { CellSelectRect } from "../../components/MapCanvas/MapCanvas";
 
-/** Waypoint em edição — `id` é local (frontend), estável enquanto o ponto existe (mesmo padrão de ObstaclesModel.id); `x`/`y` são célula do grid (mesma convenção de TaskWaypointModel/RobotPath). */
+/** Waypoint em edição — `id` é local (frontend), estável enquanto o ponto existe (mesmo padrão de ObstacleModel.id); `x`/`y` são célula do grid (mesma convenção de TaskWaypointModel/RobotPath). */
 export interface TaskWaypointDraft {
   id: string;
   x: number;

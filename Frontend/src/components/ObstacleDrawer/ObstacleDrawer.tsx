@@ -1,5 +1,5 @@
 import type { ChangeEvent } from 'react';
-import type { ObstaclesModel } from '../../model/Obstacles.Model';
+import type { ObstacleModel } from '../../model/Obstacle.Model';
 import { useMapSelection } from '../../hooks/useMapElements';
 import { Drawer } from '../Drawer/Drawer';
 import { Button } from '../Button/Button';
@@ -7,9 +7,9 @@ import styles from './ObstacleDrawer.module.css';
 
 interface ObstacleDrawerProps {
   /** Todos os obstáculos do cenário — o drawer filtra sozinho quem está selecionado (ver useMapSelection). */
-  allObstacles: ObstaclesModel[];
+  allObstacles: ObstacleModel[];
   /** Só chamado com exatamente 1 selecionado (editar campos de vários de uma vez não faz sentido aqui) — o drawer já resolve o id, a tela só aplica o patch. */
-  onChange: (id: string, patch: Partial<ObstaclesModel>) => void;
+  onChange: (id: string, patch: Partial<ObstacleModel>) => void;
 }
 
 // Painel de edição da seleção de obstáculos no grid (ferramentas
@@ -24,7 +24,7 @@ export function ObstacleDrawer({ allObstacles, onChange }: ObstacleDrawerProps) 
   const obstacles = allObstacles.filter((o) => selectedIds.has(o.id));
   const single = obstacles.length === 1 ? obstacles[0] : null;
 
-  function handleSingleChange(patch: Partial<ObstaclesModel>) {
+  function handleSingleChange(patch: Partial<ObstacleModel>) {
     if (single) onChange(single.id, patch);
   }
 

@@ -15,7 +15,7 @@ interface MapMenuLayoutProps {
 
 // Layout de duas colunas (mapa + menu lateral) reutilizado pelas telas que
 // combinam um <MapCanvas> com um painel de configuração/controle ao lado
-// (ex.: CenarioBuilder). Mede a altura disponível da coluna do mapa e
+// (ex.: ScenarioBuilder). Mede a altura disponível da coluna do mapa e
 // repassa pro conteúdo, pra ele preencher a tela sem estourar o rodapé.
 export function MapMenuLayout({ menu, children, className = '' }: MapMenuLayoutProps) {
   const mapColumnRef = useRef<HTMLDivElement>(null);
