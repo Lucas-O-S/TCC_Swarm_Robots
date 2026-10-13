@@ -2,7 +2,7 @@ import type { ChangeEvent } from 'react';
 import { Button } from '../Button/Button';
 import { DrawerBody, DrawerError, DrawerField, DrawerHint, DrawerRow } from '../Drawer/DrawerForm';
 import { ObstacleDrawerBase } from '../ObstacleDrawer/ObstacleDrawerBase';
-import type { ScenarioObstacleModel } from '../../model/Scenario.Model';
+import type { ScenarioObstacleModel } from '../../model/SimScenario.Model';
 import { useCommitField } from '../../screens/Simulation/hooks/useCommitField';
 import { obstacleSelId } from '../../screens/Simulation/hooks/useSimSelection';
 
@@ -15,7 +15,7 @@ interface SimObstacleDrawerProps {
 }
 
 // Painel da barreira selecionada no modo Editar — mesmo papel do
-// ObstacleDrawer do CenarioBuilder, só que em mm (o cenário do simulador).
+// ObstacleDrawer do ScenarioBuilder, só que em mm (o cenário do simulador).
 // Precisa ser passado via <MapCanvas panel={...}> pra enxergar a seleção.
 export function SimObstacleDrawer({ obstacles, onPatch, onRename }: SimObstacleDrawerProps) {
   return (

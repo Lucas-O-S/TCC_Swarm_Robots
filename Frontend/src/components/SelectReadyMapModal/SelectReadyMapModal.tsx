@@ -10,7 +10,7 @@ interface SelectReadyMapModalProps {
   savedTitle: string;
   savedEmptyText: string;
   savedButtonLabel: string;
-  /** Texto da opção do mapa de teste (CenarioService.createMockMap). */
+  /** Texto da opção do mapa de teste (ScenarioService.createMockMap). */
   mockText: string;
   onSelectMock: () => void;
   /** Sem `closable`, não dá pra sair sem escolher (sem "×", backdrop nem Esc). */
@@ -20,7 +20,7 @@ interface SelectReadyMapModalProps {
 
 // Escolha de um mapa PRONTO antes de usar a tela (Tarefas, Visualizador):
 // os salvos no banco (inerte enquanto a conexão não existe — ver
-// CenarioService.createMockMap) ou o mapa de teste fixo, a única opção que
+// ScenarioService.createMockMap) ou o mapa de teste fixo, a única opção que
 // funciona por enquanto. Cada tela passa os próprios textos.
 export function SelectReadyMapModal({
   open,

@@ -19,7 +19,7 @@ import { RobotControlMode } from '../../enums/RobotControlMode.enum';
 import { TaskStatus } from '../../enums/TaskStatus.enum';
 import { MapElementsProvider, useMapElementsState } from '../../hooks/useMapElements';
 import { ORCHESTRATOR_RUN_S } from '../../Integration/LocalOrchestrator';
-import { ScenarioMapper } from '../../mapper/Scenario.Mapper';
+import { SimScenarioMapper } from '../../mapper/SimScenario.Mapper';
 import { SimRobotMapper } from '../../mapper/SimRobot.Mapper';
 import { TaskMapper } from '../../mapper/Task.Mapper';
 import { VisRobotMapper } from '../../mapper/VisRobot.Mapper';
@@ -66,7 +66,7 @@ export function Visualizer() {
   // quando ele cai numa barreira.
   const arena = cenario ? { width: cenario.sizeX * CELL_MM, height: cenario.sizeY * CELL_MM } : { width: CELL_MM, height: CELL_MM };
   const obstacles: SimObstacleModel[] = cenario
-    ? ScenarioMapper.fromMap({ cenario, robots: [] }).obstacles.map((o) => ({ id: o.id, x: o.x_mm, y: o.y_mm, w: o.w_mm, h: o.h_mm }))
+    ? SimScenarioMapper.fromMap({ scenario: cenario, robots: [] }).obstacles.map((o) => ({ id: o.id, x: o.x_mm, y: o.y_mm, w: o.w_mm, h: o.h_mm }))
     : [];
   const connected = vis.link.status === 'connected';
   const clampPoint = (p: Vec2Model) => clampPointToArena(p, arena);

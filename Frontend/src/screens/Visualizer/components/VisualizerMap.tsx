@@ -6,7 +6,7 @@ import { Obstacle } from '../../../components/Obstacle/Obstacle';
 import { CELL_MM } from '../../../Consts/SimulationConsts';
 import type { MapElementsController } from '../../../hooks/useMapElements';
 import type { ElementBounds } from '../../../hooks/useSelectableElements';
-import type { CenarioModel } from '../../../model/Cenario.Model';
+import type { ScenarioModel } from '../../../model/Scenario.Model';
 import type { SimMapRobotModel } from '../../../model/SimRobot.Model';
 import type { Vec2Model } from '../../../model/SimWorld.Model';
 import { SimRobotsLayer } from '../../Simulation/components/SimRobotsLayer';
@@ -15,7 +15,7 @@ import type { RouteDraft } from '../../Simulation/hooks/useRouteDraft';
 
 interface VisualizerMapProps {
   /** Cenário pronto, no formato do Construtor: células, Y pra baixo. */
-  cenario: CenarioModel;
+  cenario: ScenarioModel;
   /** Robôs da API, em mm com Y pra cima (convenção LH2). */
   robots: SimMapRobotModel[];
   trails: ReadonlyMap<string, readonly Vec2Model[]>;
@@ -85,7 +85,7 @@ export function VisualizerMap({
       {(cellWidth, cellHeight) => (
         <>
           {/* Sem id: só desenho, igual ao Construtor mas sem seleção/arrasto. */}
-          {cenario.Obstacles.map((o) => (
+          {cenario.obstacles.map((o) => (
             <Obstacle
               key={o.id}
               label={o.name}

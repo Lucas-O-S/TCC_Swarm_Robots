@@ -1,11 +1,12 @@
-import type { ServiceResult } from '../services/Robot.Service';
+import { failure } from '../services/ServiceResult';
+import type { ServiceResult } from '../services/ServiceResult';
 import type { ApiLink, ApiLinkState } from './ApiLink';
 
 /** Aviso único de "sem conexão": aparece no header, no log e no drawer quando um comando é tentado. */
 export const API_NOT_CONNECTED = 'Sem conexão com a API: a integração ainda não foi implementada.';
 
 function notConnected<T>(): Promise<ServiceResult<T>> {
-  return Promise.resolve({ ok: false, message: API_NOT_CONNECTED });
+  return Promise.resolve(failure('network', API_NOT_CONNECTED));
 }
 
 // ApiLink que não conecta em nada, enquanto a conexão com a API não existe

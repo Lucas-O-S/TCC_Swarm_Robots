@@ -29,7 +29,7 @@ import type { ElementBounds } from '../../hooks/useSelectableElements';
 import { ORCHESTRATOR_RUN_S } from '../../Integration/LocalOrchestrator';
 import { SimRobotMapper } from '../../mapper/SimRobot.Mapper';
 import { TaskMapper } from '../../mapper/Task.Mapper';
-import type { ScenarioModel } from '../../model/Scenario.Model';
+import type { SimScenarioModel } from '../../model/SimScenario.Model';
 import type { SimMapRobotModel, SimRobotRowModel } from '../../model/SimRobot.Model';
 import type { SimObstacleModel, Vec2Model } from '../../model/SimWorld.Model';
 import { SimulationService } from '../../services/Simulation.Service';
@@ -63,7 +63,7 @@ const CREATE_TOOLS: Tool[] = ['obstacle', 'robot', 'waypoint'];
 
 // Tela de Simulação — recriada no padrão das outras telas (MapMenuLayout +
 // header no topo + MapCanvas + Menu + ferramentas no canto do mapa + Drawer da seleção +
-// modal de escolha no início, como CenarioBuilder/TaskBuilder) seguindo a
+// modal de escolha no início, como ScenarioBuilder/TaskBuilder) seguindo a
 // lógica e o modelo de funcionamento do RobotSwarmSimulator:
 //   - Editar: monta o estado inicial do cenário (barreiras, robôs, rotas,
 //     rede e parâmetros), no mesmo JSON do simulador;
@@ -139,7 +139,7 @@ export function Simulation() {
     setPreviewTaskId(null);
   }
 
-  function loadScenario(scenario: ScenarioModel, name: string, target: SimMode) {
+  function loadScenario(scenario: SimScenarioModel, name: string, target: SimMode) {
     resetInteraction();
     setNotice(null);
     setPickerError(null);

@@ -13,9 +13,10 @@ import { Robot } from "../../components/Robot/RobotProp";
 import { RobotStatus } from "../../enums/RobotStatus.enum";
 import { WaypointDrawer } from "../../components/WaypointDrawer/WaypointDrawer";
 import { AreaDrawer } from "../../components/AreaDrawer/AreaDrawer";
-import { SelectReadyMapModal } from "../../components/SelectReadyMapModal/SelectReadyMapModal";
+import { SelectTaskMapModal } from "../../components/SelectTaskMapModal/SelectTaskMapModal";
 import { Button } from "../../components/Button/Button";
 import { TaskService } from "../../services/Task.Service";
+import type { ScenarioModel } from "../../model/Scenario.Model";
 import { ScenarioService } from "../../services/Scenario.Service";
 import {
   areaCorners,
@@ -46,8 +47,7 @@ type SaveState = { status: "idle" | "saving" | "error" | "success"; message?: st
 // <Waypoint>). Diferente do ScenarioBuilder: a rota precisa saber o tamanho
 // do grid e os obstáculos de um mapa já existente (pra desviar deles), então
 // selecionar um mapa é obrigatório antes de liberar o mapa — ver
-// SelectReadyMapModal. Sem conexão com o banco ainda, a única opção é o mock
-// (CenarioService.createMockMap).
+// SelectTaskMapModal: o cenário é escolhido entre os salvos (GET /scenarios).
 export function TaskBuilder() {
   const [mapConfig, setMapConfig] = useState<MapModel | null>(null);
   const [name, setName] = useState("");
@@ -68,8 +68,8 @@ export function TaskBuilder() {
   const createTool = waypointTool || areaTool || robotTool;
   const canMoveWaypoint = tool === "select" || createTool;
 
-  function handleSelectMockMap() {
-    setMapConfig(ScenarioService.createMockMap());
+  function handleSelectScenario(scenario: ScenarioModel) {
+    setMapConfig(ScenarioService.toMap(scenario));
     setStops([]);
     removeRobot();
   }
@@ -126,7 +126,7 @@ export function TaskBuilder() {
     setSaveState({ status: "saving" });
     // ATENÇÃO: o backend (POST /tasks) só aceita `name` e `priority`. Os
     // waypoints desenhados ainda NÃO são enviados — falta rota no backend.
-    const result = await TaskService.create({ name: name.trim() });
+    const result = await TaskService.create({ name: name.trim(), priority });
 
     setSaveState(
       result.ok
@@ -160,16 +160,7 @@ export function TaskBuilder() {
 
   return (
     <>
-      <SelectReadyMapModal
-        open={mapConfig === null}
-        title="Selecionar mapa da task"
-        description="A rota é desenhada em cima de um mapa (tamanho do grid e obstáculos a evitar) — selecione um antes de continuar."
-        savedTitle="Mapas salvos"
-        savedEmptyText="Nenhum mapa disponível — a conexão com o banco de dados ainda não foi implementada."
-        savedButtonLabel="Selecionar mapa"
-        mockText="Sem conexão com o banco ainda — use um mapa fixo (com alguns obstáculos de exemplo) pra testar a tela."
-        onSelectMock={handleSelectMockMap}
-      />
+      <SelectTaskMapModal open={mapConfig === null} onSelect={handleSelectScenario} />
 
       <MapMenuLayout
         menu={

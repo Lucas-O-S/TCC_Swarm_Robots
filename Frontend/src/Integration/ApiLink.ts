@@ -6,7 +6,7 @@ import type { RobotTelemetryModel } from '../model/RobotTelemetry.Model';
 import type { RgbColorModel } from '../model/SimRobot.Model';
 import type { Vec2Model } from '../model/SimWorld.Model';
 import type { TaskModel } from '../model/Task.Model';
-import type { ServiceResult } from '../services/Robot.Service';
+import type { ServiceResult } from '../services/ServiceResult';
 
 // Contrato entre a tela do Visualizador e a API (backend NestJS). Faz o
 // mesmo papel do FleetLink na Simulação: a tela e o hook

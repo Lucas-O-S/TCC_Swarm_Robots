@@ -4,7 +4,7 @@ import { Drawer } from '../Drawer/Drawer';
 import { Segmented } from '../Segmented/Segmented';
 import { DEFAULT_WAYPOINT_THRESHOLD_MM } from '../../Consts/SimulationConsts';
 import { DotBotControlMode } from '../../enums/DotBotControlMode.enum';
-import type { ScenarioRobotModel } from '../../model/Scenario.Model';
+import type { ScenarioRobotModel } from '../../model/SimScenario.Model';
 import { useCommitField } from '../../screens/Simulation/hooks/useCommitField';
 import { num } from '../Drawer/numInput';
 import { DrawerActions, DrawerBody, DrawerDivider, DrawerError, DrawerField, DrawerHint, DrawerRow, DrawerSection } from '../Drawer/DrawerForm';
@@ -18,7 +18,7 @@ const MODE_OPTIONS: { value: DotBotControlMode; label: string; title: string }[]
 // ---------------------------------------------------------------------------
 // Modo Editar — propriedades do robô no estado INICIAL do cenário
 // (EditorPanel do RobotSwarmSimulator). Aberto pela seleção do mapa, como o
-// ObstacleDrawer do CenarioBuilder — via <MapCanvas panel={...}>.
+// ObstacleDrawer do ScenarioBuilder — via <MapCanvas panel={...}>.
 // ---------------------------------------------------------------------------
 
 interface SimRobotEditDrawerProps {

@@ -13,7 +13,7 @@ import { SelectMapModal } from "../../components/SelectMapModal/SelectMapModal";
 import { ObstacleDrawer } from "../../components/ObstacleDrawer/ObstacleDrawer";
 import { Button } from "../../components/Button/Button";
 import { ScenarioService } from "../../services/Scenario.Service";
-import { createObstacleFromRect } from "./useObstacleEditor";
+import { createObstacleFromRect } from "./hooks/useObstacleEditor";
 import styles from "./ScenarioBuilder.module.css";
 
 type Tool = "move" | "select" | "obstacle";
