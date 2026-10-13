@@ -4,7 +4,7 @@ import type { RobotControlMode } from '../enums/RobotControlMode.enum';
 import { RobotStatus } from '../enums/RobotStatus.enum';
 import type { SwarmitDeviceStatus } from '../enums/SwarmitDeviceStatus.enum';
 import { controlModeLabel } from '../Integration/LocalOrchestrator';
-import type { ScenarioRobotModel } from '../model/Scenario.Model';
+import type { ScenarioRobotModel } from '../model/SimScenario.Model';
 import type { RgbColorModel, SimMapRobotModel, SimRobotModel, SimRobotRowModel } from '../model/SimRobot.Model';
 
 // Paleta determinística por posição do robô na frota (a cor fixa do robô:

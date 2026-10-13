@@ -1,16 +1,16 @@
-import { CenarioService } from './Cenario.Service';
+import { ScenarioService } from './Scenario.Service';
 import { DEFAULT_COLS, DEFAULT_ROWS } from '../Consts/MapConsts';
 import { CELL_MM, DEFAULT_NETWORK, DEFAULT_SIM_CONFIG, POINT_SNAP_MM, ROBOT_RADIUS_MM } from '../Consts/SimulationConsts';
 import { DotBotControlMode } from '../enums/DotBotControlMode.enum';
 import { TaskStatus } from '../enums/TaskStatus.enum';
-import { ScenarioMapper } from '../mapper/Scenario.Mapper';
-import type { ScenarioModel, ScenarioRobotModel } from '../model/Scenario.Model';
+import { SimScenarioMapper } from '../mapper/SimScenario.Mapper';
+import type { SimScenarioModel, ScenarioRobotModel } from '../model/SimScenario.Model';
 import type { SimObstacleModel, Vec2Model } from '../model/SimWorld.Model';
 import type { TaskModel } from '../model/Task.Model';
 import { collidesAny } from '../screens/Simulation/Service/SimPhysics';
 
 // Cenários que a tela de Simulação oferece sem banco de dados (a conexão com
-// a API ainda não existe — mesmo espírito do CenarioService.createMockMap
+// a API ainda não existe — mesmo espírito do ScenarioService.createMockMap
 // usado pelo TaskBuilder):
 //   - os dois exemplos do RobotSwarmSimulator (scenarios/exemplo.json e
 //     scenarios/enxame.json), copiados como estão — o formato é o mesmo, então
@@ -18,7 +18,7 @@ import { collidesAny } from '../screens/Simulation/Service/SimPhysics';
 //   - o mapa mock do Construtor de Cenários, convertido de células pra mm;
 //   - um cenário em branco pra montar do zero no modo Editar.
 
-const EXEMPLO: ScenarioModel = {
+const EXEMPLO: SimScenarioModel = {
   version: 1,
   network: { ...DEFAULT_NETWORK },
   arena: { width_mm: 2000, height_mm: 2000, grid_mm: 100 },
@@ -41,7 +41,7 @@ const EXEMPLO: ScenarioModel = {
   sim: { ...DEFAULT_SIM_CONFIG },
 };
 
-const ENXAME: ScenarioModel = {
+const ENXAME: SimScenarioModel = {
   version: 1,
   network: { ...DEFAULT_NETWORK },
   arena: { width_mm: 4000, height_mm: 4000, grid_mm: 200 },
@@ -159,24 +159,24 @@ export interface ScenarioPreset {
   description: string;
 }
 
-const PRESETS: (ScenarioPreset & { build: () => ScenarioModel })[] = [
+const PRESETS: (ScenarioPreset & { build: () => SimScenarioModel })[] = [
   {
     key: 'exemplo',
     name: 'exemplo',
     description: '2 robôs (1 em AUTO com rota, 1 em MANUAL) e uma barreira — o exemplo.json do RobotSwarmSimulator.',
-    build: () => ScenarioMapper.clone(EXEMPLO),
+    build: () => SimScenarioMapper.clone(EXEMPLO),
   },
   {
     key: 'enxame',
     name: 'enxame',
     description: '6 robôs, rotas em loop, bateria variada e 3 obstáculos — o enxame.json do RobotSwarmSimulator.',
-    build: () => ScenarioMapper.clone(ENXAME),
+    build: () => SimScenarioMapper.clone(ENXAME),
   },
   {
     key: 'mock',
     name: 'Mapa de teste (mock)',
     description: 'O mapa fixo do Construtor de Cenários (12×10 blocos, 2 obstáculos) com 3 robôs de exemplo.',
-    build: () => ScenarioMapper.fromMap(CenarioService.createMockMap(), MOCK_ROBOTS),
+    build: () => SimScenarioMapper.fromMap(ScenarioService.createMockMap(), MOCK_ROBOTS),
   },
 ];
 
@@ -205,7 +205,7 @@ function segmentIsFree(a: Vec2Model, b: Vec2Model, obstacles: SimObstacleModel[]
   return true;
 }
 
-function buildMockTasks(scenario: ScenarioModel): TaskModel[] {
+function buildMockTasks(scenario: SimScenarioModel): TaskModel[] {
   const { width_mm: w, height_mm: h } = scenario.arena;
   const obstacles: SimObstacleModel[] = scenario.obstacles.map((o) => ({ id: o.id, x: o.x_mm, y: o.y_mm, w: o.w_mm, h: o.h_mm }));
   const snap = (v: number, max: number) =>
@@ -229,7 +229,7 @@ function buildMockTasks(scenario: ScenarioModel): TaskModel[] {
   return tasks;
 }
 
-export type ParseScenarioResult = { ok: true; scenario: ScenarioModel } | { ok: false; error: string };
+export type ParseScenarioResult = { ok: true; scenario: SimScenarioModel } | { ok: false; error: string };
 
 export const SimulationService = {
   /** Cenários de exemplo disponíveis offline (nome + descrição, pro SelectSimulationScenarioModal). */
@@ -238,12 +238,12 @@ export const SimulationService = {
   },
 
   /** Cópia nova do cenário de exemplo `key`, ou null se não existir. */
-  createPreset(key: string): ScenarioModel | null {
+  createPreset(key: string): SimScenarioModel | null {
     return PRESETS.find((p) => p.key === key)?.build() ?? null;
   },
 
   /** Cenário vazio do tamanho padrão do grid do app (16×16 blocos). */
-  createBlank(cols = DEFAULT_COLS, rows = DEFAULT_ROWS): ScenarioModel {
+  createBlank(cols = DEFAULT_COLS, rows = DEFAULT_ROWS): SimScenarioModel {
     return {
       version: 1,
       network: { ...DEFAULT_NETWORK },
@@ -258,13 +258,13 @@ export const SimulationService = {
    * Tasks mock pro cenário (todas Pending, rotas que cabem nele). Quando a
    * API existir, isto vira o `TaskService.list()`.
    */
-  createMockTasks(scenario: ScenarioModel): TaskModel[] {
+  createMockTasks(scenario: SimScenarioModel): TaskModel[] {
     return buildMockTasks(scenario);
   },
 
   /**
    * Texto de um .json (mesmo schema do RobotSwarmSimulator) → cenário
-   * validado e canônico (mesma validação do ScenarioMapper.toWorld; normaliza
+   * validado e canônico (mesma validação do SimScenarioMapper.toWorld; normaliza
    * address pra maiúsculas e descarta campos desconhecidos).
    */
   parseFile(text: string): ParseScenarioResult {
@@ -275,7 +275,7 @@ export const SimulationService = {
       return { ok: false, error: 'O arquivo não é um JSON válido.' };
     }
     try {
-      return { ok: true, scenario: ScenarioMapper.fromWorld(ScenarioMapper.toWorld(parsed as ScenarioModel)) };
+      return { ok: true, scenario: SimScenarioMapper.fromWorld(SimScenarioMapper.toWorld(parsed as SimScenarioModel)) };
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) };
     }

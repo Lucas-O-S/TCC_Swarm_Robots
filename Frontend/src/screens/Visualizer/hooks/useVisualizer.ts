@@ -4,11 +4,12 @@ import { SocketEvents } from '../../../enums/SocketEvents.enum';
 import type { ApiLink, ApiLinkState } from '../../../Integration/ApiLink';
 import { API_NOT_CONNECTED, DisconnectedApiLink } from '../../../Integration/DisconnectedApiLink';
 import { controlModeLabel } from '../../../Integration/LocalOrchestrator';
-import type { CenarioModel } from '../../../model/Cenario.Model';
+import type { ScenarioModel } from '../../../model/Scenario.Model';
 import type { RgbColorModel } from '../../../model/SimRobot.Model';
 import type { Vec2Model } from '../../../model/SimWorld.Model';
-import { CenarioService } from '../../../services/Cenario.Service';
-import type { ServiceResult } from '../../../services/Robot.Service';
+import { ScenarioService } from '../../../services/Scenario.Service';
+import { failure } from '../../../services/ServiceResult';
+import type { ServiceResult } from '../../../services/ServiceResult';
 import { VisFleet } from '../VisFleet';
 
 // Ponte entre a API (pelo ApiLink) e o estado React da tela do
@@ -31,7 +32,7 @@ const INITIAL_LINK: ApiLinkState = { status: 'connecting', message: 'Conectando 
 
 export function useVisualizer() {
   /** Cenário pronto no formato do Construtor (células): só o mapa — os robôs vêm da API. */
-  const [cenario, setCenario] = useState<CenarioModel | null>(null);
+  const [cenario, setCenario] = useState<ScenarioModel | null>(null);
   const [link, setLink] = useState<ApiLinkState>(INITIAL_LINK);
   const [now, setNow] = useState(() => Date.now());
   const [, setFrame] = useState(0);
@@ -125,14 +126,14 @@ export function useVisualizer() {
   // ---- cenário -------------------------------------------------------------------
 
   /** Único cenário pronto por enquanto: o mapa mock do Construtor (a API ainda não tem rota de cenários). */
-  const loadMockScenario = useCallback(() => setCenario(CenarioService.createMockMap().cenario), []);
+  const loadMockScenario = useCallback(() => setCenario(ScenarioService.createMockMap().scenario), []);
 
   // ---- comandos (drawer) — cada um devolve o erro da API ou null ---------------------
 
   const command = useCallback(
     async (label: string, address: string, run: (api: ApiLink) => Promise<ServiceResult<unknown>>): Promise<string | null> => {
       const api = linkRef.current;
-      const res: ServiceResult<unknown> = api ? await run(api) : { ok: false, message: API_NOT_CONNECTED };
+      const res: ServiceResult<unknown> = api ? await run(api) : failure('network', API_NOT_CONNECTED);
       if (res.ok) {
         fleet.log(`⇩ ${label} → ${address}`);
         return null;

@@ -7,9 +7,9 @@ import { LocalFleetLink } from '../../../Integration/LocalFleetLink';
 import type { BackendRobotView } from '../../../Integration/LocalFleetLink';
 import type { LinkLogEntry } from '../../../Integration/LinkLog';
 import type { OrchestratorRobotRecord } from '../../../Integration/LocalOrchestrator';
-import { ScenarioMapper } from '../../../mapper/Scenario.Mapper';
+import { SimScenarioMapper } from '../../../mapper/SimScenario.Mapper';
 import { SimulationService } from '../../../services/Simulation.Service';
-import type { ScenarioModel, SimConfigModel } from '../../../model/Scenario.Model';
+import type { SimScenarioModel, SimConfigModel } from '../../../model/SimScenario.Model';
 import type { SimRobotModel } from '../../../model/SimRobot.Model';
 import type { TaskModel } from '../../../model/Task.Model';
 import type { Vec2Model } from '../../../model/SimWorld.Model';
@@ -28,7 +28,7 @@ import { pushTrailPoint } from './useTrails';
 // Dois modos, como no simulador de referência:
 //   - EDITAR: a simulação NÃO roda — edita-se o estado INICIAL do cenário
 //     (o "draft", formato JSON em mm/graus);
-//   - SIMULAR: ScenarioMapper.toWorld(draft) do zero, com o gateway sempre
+//   - SIMULAR: SimScenarioMapper.toWorld(draft) do zero, com o gateway sempre
 //     ligado num LocalFleetLink (offline — não há API ainda). Assim o ciclo
 //     de vida da rede, o modelo de PDR/latência e os timers do backend
 //     funcionam sem nenhum servidor.
@@ -88,7 +88,7 @@ export function downloadJson(filename: string, data: unknown): void {
 }
 
 export function useSimulation() {
-  const [draft, setDraft] = useState<ScenarioModel | null>(null);
+  const [draft, setDraft] = useState<SimScenarioModel | null>(null);
   const [scenarioName, setScenarioName] = useState('');
   const [mode, setMode] = useState<SimMode>('edit');
   const [playing, setPlaying] = useState(true);
@@ -110,9 +110,9 @@ export function useSimulation() {
   }, []);
 
   const startRuntime = useCallback(
-    (scenario: ScenarioModel) => {
+    (scenario: SimScenarioModel) => {
       stopRuntime();
-      const world = ScenarioMapper.toWorld(scenario);
+      const world = SimScenarioMapper.toWorld(scenario);
       const link = new LocalFleetLink({ clock: () => world.time });
       // A tela não cria task: puxa a lista do backend. Offline = mock, sempre
       // do zero (todas Pending) a cada início/Reiniciar.
@@ -173,7 +173,7 @@ export function useSimulation() {
   // ---- cenário / modo ---------------------------------------------------------
 
   const load = useCallback(
-    (scenario: ScenarioModel, name: string, target: SimMode) => {
+    (scenario: SimScenarioModel, name: string, target: SimMode) => {
       setDraft(scenario);
       setScenarioName(name);
       setMode(target);
@@ -202,7 +202,7 @@ export function useSimulation() {
     rerender();
   }, [draft, mode, startRuntime, rerender]);
 
-  const updateDraft = useCallback((fn: (s: ScenarioModel) => ScenarioModel) => {
+  const updateDraft = useCallback((fn: (s: SimScenarioModel) => SimScenarioModel) => {
     setDraft((prev) => (prev ? fn(prev) : prev));
   }, []);
 
@@ -341,7 +341,7 @@ export function useSimulation() {
 
   const exportState = useCallback(() => {
     const rt = runtimeRef.current;
-    if (rt) downloadJson(`${scenarioName || 'cenario'}-estado.json`, ScenarioMapper.fromWorld(rt.world));
+    if (rt) downloadJson(`${scenarioName || 'cenario'}-estado.json`, SimScenarioMapper.fromWorld(rt.world));
   }, [scenarioName]);
 
   const exportDraft = useCallback(() => {

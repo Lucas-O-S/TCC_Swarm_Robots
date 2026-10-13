@@ -28,7 +28,8 @@ export function useLogin() {
         setError(result.message);
         return;
       }
-      navigate('/dashboard');
+      // /dashboard está sem rota (dev-front, 2026-10-05): a tela inicial agora é a Simulação.
+      navigate('/simulacao');
     } finally {
       setLoading(false);
     }

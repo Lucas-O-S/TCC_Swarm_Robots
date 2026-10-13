@@ -21,12 +21,13 @@ const TaskBuilder = lazy(() =>
 );
 
 // Mapa de rotas do app. /login fica fora da casca de navegação; todas as
-// telas autenticadas são filhas de <AppLayout /> (barra MARI + menu + Sair).
+// telas autenticadas são filhas de <RequireAuth /> (sem token → /login) e de
+// <AppLayout /> (barra MARI + menu + Sair).
 //
 // /robos removida a pedido (2026-09-01): só a estrutura de integração com o
 // backend (src/dto, src/model, src/mapper, src/services/RobotService)
 // deveria existir nesta rodada, sem tela ainda. /tarefas voltou como
-// TaskBuilder (mesmo padrão do CenarioBuilder, ver src/screens/TaskBuilder).
+// TaskBuilder (mesmo padrão do ScenarioBuilder, ver src/screens/TaskBuilder).
 //
 // /dashboard e /mapa-teste sem acesso a pedido (2026-10-05): as telas
 // continuam em src/screens (dashboard, map-test), só sem rota e sem menu.
@@ -38,12 +39,15 @@ export function AppRoutes() {
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginScreen />} />
 
-          <Route element={<AppLayout />}>
-            <Route path="/simulacao" element={<Simulation />} />
-            <Route path="/visualizador" element={<Visualizer />} />
-            {/* Rota antiga (antes do rename Cenario -> Scenario): mantém links salvos funcionando. */}
-            <Route path="/CenarioBuilder" element={<Navigate to="/ScenarioBuilder" replace />} />
-            <Route path="/TaskBuilder" element={<TaskBuilder />} />
+          <Route element={<RequireAuth />}>
+            <Route element={<AppLayout />}>
+              <Route path="/simulacao" element={<Simulation />} />
+              <Route path="/visualizador" element={<Visualizer />} />
+              <Route path="/ScenarioBuilder" element={<ScenarioBuilder />} />
+              {/* Rota antiga (antes do rename Cenario -> Scenario): mantém links salvos funcionando. */}
+              <Route path="/CenarioBuilder" element={<Navigate to="/ScenarioBuilder" replace />} />
+              <Route path="/TaskBuilder" element={<TaskBuilder />} />
+            </Route>
           </Route>
         </Routes>
       </Suspense>

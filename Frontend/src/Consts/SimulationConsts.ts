@@ -1,4 +1,4 @@
-import type { NetworkConfigModel, SimConfigModel } from '../model/Scenario.Model';
+import type { NetworkConfigModel, SimConfigModel } from '../model/SimScenario.Model';
 import { BLOCK_SIDE_M } from './MapConsts';
 
 // ---- Mapa (ponte mm ↔ grid do app) -----------------------------------------
