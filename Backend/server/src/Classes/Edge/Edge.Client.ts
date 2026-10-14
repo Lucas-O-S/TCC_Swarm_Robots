@@ -3,13 +3,13 @@ import { io, Socket } from "socket.io-client";
 import { edgeConfig } from "src/config/edge.config";
 import { Command } from "src/Enums/Command.enum";
 import { EdgeSocketEvents } from "src/Enums/EdgeSocketEvents.enum";
-import { EdgeRobotSnapshot, EdgeRobotState, EdgeRobotStatusEvent } from "./Edge.Types";
+import { EdgeRobotSnapshot, EdgeRobotState, EdgeRobotStatesEvent, EdgeRobotStatusEvent } from "./Edge.Types";
 
 /**
  * Único ponto da API que conversa com a borda. Substitui o antigo
  * GatewayAdapter: em vez de bytes, fala o contrato público da borda.
  *  - comandos: HTTP  POST {EDGE_URL}/v1/robots/:address/commands/:comando
- *  - telemetria: socket.io  robot:state / robot:status
+ *  - telemetria: socket.io  robot:states (lote) / robot:status
  * Ao (re)conectar, puxa GET /v1/robots para não perder robô que anunciou
  * enquanto a API estava fora.
  */
@@ -50,7 +50,10 @@ export class EdgeClient implements OnModuleInit, OnModuleDestroy {
             console.warn(`[EDGE] não conectou na borda em ${edgeConfig.url} (${error.message}) - tentando de novo em segundo plano`);
         });
 
-        this.socket.on(EdgeSocketEvents.RobotState, (state: EdgeRobotState) => this.publishState(state));
+        // A borda manda em lote; cada item segue pros listeners como antes.
+        this.socket.on(EdgeSocketEvents.RobotStates, (event: EdgeRobotStatesEvent) => {
+            for (const state of event.states) this.publishState(state);
+        });
 
         this.socket.on(EdgeSocketEvents.RobotStatus, (event: EdgeRobotStatusEvent) => this.publishStatus(event));
     }

@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { Injectable, NotFoundException, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { RobotWebsockets } from "src/Websockets/Robot.Websockets";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { EventsCommands as EventCommands } from "src/Enums/Events.Enum";
@@ -11,6 +11,7 @@ import { EdgeClient } from "../Edge/Edge.Client";
 import { DOTBOT_ADVERTISEMENT, EdgeRobotPosition, EdgeRobotState, EdgeRobotStatusEvent } from "../Edge/Edge.Types";
 import { normalizeAddress } from "src/Helpers/Address";
 import { RobotUpdateEvent } from "src/Websockets/Socket.Events";
+import { RobotModel } from "src/Model/Robot.Model";
 
 /**
  * Último estado conhecido de um robô, guardado em memória pelo SwarmService.
@@ -28,7 +29,7 @@ class RobotState {
 }
 
 /**
- * Lado de NEGÓCIO da frota: consome o que a borda publica (robot:state e
+ * Lado de NEGÓCIO da frota: consome o que a borda publica (robot:states e
  * robot:status, via EdgeClient) e cuida do que é da API - cadastro automático
  * no banco, histórico de posição, status/bateria persistidos, eventos internos
  * pro Orchestrator e o robot:update/status/new pro front.
@@ -64,6 +65,22 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
 
     private readonly GPS_DISTANCE_M = 5;
 
+    // Variação mínima de bateria (V) pra regravar no banco: a leitura oscila
+    // alguns mV a cada pacote, e sem isso todo robô gravava todo ciclo.
+    private readonly BATTERY_DELTA_V = 0.05;
+
+    // address → uuid no banco. O uuid não muda, então é resolvido uma vez e o
+    // caminho quente (posição, status) não faz SELECT por amostra.
+    private readonly robotUuids = new Map<string, string>();
+
+    // Amostras de posição esperando o próximo ciclo: um INSERT em lote a cada
+    // RUN_TIME em vez de um por amostra.
+    private pendingPositions: Partial<PositionModel>[] = [];
+
+    // Ciclo do refreshAndPersist ainda rodando: o próximo tick pula em vez de
+    // sobrepor (com muitos robôs um ciclo pode passar de RUN_TIME).
+    private persisting = false;
+
     private timer: NodeJS.Timeout | null = null;
 
 
@@ -87,6 +104,9 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
             this.refreshAndPersist().catch(error =>
                 console.error("[SWARM] erro ao persistir estado:", error),
             );
+            this.flushPositions().catch(error =>
+                console.error("[SWARM] erro ao gravar posições:", error),
+            );
         }, this.RUN_TIME);
 
     }
@@ -94,6 +114,9 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
     onModuleDestroy(): void {
         if (this.timer) clearInterval(this.timer);
         this.timer = null;
+        this.flushPositions().catch(error =>
+            console.error("[SWARM] erro ao gravar posições:", error),
+        );
     }
 
 
@@ -106,55 +129,108 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
     /**
      * Único escritor no Postgres. Roda a cada RUN_TIME: pra cada robô no estado
      * quente, pega o status que a borda calculou e grava status/battery/lastSync -
-     * mas SÓ quando status ou bateria mudam desde a última gravação (throttle).
+     * mas SÓ quando o status muda ou a bateria varia BATTERY_DELTA_V (throttle).
      * Assim vários pacotes viram no máximo 1 write/robô/ciclo, e nada se o robô
-     * está parado. Espelha o _dotbots_status_refresh do PyDotBot.
+     * está parado. Espelha o _dotbots_status_refresh do PyDotBot. Um robô com
+     * erro não interrompe os outros.
      */
     private async refreshAndPersist(): Promise<void> {
 
-        for (const [address, state] of this.states) {
-
-            // Sem status ainda = acabou de chegar o 1º frame: está Active.
-            const status = this.statuses.get(address) ?? RobotStatus.Active;
-
-            const batteryVolts = this.batteryVoltsOf(state);
-
-            const last = this.persisted.get(address);
-
-            const statusChanged = !last || last.status !== status;
-
-            const batteryChanged = batteryVolts !== null && (!last || last.battery !== batteryVolts);
-
-            if (!statusChanged && !batteryChanged) {
-                continue;
-            }
-
-            const robot = await this.robots.getByAddress(address);
-
-            if (!robot) {
-                continue; // anunciou na rede mas não está cadastrado no banco
-            }
-
-            const changes: { status?: RobotStatus; battery?: number; lastSync: Date } = {
-                lastSync: state.updatedAt,
-            };
-
-            if (statusChanged) changes.status = status;
-
-            if (batteryChanged) changes.battery = batteryVolts as number;
-
-            await this.robots.update(robot.uuid, changes);
-
-            this.persisted.set(address, {
-                status,
-                battery: batteryVolts ?? last?.battery ?? robot.battery,
-            });
-
-            if (statusChanged) {
-                this.ws.emitStatus(address, status);
-                console.log(`[SWARM] status de ${address}: ${RobotStatus[last?.status ?? robot.status]} → ${RobotStatus[status]}`);
-            }
+        if (this.persisting) {
+            return;
         }
+
+        this.persisting = true;
+
+        try {
+            for (const [address, state] of this.states) {
+                await this.persistRobot(address, state).catch(error =>
+                    console.error(`[SWARM] erro ao persistir ${address}:`, error),
+                );
+            }
+        } finally {
+            this.persisting = false;
+        }
+    }
+
+    private async persistRobot(address: string, state: RobotState): Promise<void> {
+
+        // Sem status ainda = acabou de chegar o 1º frame: está Active.
+        const status = this.statuses.get(address) ?? RobotStatus.Active;
+
+        const batteryVolts = this.batteryVoltsOf(state);
+
+        const last = this.persisted.get(address);
+
+        const statusChanged = !last || last.status !== status;
+
+        const batteryChanged = batteryVolts !== null
+            && (!last || Math.abs(last.battery - batteryVolts) >= this.BATTERY_DELTA_V);
+
+        if (!statusChanged && !batteryChanged) {
+            return;
+        }
+
+        const uuid = await this.robotUuidOf(address);
+
+        if (!uuid) {
+            return; // anunciou na rede mas não está cadastrado no banco
+        }
+
+        const changes: { status?: RobotStatus; battery?: number; lastSync: Date } = {
+            lastSync: state.updatedAt,
+        };
+
+        if (statusChanged) changes.status = status;
+
+        if (batteryChanged) changes.battery = batteryVolts as number;
+
+        let robot: RobotModel;
+
+        try {
+            robot = await this.robots.update(uuid, changes);
+        } catch (error) {
+            if (error instanceof NotFoundException) {
+                this.forgetRobot(address); // apagado do banco: resolve de novo na próxima
+                return;
+            }
+            throw error;
+        }
+
+        this.persisted.set(address, {
+            status,
+            battery: batteryChanged ? (batteryVolts as number) : (last?.battery ?? robot.battery),
+        });
+
+        if (statusChanged) {
+            this.ws.emitStatus(address, status);
+            console.log(`[SWARM] status de ${address}: ${last ? RobotStatus[last.status] : "?"} → ${RobotStatus[status]}`);
+        }
+    }
+
+    /** uuid do robô no banco pelo address, com cache (null = não cadastrado). */
+    private async robotUuidOf(address: string): Promise<string | null> {
+
+        const cached = this.robotUuids.get(address);
+
+        if (cached) {
+            return cached;
+        }
+
+        const robot = await this.robots.getByAddress(address);
+
+        if (robot) {
+            this.robotUuids.set(address, robot.uuid);
+        }
+
+        return robot?.uuid ?? null;
+    }
+
+    /** Esquece o que foi cacheado de um robô que sumiu do banco. */
+    private forgetRobot(address: string): void {
+        this.robotUuids.delete(address);
+        this.knownRobots.delete(address);
+        this.persisted.delete(address);
     }
 
 
@@ -169,6 +245,8 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
 
         await this.robots.findOrCreateByAddress(address, { name: `DotBot-${address}`, status: RobotStatus.Active })
         .then(([robot, created]) => {
+
+            this.robotUuids.set(address, robot.uuid);
 
             if (created) {
 
@@ -226,7 +304,7 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
         const state = new RobotState(edgeState.payloadType, edgeState.data, new Date(edgeState.updatedAt));
 
         this.states.set(address, state);   // guarda no quadro (memória)
-        this.ws.emitUpdate(this.toUpdateEvent(address, state, edgeState.position)); // empurra pro front ao vivo
+        this.ws.queueUpdate(this.toUpdateEvent(address, state, edgeState.position)); // vai pro front no próximo lote
 
         // Grava a posição no histórico (throttled por distância). Fire-and-forget:
         // não queremos travar o processamento por um write no banco.
@@ -237,12 +315,10 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
 
         //Gera o evento de advertisement
         this.events.emit( EventCommands.advertisement, { address, data: edgeState.data });
-
-        console.log(`[SWARM] estado de ${address} atualizado:`, edgeState.data);
     }
 
     /**
-     * Estado cru da borda → `robot:update` do front: posição já tratada pela
+     * Estado cru da borda → item do `robot:updates` do front: posição já tratada pela
      * borda (sem sentinela), bateria em Volts e nomes iguais ao RobotModel, pra
      * o front não precisar conhecer payloadType nem unidade do fio.
      */
@@ -260,7 +336,8 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
     }
 
     /**
-     * Grava uma amostra de posição na tabela `position`, se a borda mandou
+     * Enfileira uma amostra pra tabela `position` (gravada em lote no próximo
+     * ciclo, ver flushPositions), se a borda mandou
      * posição e o robô tiver se movido o suficiente (throttle por distância,
      * igual ao PyDotBot). LH2 vem em mm; GPS em graus. A borda já descartou as
      * leituras inválidas (position = null).
@@ -288,19 +365,34 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
             }
         }
 
-        const robot = await this.robots.getByAddress(address);
-        if (!robot) {
+        // Marca antes do await: amostras que chegam enquanto o uuid é resolvido
+        // já comparam com esta (senão o throttle deixava passar duplicadas).
+        this.lastPosition.set(address, { x, y });
+
+        const robotId = await this.robotUuidOf(address);
+        if (!robotId) {
             return; // anunciou na rede mas não está cadastrado no banco
         }
 
-        const sample: Partial<PositionModel> = { robotId: robot.uuid, source, x, y };
+        const sample: Partial<PositionModel> = { robotId, source, x, y };
         if (direction !== null) {
             sample.direction = direction;
         }
 
-        await this.positions.create(sample);
+        this.pendingPositions.push(sample); // gravada no próximo flushPositions
+    }
 
-        this.lastPosition.set(address, { x, y });
+    /** Grava num INSERT só as amostras acumuladas desde o último ciclo. */
+    private async flushPositions(): Promise<void> {
+
+        if (this.pendingPositions.length === 0) {
+            return;
+        }
+
+        const batch = this.pendingPositions;
+        this.pendingPositions = [];
+
+        await this.positions.createMany(batch);
     }
 
     /** Distância entre duas coordenadas GPS em metros (haversine, igual PyDotBot). */

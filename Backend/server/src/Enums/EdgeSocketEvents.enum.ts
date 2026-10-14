@@ -5,7 +5,7 @@
  * API emite pro front.
  */
 export enum EdgeSocketEvents {
-    RobotState = "robot:state",
+    RobotStates = "robot:states",
     RobotStatus = "robot:status",
     RobotJoined = "robot:joined",
 }
