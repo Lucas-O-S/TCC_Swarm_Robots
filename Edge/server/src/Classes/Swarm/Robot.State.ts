@@ -15,11 +15,19 @@ export interface RobotPosition {
 }
 
 /**
- * Último dado decodificado de um robô - o que sai no evento `robot:state` e
+ * Último dado decodificado de um robô - o que sai no lote `robot:states` e
  * nas rotas GET. `type` é o nome do payload (ex.: "DOTBOT_ADVERTISEMENT");
  * `payloadType` é o mesmo em número. `data` traz os campos do decoder como
  * vieram do robô (battery em mV, pos_x/pos_y em mm, waypoint_idx...).
  */
+/**
+ * Evento `robot:states`: os RobotState decodificados desde o último envio,
+ * em ordem de chegada (pode ter mais de um do mesmo robô).
+ */
+export interface RobotStatesEvent {
+    states: RobotState[];
+}
+
 export class RobotState {
 
     public readonly type: string;
