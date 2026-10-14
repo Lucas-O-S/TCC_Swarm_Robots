@@ -13,7 +13,7 @@ interface VisRobotListProps {
 
 // Lista de robôs do Visualizador: o RobotList com os cartões montados a
 // partir do que a API informa — status calculado pelo backend, modo de
-// orquestração, tarefa, pose e bateria do último advertisement.
+// orquestração, tarefa, pose e bateria da última telemetria.
 export function VisRobotList({ robots, connected }: VisRobotListProps) {
   return (
     <RobotList
@@ -59,12 +59,12 @@ function toCard(robot: VisRobotRowModel): RobotCardData {
     ),
     pose: robot.pose
       ? `x=${robot.pose.x.toFixed(0)} y=${robot.pose.y.toFixed(0)} · ${robot.pose.thetaDeg.toFixed(0)}°`
-      : robot.wireAuto === null
-        ? 'sem telemetria'
-        : 'sem localização',
+      : robot.hasTelemetry
+        ? 'sem localização'
+        : 'sem telemetria',
     battery,
     batteryText: `${Math.round(battery)}%`,
-    routeText: robot.wireAuto === null ? '—' : robot.wireAuto ? `rota · wp ${robot.waypointIdx ?? 0}` : 'sem rota',
-    routeTitle: 'Modo no fio (último advertisement)',
+    routeText: !robot.hasTelemetry ? '—' : robot.onRoute ? `rota · wp ${robot.waypointIdx ?? 0}` : 'sem rota',
+    routeTitle: 'Rota conhecida (tarefa ou avulsa) e waypoint_idx da última telemetria',
   };
 }

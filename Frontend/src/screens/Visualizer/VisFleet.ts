@@ -10,7 +10,7 @@ import type { TaskModel } from '../../model/Task.Model';
 import type { VisRobotModel } from '../../model/VisRobot.Model';
 import { pushTrailPoint } from '../Simulation/hooks/useTrails';
 
-/** O backend grava o address em hex minúsculo; a chave interna ignora a caixa pra casar REST e socket. */
+/** O backend grava o address em hex maiúsculo; a chave interna ignora a caixa pra casar REST e socket. */
 const keyOf = (address: string) => address.toLowerCase();
 
 function newEntry(robot: RobotModel): VisRobotModel {
@@ -117,8 +117,7 @@ export class VisFleet {
     if (!v) return false;
     if (v.telemetry && telemetry.updatedAt.getTime() < v.telemetry.updatedAt.getTime()) return true;
 
-    const adv = telemetry.advertisement;
-    const theta = adv ? VisRobotMapper.thetaFromDirection(adv.direction) : null;
+    const theta = VisRobotMapper.thetaFromDirection(telemetry.position?.direction ?? null);
     this.robotMap.set(k, { ...v, telemetry, receivedAt, theta: theta ?? v.theta });
 
     const pos = VisRobotMapper.position(telemetry);

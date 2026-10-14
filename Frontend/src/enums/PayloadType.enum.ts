@@ -8,6 +8,8 @@ export const PayloadType = {
   CMD_MOVE_RAW: 0x00,
   CMD_RGB_LED: 0x01,
   ADVERTISEMENT: 0x04,
+  /** SailBot: latitude/longitude × 1e6 (só lido no Visualizador, pelo estado cru da API). */
+  GPS_POSITION: 0x05,
   DOTBOT_ADVERTISEMENT: 0x06,
   CONTROL_MODE: 0x07,
   LH2_WAYPOINTS: 0x08,

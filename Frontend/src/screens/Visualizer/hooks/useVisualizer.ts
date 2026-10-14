@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RobotControlMode } from '../../../enums/RobotControlMode.enum';
 import { SocketEvents } from '../../../enums/SocketEvents.enum';
 import type { ApiLink, ApiLinkState } from '../../../Integration/ApiLink';
-import { API_NOT_CONNECTED, DisconnectedApiLink } from '../../../Integration/DisconnectedApiLink';
+import { API_NOT_CONNECTED } from '../../../Integration/DisconnectedApiLink';
 import { controlModeLabel } from '../../../Integration/LocalOrchestrator';
+import { SocketApiLink } from '../../../Integration/SocketApiLink';
 import type { ScenarioModel } from '../../../model/Scenario.Model';
 import type { RgbColorModel } from '../../../model/SimRobot.Model';
 import type { Vec2Model } from '../../../model/SimWorld.Model';
@@ -20,10 +21,9 @@ import { VisFleet } from '../VisFleet';
 // comandos do drawer viram chamadas do ApiLink e devolvem a mensagem de erro
 // da API (ou null), pra tela mostrar.
 //
-// SEM CONEXÃO POR ENQUANTO (pedido do dono: por ora é só a tela): o link é o
-// DisconnectedApiLink, que não conecta em nada. Pra ligar na API, é trocar a
-// linha marcada no efeito abaixo pela implementação real do ApiLink — a tela
-// e o resto deste hook não mudam.
+// O link é o SocketApiLink (REST + socket.io do backend). Trocar pela
+// DisconnectedApiLink na linha marcada no efeito abaixo abre a tela sem API —
+// a tela e o resto deste hook não mudam.
 
 /** Telemetria de um robô que a lista ainda não tem (robot:new perdido?) → recarrega a lista depois disso. */
 const UNKNOWN_ROBOT_RELOAD_MS = 1000;
@@ -53,8 +53,8 @@ export function useVisualizer() {
   const [fleet] = useState(() => new VisFleet(scheduleRender));
 
   useEffect(() => {
-    // ↓ Ligar na API = trocar pela implementação real do ApiLink (REST pelo Callout + socket.io).
-    const api: ApiLink = new DisconnectedApiLink();
+    // ↓ Pra abrir a tela sem API (só o mapa), trocar por `new DisconnectedApiLink()`.
+    const api: ApiLink = new SocketApiLink();
     linkRef.current = api;
     fleet.reset();
     let reloadTimer: ReturnType<typeof setTimeout> | null = null;
