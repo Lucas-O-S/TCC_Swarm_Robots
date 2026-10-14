@@ -268,8 +268,8 @@ Onde fica cada peça:
 - **Drawer** = o do modo Simular sem o que é do mundo simulado
   (derrubar/religar, swarmit):
   - Modo (Manual/Semi-auto/Auto) → `PUT /robots/:address/control-mode`;
-  - Manual: joystick (CMD_MOVE_RAW a 20 Hz pela API, usando o rumo da
-    telemetria) + rota avulsa (`PUT /robots/:address/waypoints`);
+  - Manual: joystick arcade (CMD_MOVE_RAW a 20 Hz pela API: frente/ré
+    anda, lados giram) + rota avulsa (`PUT /robots/:address/waypoints`);
   - Semi-auto: escolher tarefa pendente + Atribuir
     (`PUT /orchestrator/robots/:address/assign`). Cancelar/Trocar no meio não
     existem na API;

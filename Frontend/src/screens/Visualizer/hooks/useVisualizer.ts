@@ -87,6 +87,8 @@ export function useVisualizer() {
     });
 
     api.onEvent((event) => {
+      // DEBUG: conferir se os eventos do socket estão chegando (remover depois).
+      console.log(`[Visualizador] ${event.kind}`, event);
       switch (event.kind) {
         case SocketEvents.RobotUpdate:
           if (!fleet.applyTelemetry(event.address, event.telemetry, Date.now()) && !reloadTimer) {

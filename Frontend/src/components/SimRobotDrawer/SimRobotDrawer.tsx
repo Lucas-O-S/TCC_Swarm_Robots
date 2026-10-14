@@ -166,7 +166,7 @@ function SimRobotPanel({
 
       {mode === RobotControlMode.Manual && (
         <>
-          <ManualDrive theta={robot.theta} speed={speed} onSpeedChange={setSpeed} onDrive={onMoveRaw} />
+          <ManualDrive speed={speed} onSpeedChange={setSpeed} onDrive={onMoveRaw} />
           <RouteDraftSection
             draftCount={routeDraft.length}
             threshold={routeThreshold}

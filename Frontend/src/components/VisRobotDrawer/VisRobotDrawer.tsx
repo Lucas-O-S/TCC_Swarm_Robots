@@ -144,8 +144,7 @@ function VisRobotPanel({
 
       {mode === RobotControlMode.Manual && (
         <>
-          {/* O theta é o `direction` da última telemetria: com advertisement lento, o giro automático corrige atrasado. */}
-          <ManualDrive theta={v.theta} speed={speed} onSpeedChange={setSpeed} onDrive={(l, r) => void report(onMoveRaw(l, r))} />
+          <ManualDrive speed={speed} onSpeedChange={setSpeed} onDrive={(l, r) => void report(onMoveRaw(l, r))} />
           <RouteDraftSection
             draftCount={routeDraft.length}
             threshold={routeThreshold}
