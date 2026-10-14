@@ -113,7 +113,8 @@ NEGÓCIO do nosso sistema ficou em `Backend/server`.
   campos dos DTOs (move-raw, rgb-led, control-mode, waypoints, xgo-action).
   Na borda o control-mode só aceita 0/1; SemiAuto→Auto e `robots.mode` seguem
   na API (`RobotService.setControlMode`).
-- Telemetria: socket.io da borda, eventos `robot:state` / `robot:status` /
+- Telemetria: socket.io da borda, eventos `robot:states` (lote a cada ~20 ms;
+  o `EdgeClient` desmonta e entrega cada item aos listeners) / `robot:status` /
   `robot:joined`. A API conecta como cliente e, a cada (re)conexão, puxa
   `GET /v1/robots` para não perder robô que anunciou com ela fora.
 - O MQTT `/mari/{NETID}/to_edge|to_cloud` ficou só entre a borda e o

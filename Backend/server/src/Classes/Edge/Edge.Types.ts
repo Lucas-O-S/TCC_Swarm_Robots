@@ -16,7 +16,15 @@ export interface EdgeRobotPosition {
     direction: number | null;
 }
 
-/** Evento `robot:state` (e o `state` das rotas GET da borda). */
+/**
+ * Evento `robot:states` da borda: lote (~20 ms) dos estados decodificados,
+ * em ordem de chegada. Cada item é um EdgeRobotState.
+ */
+export interface EdgeRobotStatesEvent {
+    states: EdgeRobotState[];
+}
+
+/** Item do lote `robot:states` (e o `state` das rotas GET da borda). */
 export interface EdgeRobotState {
     address: string;
     /** Nome do payload, ex.: "DOTBOT_ADVERTISEMENT". */

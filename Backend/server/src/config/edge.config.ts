@@ -3,7 +3,7 @@ import 'dotenv/config';
 /**
  * Onde está a borda (Edge/server) e o token dela. A API do front não fala mais
  * com o hardware: comandos vão por HTTP (POST /v1/robots/:address/commands/...)
- * e a telemetria chega pelo socket.io da borda (robot:state / robot:status).
+ * e a telemetria chega pelo socket.io da borda (robot:states / robot:status).
  *
  * `token`: o mesmo EDGE_TOKEN configurado na borda. Vazio = não manda token
  * (borda com EDGE_AUTH_ACTIVATED=false).

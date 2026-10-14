@@ -29,7 +29,7 @@ class RobotState {
 }
 
 /**
- * Lado de NEGÓCIO da frota: consome o que a borda publica (robot:state e
+ * Lado de NEGÓCIO da frota: consome o que a borda publica (robot:states e
  * robot:status, via EdgeClient) e cuida do que é da API - cadastro automático
  * no banco, histórico de posição, status/bateria persistidos, eventos internos
  * pro Orchestrator e o robot:update/status/new pro front.
