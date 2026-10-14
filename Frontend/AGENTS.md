@@ -247,7 +247,7 @@ Onde fica cada peça:
   Simulação). Hoje é o `DisconnectedApiLink`: avisa "sem conexão", não emite
   evento e todo comando volta com erro, então a tela abre só com o mapa, sem
   robôs. Pra ligar, é escrever a implementação real (REST pelo `Callout` +
-  socket.io nos eventos `robot:update`/`robot:status`/`robot:new` do
+  socket.io nos eventos `robot:updates` (lote de `robot:update`)/`robot:status`/`robot:new` do
   `RobotWebsockets`) e trocar a linha marcada em `hooks/useVisualizer.ts`. As rotas e
   os eventos estão no contrato, conferidos no backend. Vai precisar do
   `socket.io-client`, que ainda não está instalado.

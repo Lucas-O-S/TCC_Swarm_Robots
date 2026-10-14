@@ -16,7 +16,7 @@ export const robotPositionEventDtoSchema = z.object({
   direction: z.number().nullable(),
 });
 
-/** `robot:update`: a cada estado novo do robô. */
+/** Estado novo de um robô — item do lote `robot:updates`. */
 export const robotUpdateEventDtoSchema = z.object({
   address: z.string(),
   position: robotPositionEventDtoSchema.nullable(),
@@ -25,6 +25,15 @@ export const robotUpdateEventDtoSchema = z.object({
   waypointIdx: z.number().nullable(),
   /** ISO 8601. */
   updatedAt: z.string(),
+});
+
+/**
+ * `robot:updates`: lote dos estados que chegaram desde o último envio. Os
+ * itens ficam `unknown` aqui e são validados um a um no SocketApiLink, pra um
+ * item fora do formato não derrubar o lote inteiro.
+ */
+export const robotUpdatesEventDtoSchema = z.object({
+  updates: z.array(z.unknown()),
 });
 
 /** `robot:status`: status recalculado pelo silêncio (Active/Inactive/Lost). */

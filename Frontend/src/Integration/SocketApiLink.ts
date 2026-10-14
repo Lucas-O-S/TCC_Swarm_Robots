@@ -1,7 +1,12 @@
 import { io } from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
 import type { z } from 'zod';
-import { robotNewEventDtoSchema, robotStatusEventDtoSchema, robotUpdateEventDtoSchema } from '../dto/robot.socket.dto';
+import {
+  robotNewEventDtoSchema,
+  robotStatusEventDtoSchema,
+  robotUpdateEventDtoSchema,
+  robotUpdatesEventDtoSchema,
+} from '../dto/robot.socket.dto';
 import type { RobotControlMode } from '../enums/RobotControlMode.enum';
 import type { RobotStatus } from '../enums/RobotStatus.enum';
 import { SocketEvents } from '../enums/SocketEvents.enum';
@@ -52,9 +57,13 @@ export class SocketApiLink implements ApiLink {
       this.stateCb?.({ status: 'disconnected', message: `Sem conexão com o socket da API (${error.message}) — tentando de novo…` }),
     );
 
-    this.listen(SocketEvents.RobotUpdate, robotUpdateEventDtoSchema, (dto) =>
-      this.eventCb?.({ kind: SocketEvents.RobotUpdate, address: dto.address, telemetry: RobotTelemetryMapper.fromUpdateEvent(dto) }),
-    );
+    // O backend manda em lote; cada item vira um RobotUpdate, como antes.
+    this.listen(SocketEvents.RobotUpdates, robotUpdatesEventDtoSchema, (batch) => {
+      for (const raw of batch.updates) {
+        const dto = this.parse(SocketEvents.RobotUpdate, robotUpdateEventDtoSchema, raw);
+        if (dto) this.eventCb?.({ kind: SocketEvents.RobotUpdate, address: dto.address, telemetry: RobotTelemetryMapper.fromUpdateEvent(dto) });
+      }
+    });
     this.listen(SocketEvents.RobotStatus, robotStatusEventDtoSchema, (dto) =>
       this.eventCb?.({ kind: SocketEvents.RobotStatus, address: dto.address, status: dto.status as RobotStatus }),
     );
@@ -83,10 +92,16 @@ export class SocketApiLink implements ApiLink {
   /** Payload fora do contrato é descartado (com aviso no console), sem derrubar a tela. */
   private listen<T>(event: SocketEvents, schema: z.ZodType<T>, handle: (dto: T) => void): void {
     this.socket?.on(event, (raw: unknown) => {
-      const parsed = schema.safeParse(raw);
-      if (parsed.success) handle(parsed.data);
-      else console.warn(`[SocketApiLink] ${event} fora do formato esperado`, parsed.error.issues);
+      const dto = this.parse(event, schema, raw);
+      if (dto) handle(dto);
     });
+  }
+
+  private parse<T>(event: SocketEvents, schema: z.ZodType<T>, raw: unknown): T | null {
+    const parsed = schema.safeParse(raw);
+    if (parsed.success) return parsed.data;
+    console.warn(`[SocketApiLink] ${event} fora do formato esperado`, parsed.error.issues);
+    return null;
   }
 
   // ---- Leitura (REST) ------------------------------------------------------
