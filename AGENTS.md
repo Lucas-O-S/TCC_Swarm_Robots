@@ -509,11 +509,20 @@ esse campo - pra tipar certo precisaria também tratar o `ADVERTISEMENT` (0x04).
 ### WebSocket (bloco G, tempo real) - FEITO
 
 - `RobotWebsockets` (`src/Websockets/Robot.Websockets.ts`, `@WebSocketGateway({ cors })`)
-  com `@WebSocketServer() server` e `emitUpdate(address, state)` →
-  `server.emit("robot:update", ...)`.
-- O `SwarmService` injeta ele e chama `emitUpdate` no fim do `handleFrame` - cada
-  estado decodificado é empurrado ao vivo pro front (evento `robot:update`), sem
-  polling.
+  com `@WebSocketServer() server` e `emitUpdate(event)` →
+  `server.emit("robot:update", event)`.
+- O `SwarmService` injeta ele e chama `emitUpdate` no `handleState` - cada
+  estado que chega da borda é empurrado ao vivo pro front (evento `robot:update`),
+  sem polling e sem throttle (~500 ms por robô no firmware).
+- **Contrato dos eventos** em `src/Websockets/Socket.Events.ts`
+  (`RobotUpdateEvent`/`RobotStatusEvent`/`RobotNewEvent`). O `robot:update` NÃO
+  manda o payload cru: `toUpdateEvent` converte pra `{ address, position, battery,
+  waypointIdx, updatedAt }` - `position` é a que a borda já extraiu (null = sem
+  leitura, sentinela já descartado), `battery` em **Volts** (igual `robots.battery`).
+  Decidido com o dono: **sem envelope `ApiResponse`** nos eventos (push não tem
+  requisição nem erro; só faria sentido no ack se um dia o front mandar comando
+  pelo socket) e **sem `RobotModel`** no `robot:update` (exigiria query por pacote;
+  posição/direção nem são colunas). O payload cru segue em `GET /robots/:address/status`.
 - `emitNew(robot)` → `server.emit("robot:new", { robot })`: robô recém-descoberto
   (auto-cadastro, ver seção acima). Manda o `RobotModel` inteiro - não só
   address+status - em canal separado do `robot:status`, pro front desenhar o

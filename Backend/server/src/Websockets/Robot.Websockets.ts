@@ -1,7 +1,9 @@
 import { WebSocketGateway, WebSocketServer } from "@nestjs/websockets";
 import { Server } from "socket.io";
 import { SocketEvents } from "src/Enums/SocketEvents.enum";
+import { RobotStatus } from "src/Enums/RobotStatus.enum";
 import { RobotModel } from "src/Model/Robot.Model";
+import { RobotNewEvent, RobotStatusEvent, RobotUpdateEvent } from "./Socket.Events";
 
 
 @WebSocketGateway({
@@ -17,9 +19,9 @@ export class RobotWebsockets {
     @WebSocketServer()
     private server!: Server;
 
-    emitUpdate(address: string, state: any): void {
-        this.server.emit(SocketEvents.RobotUpdate, { address, state });
-
+    /** Estado novo do robô (posição, bateria...), já no formato do front. */
+    emitUpdate(event: RobotUpdateEvent): void {
+        this.server.emit(SocketEvents.RobotUpdate, event);
     }
 
     /**
@@ -27,8 +29,9 @@ export class RobotWebsockets {
      * silêncio) - acontece SEM pacote novo, então o front só fica sabendo por
      * aqui. Espelha o RELOAD que o PyDotBot manda quando o status muda.
      */
-    emitStatus(address: string, status: number): void {
-        this.server.emit(SocketEvents.RobotStatus, { address, status });
+    emitStatus(address: string, status: RobotStatus): void {
+        const event: RobotStatusEvent = { address, status };
+        this.server.emit(SocketEvents.RobotStatus, event);
     }
 
     /**
@@ -38,7 +41,8 @@ export class RobotWebsockets {
      * conhecido). Mirror do NEW_DOTBOT do PyDotBot.
      */
     emitNew(robot: RobotModel): void {
-        this.server.emit(SocketEvents.RobotNew, { robot });
+        const event: RobotNewEvent = { robot };
+        this.server.emit(SocketEvents.RobotNew, event);
     }
 
 }
