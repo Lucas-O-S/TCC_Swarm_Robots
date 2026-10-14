@@ -1,19 +1,26 @@
-import type { DotBotAdvertisement } from '../Integration/Protocols/DotBot.Payload';
+import type { PositionSource } from '../enums/PositionSource.enum';
+
+/** Posição do robô já sem sentinela. LH2: x/y em mm; GPS: x = latitude, y = longitude, em graus. */
+export interface RobotPositionModel {
+  source: PositionSource;
+  x: number;
+  y: number;
+  /** Graus, anti-horário a partir de +X; null = sem leitura. */
+  direction: number | null;
+}
 
 /**
- * Último estado decodificado de um robô, como o backend guarda no
- * SwarmService (`RobotState`: payloadType + data + updatedAt) e manda no
- * `robot:update` e no `GET /robots/:address/status`. Só o
- * DOTBOT_ADVERTISEMENT (0x06) vira `advertisement`; os outros tipos (GPS do
- * SailBot etc.) chegam com `advertisement = null`.
- *
- * Unidades do fio: pos em mm (0xFFFFFFFF = ainda sem localização),
- * direction em graus (-1 = sem leitura), battery em mV e mode no formato
- * do firmware (`DotBotControlMode`: Manual = 0, Auto = 1).
+ * Último estado de um robô, no formato do `robot:update` (backend
+ * `RobotUpdateEvent`): posição tratada pela borda, bateria em Volts e o
+ * waypoint atual. O `GET /robots/:address/status` ainda devolve o estado cru
+ * e é convertido pra cá em `RobotStateMapper.toTelemetry`.
  */
 export interface RobotTelemetryModel {
-  payloadType: number;
-  advertisement: DotBotAdvertisement | null;
-  /** Quando o backend recebeu o frame (`updatedAt` do RobotState). */
+  /** null = payload sem posição ou robô ainda não localizado. */
+  position: RobotPositionModel | null;
+  /** Volts; null = payload sem bateria. */
+  battery: number | null;
+  waypointIdx: number | null;
+  /** Quando o backend recebeu o frame. */
   updatedAt: Date;
 }

@@ -10,9 +10,10 @@ import { RouteDraftSection } from '../RouteDraftSection/RouteDraftSection';
 import { StatusLine, StatusSep } from '../StatusLine/StatusLine';
 import type { StatusTone } from '../StatusLine/StatusLine';
 import { DEFAULT_WAYPOINT_THRESHOLD_MM, RAD_TO_DEG } from '../../Consts/SimulationConsts';
-import { DotBotControlMode } from '../../enums/DotBotControlMode.enum';
+import { PositionSource } from '../../enums/PositionSource.enum';
 import { RobotControlMode } from '../../enums/RobotControlMode.enum';
 import { RobotStatus } from '../../enums/RobotStatus.enum';
+import { RobotMapper } from '../../mapper/Robot.Mapper';
 import { SimRobotMapper } from '../../mapper/SimRobot.Mapper';
 import { VisRobotMapper } from '../../mapper/VisRobot.Mapper';
 import type { RgbColorModel } from '../../model/SimRobot.Model';
@@ -91,10 +92,9 @@ function VisRobotPanel({
   const [error, setError] = useState<string | null>(null);
 
   const { robot, telemetry } = v;
-  const adv = telemetry?.advertisement ?? null;
+  const gps = telemetry?.position?.source === PositionSource.GPS ? telemetry.position : null;
   const pos = VisRobotMapper.position(telemetry);
   const mode = robot.mode;
-  const wireAuto = adv?.mode === DotBotControlMode.Auto;
   const age = v.receivedAt !== null ? Math.max(0, Math.round((now - v.receivedAt) / 1000)) : null;
   const headingDeg = ((v.theta * RAD_TO_DEG) % 360 + 360) % 360;
 
@@ -117,21 +117,21 @@ function VisRobotPanel({
 
       <KeyValueList
         items={[
-          { label: 'pos (mm)', value: pos ? `x=${pos.x.toFixed(0)} y=${pos.y.toFixed(0)}` : adv ? 'sem localização' : '—' },
-          { label: 'rumo', value: adv ? (adv.direction === -1 ? 'sem leitura' : `${headingDeg.toFixed(0)}°`) : '—' },
-          { label: 'modo (fio)', value: adv ? (wireAuto ? 'AUTO' : 'MANUAL') : '—' },
+          gps
+            ? { label: 'pos (GPS)', value: `lat=${gps.x.toFixed(6)} lon=${gps.y.toFixed(6)}` }
+            : { label: 'pos (mm)', value: pos ? `x=${pos.x.toFixed(0)} y=${pos.y.toFixed(0)}` : telemetry ? 'sem localização' : '—' },
+          {
+            label: 'rumo',
+            value: telemetry?.position ? (telemetry.position.direction === null ? 'sem leitura' : `${headingDeg.toFixed(0)}°`) : '—',
+          },
           {
             label: 'bateria',
-            value: adv
-              ? `${VisRobotMapper.batteryPercent(adv.battery)}% (${(adv.battery / 1000).toFixed(2)} V)`
-              : `${robot.battery.toFixed(2)} V (gravado na API)`,
+            value:
+              telemetry?.battery != null
+                ? `${RobotMapper.batteryToPercent(telemetry.battery)}% (${telemetry.battery.toFixed(2)} V)`
+                : `${robot.battery.toFixed(2)} V (gravado na API)`,
           },
-          { label: 'pwm L/R', value: adv ? `${adv.pwm_left} / ${adv.pwm_right}` : '—' },
-          { label: 'encoders', value: adv ? `${adv.encoder_left} / ${adv.encoder_right}` : '—' },
-          {
-            label: 'wp_idx',
-            value: adv ? (wireAuto ? `${adv.waypoint_idx} → (${adv.waypoint_x}, ${adv.waypoint_y})` : String(adv.waypoint_idx)) : '—',
-          },
+          { label: 'wp_idx', value: telemetry?.waypointIdx != null ? String(telemetry.waypointIdx) : '—' },
           { label: 'tarefa', value: task ? task.name : robot.taskId ? `${robot.taskId.slice(0, 8)}…` : '—' },
         ]}
       />
@@ -144,8 +144,7 @@ function VisRobotPanel({
 
       {mode === RobotControlMode.Manual && (
         <>
-          {/* O theta é o `direction` da última telemetria: com advertisement lento, o giro automático corrige atrasado. */}
-          <ManualDrive theta={v.theta} speed={speed} onSpeedChange={setSpeed} onDrive={(l, r) => void report(onMoveRaw(l, r))} />
+          <ManualDrive speed={speed} onSpeedChange={setSpeed} onDrive={(l, r) => void report(onMoveRaw(l, r))} />
           <RouteDraftSection
             draftCount={routeDraft.length}
             threshold={routeThreshold}
@@ -166,7 +165,7 @@ function VisRobotPanel({
           semiAuto={mode === RobotControlMode.SemiAuto}
           task={task}
           hasTask={robot.taskId !== null}
-          wpIdx={adv?.waypoint_idx ?? null}
+          wpIdx={telemetry?.waypointIdx ?? null}
           threshold={robot.waypointsThreshold}
           pendingTasks={pendingTasks}
           onAssign={(id) => void report(onAssign(id))}

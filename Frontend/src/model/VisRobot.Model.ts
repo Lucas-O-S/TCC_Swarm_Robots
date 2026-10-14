@@ -13,8 +13,8 @@ export interface VisRouteModel {
 /**
  * Robô no Visualizador: o registro da API (GET /robots, robot:new,
  * robot:status) + a última telemetria (robot:update) + o que só esta tela
- * sabe (último LED e última rota mandados daqui, rumo mantido quando o
- * advertisement chega sem leitura de direção). Ver `useVisualizer.ts`.
+ * sabe (último LED e última rota mandados daqui, rumo mantido quando a
+ * telemetria chega sem leitura de direção). Ver `useVisualizer.ts`.
  */
 export interface VisRobotModel {
   robot: RobotModel;
@@ -36,8 +36,10 @@ export interface VisRobotRowModel {
   status: RobotStatus;
   /** Modo de orquestração (coluna `mode` da API). */
   modeLabel: string;
-  /** Modo no fio, do último advertisement — null sem telemetria. */
-  wireAuto: boolean | null;
+  /** Já chegou telemetria (robot:update ou GET status) desde que a tela abriu. */
+  hasTelemetry: boolean;
+  /** Tem rota conhecida: tarefa atribuída ou rota avulsa mandada desta tela. */
+  onRoute: boolean;
   battery: number;
   pose: { x: number; y: number; thetaDeg: number } | null;
   /** Posição fora da arena do cenário escolhido. */

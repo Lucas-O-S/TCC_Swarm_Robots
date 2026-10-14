@@ -9,8 +9,10 @@ import type { Vec2Model } from '../../model/SimWorld.Model';
 import type { TaskModel } from '../../model/Task.Model';
 import type { VisRobotModel } from '../../model/VisRobot.Model';
 import { pushTrailPoint } from '../Simulation/hooks/useTrails';
+import { PoseTween } from './PoseTween';
+import type { TweenPose } from './PoseTween';
 
-/** O backend grava o address em hex minúsculo; a chave interna ignora a caixa pra casar REST e socket. */
+/** O backend grava o address em hex maiúsculo; a chave interna ignora a caixa pra casar REST e socket. */
 const keyOf = (address: string) => address.toLowerCase();
 
 function newEntry(robot: RobotModel): VisRobotModel {
@@ -30,6 +32,8 @@ export class VisFleet {
   /** Chave = address como a API manda (é o que o SimOverlay procura). */
   private trailMap = new Map<string, Vec2Model[]>();
   private readonly linkLog = new LinkLog();
+  /** Pose desenhada de cada robô, deslizando entre as amostras (ver PoseTween). */
+  private readonly tween = new PoseTween();
   private startedAt = Date.now();
   private readonly onChange: () => void;
 
@@ -60,6 +64,16 @@ export class VisFleet {
     return this.robotMap.get(keyOf(address)) ?? null;
   }
 
+  /** Pose suavizada pra desenhar no mapa (null = sem amostra de posição ainda). */
+  shownPose(address: string): TweenPose | null {
+    return this.tween.pose(keyOf(address));
+  }
+
+  /** Avança o deslize dos robôs até `now`; true = ainda tem robô se mexendo (pede outro quadro). */
+  advance(now: number): boolean {
+    return this.tween.advance(now);
+  }
+
   // ---- Escrita (hook) -----------------------------------------------------------
 
   /** Começa do zero (link novo). */
@@ -67,6 +81,7 @@ export class VisFleet {
     this.robotMap = new Map();
     this.taskList = [];
     this.trailMap = new Map();
+    this.tween.clear();
     this.linkLog.clear();
     this.startedAt = Date.now();
     this.onChange();
@@ -117,12 +132,14 @@ export class VisFleet {
     if (!v) return false;
     if (v.telemetry && telemetry.updatedAt.getTime() < v.telemetry.updatedAt.getTime()) return true;
 
-    const adv = telemetry.advertisement;
-    const theta = adv ? VisRobotMapper.thetaFromDirection(adv.direction) : null;
-    this.robotMap.set(k, { ...v, telemetry, receivedAt, theta: theta ?? v.theta });
+    const theta = VisRobotMapper.thetaFromDirection(telemetry.position?.direction ?? null) ?? v.theta;
+    this.robotMap.set(k, { ...v, telemetry, receivedAt, theta });
 
     const pos = VisRobotMapper.position(telemetry);
-    if (pos) pushTrailPoint(this.trailMap, v.robot.address, pos);
+    if (pos) {
+      pushTrailPoint(this.trailMap, v.robot.address, pos);
+      this.tween.push(k, { ...pos, theta }, Date.now());
+    }
     this.onChange();
     return true;
   }

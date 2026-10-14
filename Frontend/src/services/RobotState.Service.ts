@@ -1,6 +1,7 @@
 import { RobotMapper } from '../mapper/Robot.Mapper';
 import { RobotStateMapper } from '../mapper/RobotState.Mapper';
 import type { RobotStateModel } from '../model/RobotState.Model';
+import type { RobotTelemetryModel } from '../model/RobotTelemetry.Model';
 import { RobotStateRepository } from '../repository/RobotStateRepository';
 import { fromNullableUnit } from './ServiceResult';
 import type { ServiceResult } from './ServiceResult';
@@ -15,5 +16,11 @@ export const RobotStateService = {
   async getStatus(address: string): Promise<ServiceResult<RobotStateModel | null>> {
     const target = RobotMapper.normalizeAddress(address);
     return fromNullableUnit(await RobotStateRepository.findByAddress(target), RobotStateMapper.fromDto);
+  },
+
+  /** Mesmo estado, já no formato do `robot:update` (o que o Visualizador usa). */
+  async getTelemetry(address: string): Promise<ServiceResult<RobotTelemetryModel | null>> {
+    const target = RobotMapper.normalizeAddress(address);
+    return fromNullableUnit(await RobotStateRepository.findByAddress(target), RobotStateMapper.toTelemetry);
   },
 };

@@ -229,8 +229,11 @@ Onde fica cada peça:
 
 - `screens/Visualizer/` — `Visualizer.tsx` (tela), `hooks/useVisualizer.ts`
   (ponte API ↔ React), `VisFleet.ts` (a frota como a API mostra, fora do
-  React: registro, telemetria, rastro, tarefas e log) e
-  `components/VisualizerMap.tsx` (mapa).
+  React: registro, telemetria, rastro, tarefas e log),
+  `PoseTween.ts` (suaviza a pose no mapa: a cada amostra o robô desliza da
+  pose desenhada até a nova durante o intervalo médio entre amostras; o
+  `useVisualizer` mantém o laço de rAF só enquanto algum robô desliza. A lista
+  e o rastro usam a amostra crua) e `components/VisualizerMap.tsx` (mapa).
 - `components/` — `VisualizerControls` (header), `VisRobotList` e
   `VisRobotDrawer`, montados com as peças compartilhadas listadas em "Peças
   compartilhadas" da Simulação (`RobotList`, `RobotCard`, `TaskPanel`,
@@ -247,7 +250,7 @@ Onde fica cada peça:
   Simulação). Hoje é o `DisconnectedApiLink`: avisa "sem conexão", não emite
   evento e todo comando volta com erro, então a tela abre só com o mapa, sem
   robôs. Pra ligar, é escrever a implementação real (REST pelo `Callout` +
-  socket.io nos eventos `robot:update`/`robot:status`/`robot:new` do
+  socket.io nos eventos `robot:updates` (lote de `robot:update`)/`robot:status`/`robot:new` do
   `RobotWebsockets`) e trocar a linha marcada em `hooks/useVisualizer.ts`. As rotas e
   os eventos estão no contrato, conferidos no backend. Vai precisar do
   `socket.io-client`, que ainda não está instalado.
@@ -268,8 +271,8 @@ Onde fica cada peça:
 - **Drawer** = o do modo Simular sem o que é do mundo simulado
   (derrubar/religar, swarmit):
   - Modo (Manual/Semi-auto/Auto) → `PUT /robots/:address/control-mode`;
-  - Manual: joystick (CMD_MOVE_RAW a 20 Hz pela API, usando o rumo da
-    telemetria) + rota avulsa (`PUT /robots/:address/waypoints`);
+  - Manual: joystick arcade (CMD_MOVE_RAW a 20 Hz pela API: frente/ré
+    anda, lados giram) + rota avulsa (`PUT /robots/:address/waypoints`);
   - Semi-auto: escolher tarefa pendente + Atribuir
     (`PUT /orchestrator/robots/:address/assign`). Cancelar/Trocar no meio não
     existem na API;
