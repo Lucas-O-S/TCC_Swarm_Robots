@@ -511,7 +511,7 @@ esse campo - pra tipar certo precisaria também tratar o `ADVERTISEMENT` (0x04).
 
 - `RobotWebsockets` (`src/Websockets/Robot.Websockets.ts`, `@WebSocketGateway({ cors })`)
   com `@WebSocketServer() server` e `queueUpdate(event)`, que junta os estados
-  e emite `server.emit("robot:updates", { updates })` a cada ~100 ms
+  e emite `server.emit("robot:updates", { updates })` a cada ~33 ms
   (`UPDATES_FLUSH_MS`), com todos os itens em ordem (o rastro usa todos).
 - O `SwarmService` injeta ele e chama `queueUpdate` no `handleState` - todo
   estado que chega da borda vai pro front, sem polling e sem descartar amostra;
@@ -721,7 +721,7 @@ dependência real, cada bloco precisa do anterior:
   placeholder (só solta a task); a **recarga** foi adiada (ver "Adiado"). Ver
   "Automação nível 2".
 - **Bloco G (WebSocket): FEITO** - `RobotWebsockets` empurra `robot:updates` (lote
-  a cada ~100 ms) e `robot:status` (quando o status muda por timeout) ao front.
+  a cada ~33 ms) e `robot:status` (quando o status muda por timeout) ao front.
 - **Bloco H (Rotas): FEITO** - 5 comandos + `GET /status` + atribuição **manual**
   (`PUT /orchestrator/robots/:address/assign`, usada pelo SemiAuto). A atribuição
   automática segue no Orchestrator.

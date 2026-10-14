@@ -5,8 +5,13 @@ import { RobotStatus } from "src/Enums/RobotStatus.enum";
 import { RobotModel } from "src/Model/Robot.Model";
 import { RobotNewEvent, RobotStatusEvent, RobotUpdateEvent, RobotUpdatesEvent } from "./Socket.Events";
 
-/** Janela do lote do `robot:updates`: ~10 envios/s, independente de quantos robôs. */
-const UPDATES_FLUSH_MS = 100;
+/**
+ * Janela do lote do `robot:updates` (~30 envios/s, independente de quantos
+ * robôs). Bem menor que o intervalo entre amostras de um robô (100 ms a
+ * 10 Hz): com janela igual ao intervalo, cada lote levava 0, 1 ou 2 amostras
+ * do mesmo robô e o movimento no front ficava parado-pulo.
+ */
+const UPDATES_FLUSH_MS = 33;
 
 
 @WebSocketGateway({
