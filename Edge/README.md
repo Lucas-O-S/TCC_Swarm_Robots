@@ -59,7 +59,7 @@ Corpo inválido → `400`.
 
 | Evento | Payload |
 | --- | --- |
-| `robot:state` | `{ address, type, payloadType, data, position, updatedAt }` |
+| `robot:states` | `{ states: [{ address, type, payloadType, data, position, updatedAt }, ...] }` — lote a cada ~20 ms, em ordem de chegada |
 | `robot:status` | `{ address, status, lastSync }` — `status`: 0 Active, 1 Inactive (>5 s sem frame), 2 Lost (>60 s) |
 | `robot:joined` | `{ address }` — primeiro advertisement desde que a borda subiu |
 
@@ -89,6 +89,6 @@ server/src/
     Swarm/          estado vivo, status por silêncio, posição, GET /v1/robots
     Commands/       POST /v1/robots/:address/commands/*  (ponto único de envio)
     Auth/           token único (EDGE_TOKEN)
-  Websockets/       socket.io: robot:state / robot:status / robot:joined
+  Websockets/       socket.io: robot:states / robot:status / robot:joined
   Tests/            HDLC byte a byte contra o marilib (npm test)
 ```

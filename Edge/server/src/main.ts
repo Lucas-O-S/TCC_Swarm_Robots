@@ -18,7 +18,7 @@ async function bootstrap() {
         .setTitle('TCC Swarm Robots - Borda')
         .setDescription(
             'Borda dos robôs: fala Mari/HDLC com o gateway e expõe a frota por REST (/v1) ' +
-            'e socket.io (eventos robot:state, robot:status, robot:joined).'
+            'e socket.io (eventos robot:states, robot:status, robot:joined).'
         )
         .setVersion('1.0')
         .addBearerAuth()

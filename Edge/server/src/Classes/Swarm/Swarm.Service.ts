@@ -113,7 +113,7 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
             console.log(`[SWARM] robô ${address} entrou na rede`);
         }
 
-        this.ws.emitState(state);
+        this.ws.queueState(state);
     }
 
     /**
