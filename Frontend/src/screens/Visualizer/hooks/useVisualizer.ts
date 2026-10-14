@@ -38,19 +38,27 @@ export function useVisualizer() {
   const [, setFrame] = useState(0);
 
   const frameRef = useRef(0);
+  const fleetRef = useRef<VisFleet | null>(null);
   const linkRef = useRef<ApiLink | null>(null);
   const reloadRef = useRef<() => Promise<void>>(() => Promise.resolve());
 
-  // Vários eventos por quadro de tela (N robôs × taxa de advertisement) viram um render só.
+  // Vários eventos por quadro de tela (N robôs × taxa de advertisement) viram
+  // um render só. Enquanto algum robô desliza entre duas amostras (PoseTween),
+  // cada quadro pede o seguinte; parou, o laço para sozinho.
   const scheduleRender = useCallback(() => {
     if (frameRef.current) return;
-    frameRef.current = requestAnimationFrame(() => {
+    frameRef.current = requestAnimationFrame(function frame() {
       frameRef.current = 0;
       setFrame((f) => f + 1);
+      if (fleetRef.current?.advance(Date.now())) frameRef.current = requestAnimationFrame(frame);
     });
   }, []);
 
   const [fleet] = useState(() => new VisFleet(scheduleRender));
+
+  useEffect(() => {
+    fleetRef.current = fleet;
+  }, [fleet]);
 
   useEffect(() => {
     // ↓ Pra abrir a tela sem API (só o mapa), trocar por `new DisconnectedApiLink()`.
@@ -209,6 +217,7 @@ export function useVisualizer() {
     link,
     now,
     robots: fleet.robots,
+    shownPose: (address: string) => fleet.shownPose(address),
     tasks: fleet.tasks,
     trails: fleet.trails,
     logEntries: fleet.entries,

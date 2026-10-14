@@ -76,7 +76,7 @@ export function Visualizer() {
 
   const mapRobots: SimMapRobotModel[] = vis.robots.flatMap((v, i) => {
     const task = taskOf(v);
-    const robot = VisRobotMapper.toMap(v, i, arena, task ? TaskMapper.routePoints(task) : null);
+    const robot = VisRobotMapper.toMap(v, i, arena, task ? TaskMapper.routePoints(task) : null, vis.shownPose(v.robot.address));
     return robot ? [robot] : [];
   });
   const rows = vis.robots.map((v, i) => VisRobotMapper.toRow(v, i, cenario ? arena : null, taskOf(v)?.name ?? null));

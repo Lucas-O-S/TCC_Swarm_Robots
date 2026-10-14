@@ -3,7 +3,7 @@
  * `RobotWebsockets` (socket.io, `src/Websockets/Robot.Websockets.ts`) emite
  * pro front. Payloads (`src/Websockets/Socket.Events.ts`, schemas em
  * `dto/robot.socket.dto.ts`):
- *   - robot:updates → `{ updates: [...] }`, lote (~100 ms) dos estados novos
+ *   - robot:updates → `{ updates: [...] }`, lote (~33 ms) dos estados novos
  *     que chegaram, em ordem; cada item é um robot:update
  *     `{ address, position, battery, waypointIdx, updatedAt }` (posição sem
  *     sentinela, bateria em Volts). O SocketApiLink desmonta o lote e entrega

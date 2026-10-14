@@ -52,9 +52,17 @@ export const VisRobotMapper = {
    * (AUTO no mapa) quando a tela conhece uma — o robot:update não traz o
    * modo do fio nem o alvo atual.
    */
-  toMap(v: VisRobotModel, index: number, arena: ArenaSize, taskPoints: Vec2Model[] | null): SimMapRobotModel | null {
-    const pos = position(v.telemetry);
-    if (!pos) return null;
+  toMap(
+    v: VisRobotModel,
+    index: number,
+    arena: ArenaSize,
+    taskPoints: Vec2Model[] | null,
+    /** Pose suavizada (PoseTween) no lugar da última amostra crua. */
+    shown: { x: number; y: number; theta: number } | null = null,
+  ): SimMapRobotModel | null {
+    const raw = position(v.telemetry);
+    if (!raw) return null;
+    const pos = shown ?? { ...raw, theta: v.theta };
 
     const waypoints = knownRoute(v, taskPoints);
     const onRoute = waypoints.length > 0;
@@ -65,7 +73,7 @@ export const VisRobotMapper = {
       color: SimRobotMapper.color(index),
       x: clamp(pos.x, 0, arena.width),
       y: clamp(pos.y, 0, arena.height),
-      theta: v.theta,
+      theta: pos.theta,
       status: v.robot.status,
       rgb: v.rgb,
       mode: onRoute ? DotBotControlMode.Auto : DotBotControlMode.Manual,
