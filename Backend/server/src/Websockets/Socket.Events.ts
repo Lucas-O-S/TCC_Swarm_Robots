@@ -19,7 +19,7 @@ export interface RobotPositionEvent {
     direction: number | null;
 }
 
-/** `robot:update` - a cada estado novo do robô (~500 ms no firmware). */
+/** Estado novo de UM robô. Vai pro front dentro do lote `robot:updates`. */
 export interface RobotUpdateEvent {
     address: string;
     /** null = payload sem posição ou sem leitura (ex.: LH2 sem lighthouse). */
@@ -29,6 +29,16 @@ export interface RobotUpdateEvent {
     waypointIdx: number | null;
     /** ISO 8601 - mesmo instante que vira `robots.last_sync`. */
     updatedAt: string;
+}
+
+/**
+ * `robot:updates` - todos os estados que chegaram desde o último envio, em
+ * ordem de chegada (pode ter mais de um do mesmo robô: o rastro usa todos).
+ * Agrupar evita um emit por amostra: com 100 robôs a 10 Hz seriam 1000
+ * eventos/s por cliente.
+ */
+export interface RobotUpdatesEvent {
+    updates: RobotUpdateEvent[];
 }
 
 /** `robot:status` - status mudou (Active/Inactive/Lost por silêncio). */

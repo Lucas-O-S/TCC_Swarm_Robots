@@ -127,8 +127,8 @@ NEGÓCIO do nosso sistema ficou em `Backend/server`.
   borda) + `handleStatus` (status calculado pela borda). Sair de Active gera o
   evento interno `robot.lost` uma vez por período de silêncio - mesmo
   momento de antes (5 s). Cadastro automático, histórico de posição (throttle
-  por distância), persistência de status/bateria e `robot:update/status/new`
-  pro front continuam aqui, com o mesmo formato.
+  por distância), persistência de status/bateria e `robot:updates/status/new`
+  pro front continuam aqui.
 - Erros da borda viram HTTP na API: borda fora = `503`, corpo recusado = `400`,
   token errado/erro interno da borda = `502`.
 - `normalizeAddress` local em `src/Helpers/Address.ts`.
@@ -509,19 +509,20 @@ esse campo - pra tipar certo precisaria também tratar o `ADVERTISEMENT` (0x04).
 ### WebSocket (bloco G, tempo real) - FEITO
 
 - `RobotWebsockets` (`src/Websockets/Robot.Websockets.ts`, `@WebSocketGateway({ cors })`)
-  com `@WebSocketServer() server` e `emitUpdate(event)` →
-  `server.emit("robot:update", event)`.
-- O `SwarmService` injeta ele e chama `emitUpdate` no `handleState` - cada
-  estado que chega da borda é empurrado ao vivo pro front (evento `robot:update`),
-  sem polling e sem throttle (~500 ms por robô no firmware).
+  com `@WebSocketServer() server` e `queueUpdate(event)`, que junta os estados
+  e emite `server.emit("robot:updates", { updates })` a cada ~100 ms
+  (`UPDATES_FLUSH_MS`), com todos os itens em ordem (o rastro usa todos).
+- O `SwarmService` injeta ele e chama `queueUpdate` no `handleState` - todo
+  estado que chega da borda vai pro front, sem polling e sem descartar amostra;
+  só o envio é agrupado (com 100 robôs a 10 Hz seriam 1000 emits/s por cliente).
 - **Contrato dos eventos** em `src/Websockets/Socket.Events.ts`
-  (`RobotUpdateEvent`/`RobotStatusEvent`/`RobotNewEvent`). O `robot:update` NÃO
+  (`RobotUpdateEvent`/`RobotUpdatesEvent`/`RobotStatusEvent`/`RobotNewEvent`). O item do `robot:updates` NÃO
   manda o payload cru: `toUpdateEvent` converte pra `{ address, position, battery,
   waypointIdx, updatedAt }` - `position` é a que a borda já extraiu (null = sem
   leitura, sentinela já descartado), `battery` em **Volts** (igual `robots.battery`).
   Decidido com o dono: **sem envelope `ApiResponse`** nos eventos (push não tem
   requisição nem erro; só faria sentido no ack se um dia o front mandar comando
-  pelo socket) e **sem `RobotModel`** no `robot:update` (exigiria query por pacote;
+  pelo socket) e **sem `RobotModel`** nos itens do `robot:updates` (exigiria query por pacote;
   posição/direção nem são colunas). O payload cru segue em `GET /robots/:address/status`.
 - `emitNew(robot)` → `server.emit("robot:new", { robot })`: robô recém-descoberto
   (auto-cadastro, ver seção acima). Manda o `RobotModel` inteiro - não só
@@ -583,6 +584,9 @@ quem detecta de quem age:
   - `onAdvertisement` → se `waypoint_idx >= nº de waypoints`, conclui a task
     (`Completed`) e libera o robô. Se a bateria (mV/1000 → Volts) está abaixo do
     `LOW_BATTERY_VOLTS`, hoje só solta a task (placeholder - recarga adiada).
+    Antes do banco há um filtro: um robô por vez (`checkingAdvertisement`) e,
+    se `waypoint_idx` e a faixa de bateria não mudaram, só reconfere depois de
+    `ADVERTISEMENT_RECHECK_MS` (2 s) - sem isso cada pacote virava SELECT.
 
 **Atribuição manual (SemiAuto)**: `OrchestratorController` expõe
 `PUT /orchestrator/robots/:address/assign` (body `{ taskId }`). Faz o mesmo que
@@ -627,7 +631,10 @@ periódico (1s, mesmo timer do `checkLost`), espelhando o
   ou a bateria mudam desde a última gravação (guardado num `Map` em memória por
   address). Vários pacotes viram no máximo 1 write/robô/ciclo, e nada se o robô
   está parado. `battery` é gravada em **Volts** (o fio manda mV → divide por
-  1000, igual PyDotBot).
+  1000, igual PyDotBot). A bateria só regrava quando varia `BATTERY_DELTA_V`
+  (0,05 V), senão a oscilação de mV gravava todo robô todo ciclo. O uuid do
+  robô fica em cache por address (`robotUuidOf`), o ciclo não roda sobreposto
+  (`persisting`) e um robô com erro não interrompe os outros.
 - **Histórico de posição** (tabela `position`, via `PositionService`): grava a
   posição decodificada com throttle por **distância** - descarta se moveu menos
   que `LH2_DISTANCE_MM = 20` (LH2, mm) ou `GPS_DISTANCE_M = 5` (GPS, metros por
@@ -635,10 +642,14 @@ periódico (1s, mesmo timer do `checkLost`), espelhando o
   `0xFFFFFFFF` = "sem localização") e `GPS_POSITION`. **Nota**: o PyDotBot só
   grava LH2 quando o robô está totalmente calibrado; esse gate ainda não existe
   aqui (não temos o estado de calibração no backend), só a guarda do sentinela.
+  As amostras aprovadas vão pra uma fila (`pendingPositions`) e são gravadas
+  num INSERT em lote (`createMany` → `bulkCreate`) a cada ciclo de 1 s. O
+  `lastPosition` é marcado antes de qualquer await, pra amostras simultâneas
+  não furarem o throttle.
 - **WebSocket**: `emitStatus` empurra `robot:status` pro front quando o status
   muda (isso acontece SEM pacote novo - por timeout - então o front só fica
   sabendo por aqui; é o equivalente ao `RELOAD` do PyDotBot). Os nomes de evento
-  do socket ficam no enum `SocketEvents` (`robot:update`, `robot:status`, `robot:new`),
+  do socket ficam no enum `SocketEvents` (`robot:updates`, `robot:status`, `robot:new`),
   separado do `EventsCommands` interno de propósito.
 
 `SwarmModule` importa `RobotModule` + `PositionModule` (pra injetar
@@ -708,8 +719,8 @@ dependência real, cada bloco precisa do anterior:
   no fim conclui) via `OrchestratorListener`. A regra de **bateria baixa** hoje é
   placeholder (só solta a task); a **recarga** foi adiada (ver "Adiado"). Ver
   "Automação nível 2".
-- **Bloco G (WebSocket): FEITO** - `RobotWebsockets` empurra `robot:update` (a cada
-  frame) e `robot:status` (quando o status muda por timeout) ao front.
+- **Bloco G (WebSocket): FEITO** - `RobotWebsockets` empurra `robot:updates` (lote
+  a cada ~100 ms) e `robot:status` (quando o status muda por timeout) ao front.
 - **Bloco H (Rotas): FEITO** - 5 comandos + `GET /status` + atribuição **manual**
   (`PUT /orchestrator/robots/:address/assign`, usada pelo SemiAuto). A atribuição
   automática segue no Orchestrator.

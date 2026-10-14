@@ -20,6 +20,19 @@ export class OrchestratorService implements OnModuleInit {
     /** Limiar de bateria baixa, em Volts. O protocolo manda mV; convertemos ao comparar. */
     private LOW_BATTERY_VOLTS = 3.0;
 
+    /**
+     * Advertisement igual ao último conferido (mesmo waypoint_idx e mesma
+     * faixa de bateria) só volta a consultar o banco depois disso. Sem isso,
+     * cada pacote de cada robô virava SELECT de robô + task.
+     */
+    private readonly ADVERTISEMENT_RECHECK_MS = 2000;
+
+    /** Robôs com advertisement sendo conferido agora: um por vez por robô. */
+    private readonly checkingAdvertisement = new Set<string>();
+
+    /** Última conferência por robô: o que foi visto e quando. */
+    private readonly lastAdvertisementCheck = new Map<string, { signature: string; at: number }>();
+
     /** Atribuição automática ligada? Começa pelo .env e muda em runtime (setAutoEnabled). */
     private autoEnabled = orchestratorConfig.autoEnabled;
 
@@ -206,18 +219,53 @@ export class OrchestratorService implements OnModuleInit {
 
     }
 
+    /**
+     * Filtro antes do banco: pula o advertisement se o mesmo robô já está
+     * sendo conferido (evita concluir a mesma task duas vezes) ou se nada que
+     * importa mudou desde a última conferência, há menos de
+     * ADVERTISEMENT_RECHECK_MS.
+     */
     async onAdvertisement( payload : {address : string, data : any}) : Promise<void>{
 
-        const robot = await this.robotService.getByAddress(payload.address);
+        const { address, data } = payload;
+
+        //Verifica bateria baixa (data.battery vem em mV; comparamos em Volts)
+        const lowBattery = data.battery / 1000 <= this.LOW_BATTERY_VOLTS;
+
+        const signature = `${data.waypoint_idx}|${lowBattery}`;
+
+        const now = Date.now();
+
+        const last = this.lastAdvertisementCheck.get(address);
+
+        if (this.checkingAdvertisement.has(address)) {
+            return;
+        }
+
+        if (last && last.signature === signature && now - last.at < this.ADVERTISEMENT_RECHECK_MS) {
+            return;
+        }
+
+        this.checkingAdvertisement.add(address);
+
+        this.lastAdvertisementCheck.set(address, { signature, at: now });
+
+        try {
+            await this.checkAdvertisement(address, data, lowBattery);
+        } finally {
+            this.checkingAdvertisement.delete(address);
+        }
+    }
+
+    private async checkAdvertisement(address: string, data: any, lowBattery: boolean): Promise<void> {
+
+        const robot = await this.robotService.getByAddress(address);
 
         if (!robot || !robot.taskId){
             return
         }
 
-        //Verifica bateria baixa (data.battery vem em mV; comparamos em Volts)
-        const batteryVolts = payload.data.battery / 1000;
-
-        if (batteryVolts <= this.LOW_BATTERY_VOLTS){
+        if (lowBattery){
 
             //To do task de recarregar
             await this.resetTask(robot)
@@ -228,7 +276,7 @@ export class OrchestratorService implements OnModuleInit {
 
         const howManyWaypoints = task?.waypoints.length ?? 0
 
-        if(payload.data.waypoint_idx >= howManyWaypoints){
+        if(data.waypoint_idx >= howManyWaypoints){
             await this.completeTask(robot);
             return
         }
