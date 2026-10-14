@@ -10,12 +10,14 @@ import { PositionModel } from "src/Model/Position.Model";
 import { EdgeClient } from "../Edge/Edge.Client";
 import { DOTBOT_ADVERTISEMENT, EdgeRobotPosition, EdgeRobotState, EdgeRobotStatusEvent } from "../Edge/Edge.Types";
 import { normalizeAddress } from "src/Helpers/Address";
+import { RobotUpdateEvent } from "src/Websockets/Socket.Events";
 
 /**
  * Último estado conhecido de um robô, guardado em memória pelo SwarmService.
  * Tipar isto (em vez de `any` no Map) faz o TS pegar erro de campo - foi um
  * `updateAt` sem "d" que passou batido quando o Map era `any`.
- * É também o `state` que vai pro front no robot:update.
+ * É o que o `GET /robots/:address/status` devolve; pro front no robot:update
+ * vai convertido em `RobotUpdateEvent` (ver `toUpdateEvent`).
  */
 class RobotState {
     constructor(
@@ -224,7 +226,7 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
         const state = new RobotState(edgeState.payloadType, edgeState.data, new Date(edgeState.updatedAt));
 
         this.states.set(address, state);   // guarda no quadro (memória)
-        this.ws.emitUpdate(address, state); // empurra pro front ao vivo
+        this.ws.emitUpdate(this.toUpdateEvent(address, state, edgeState.position)); // empurra pro front ao vivo
 
         // Grava a posição no histórico (throttled por distância). Fire-and-forget:
         // não queremos travar o processamento por um write no banco.
@@ -237,6 +239,24 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
         this.events.emit( EventCommands.advertisement, { address, data: edgeState.data });
 
         console.log(`[SWARM] estado de ${address} atualizado:`, edgeState.data);
+    }
+
+    /**
+     * Estado cru da borda → `robot:update` do front: posição já tratada pela
+     * borda (sem sentinela), bateria em Volts e nomes iguais ao RobotModel, pra
+     * o front não precisar conhecer payloadType nem unidade do fio.
+     */
+    private toUpdateEvent(address: string, state: RobotState, position: EdgeRobotPosition | null): RobotUpdateEvent {
+
+        const waypointIdx = state.data?.waypoint_idx;
+
+        return {
+            address,
+            position,
+            battery: this.batteryVoltsOf(state),
+            waypointIdx: typeof waypointIdx === "number" ? waypointIdx : null,
+            updatedAt: state.updatedAt.toISOString(),
+        };
     }
 
     /**
