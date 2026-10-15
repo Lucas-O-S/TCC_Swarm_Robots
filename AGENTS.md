@@ -549,8 +549,13 @@ esse campo - pra tipar certo precisaria também tratar o `ADVERTISEMENT` (0x04).
   (`robotService.getFreeRobots`, `taskId=null` e `mode=Auto`), emparelha 1:1; pra
   cada par manda os waypoints (reusa `sendCommand`) e **só então** marca a task
   InProgress + grava `taskId` no robô (persiste só o campo mudado).
-- Guardas: pula task sem waypoints; envio protegido (retorna bool) - só atribui se
-  o envio funcionou (o próximo ciclo tenta de novo se falhar).
+- Guardas: as regras de "pode atribuir?" ficam em dois métodos usados pelo
+  automático e pelo manual - `robotRejection(robot)` (Manual, já tem task, sem
+  calibração LH2/posição via `SwarmService.taskBlockReason`) e
+  `taskRejection(task)` (sem waypoints, mais de `MAX_WAYPOINTS`, já em andamento).
+  Devolvem a exception (400/409) ou `null`: o manual lança, o automático só filtra/
+  pula. Envio protegido (retorna bool) - só atribui se o envio funcionou (o
+  próximo ciclo tenta de novo se falhar).
 - Gatilho: `onModuleInit` + `setInterval(assignPending, 5000)` com `.catch` (é job
   de fundo, sem o ExceptionFilter do HTTP - por isso o catch é obrigatório).
 - **Liga/desliga** (`autoEnabled` no `OrchestratorService`): estado inicial por
@@ -633,9 +638,9 @@ periódico (1s, mesmo timer do `checkLost`), espelhando o
   de silêncio, com os limiares exatos do PyDotBot - `INACTIVE_DELAY = 5s`,
   `LOST_DELAY = 60s` (< 5s = Active, 5–60s = Inactive, > 60s = Lost). O status
   **nunca vem do robô**, é calculado.
-- **Throttle de graça**: grava `status`/`battery`/`lastSync` só quando o status
-  ou a bateria mudam desde a última gravação (guardado num `Map` em memória por
-  address). Vários pacotes viram no máximo 1 write/robô/ciclo, e nada se o robô
+- **Throttle de graça**: grava `status`/`battery`/`calibrated`/`lastSync` só
+  quando o status, a bateria ou a calibração mudam desde a última gravação
+  (guardado num `Map` em memória por address; `lh2` null não conta como mudança). Vários pacotes viram no máximo 1 write/robô/ciclo, e nada se o robô
   está parado. `battery` é gravada em **Volts** (o fio manda mV → divide por
   1000, igual PyDotBot). A bateria só regrava quando varia `BATTERY_DELTA_V`
   (0,05 V), senão a oscilação de mV gravava todo robô todo ciclo. O uuid do
@@ -645,9 +650,10 @@ periódico (1s, mesmo timer do `checkLost`), espelhando o
   posição decodificada com throttle por **distância** - descarta se moveu menos
   que `LH2_DISTANCE_MM = 20` (LH2, mm) ou `GPS_DISTANCE_M = 5` (GPS, metros por
   haversine). Trata `DOTBOT_ADVERTISEMENT` (LH2, com guarda do sentinela
-  `0xFFFFFFFF` = "sem localização") e `GPS_POSITION`. **Nota**: o PyDotBot só
-  grava LH2 quando o robô está totalmente calibrado; esse gate ainda não existe
-  aqui (não temos o estado de calibração no backend), só a guarda do sentinela.
+  `0xFFFFFFFF` = "sem localização") e `GPS_POSITION`. Como no PyDotBot, LH2 só
+  é gravada com o robô calibrado: se a borda manda `lh2` e ele não é `valid` (ou
+  `deviceCount` é 0), a amostra é descartada antes do throttle; `lh2` null
+  (simulador/MQTT) grava como antes. GPS não passa por esse gate.
   As amostras aprovadas vão pra uma fila (`pendingPositions`) e são gravadas
   num INSERT em lote (`createMany` → `bulkCreate`) a cada ciclo de 1 s. O
   `lastPosition` é marcado antes de qualquer await, pra amostras simultâneas
@@ -719,7 +725,8 @@ dependência real, cada bloco precisa do anterior:
   seção "Rede Mari".
 - **Bloco E (SwarmService): FEITO** - `Map` + `handleFrame` (11/12), job de status por
   `lastSync` (13), escrita throttled no Postgres (14) e emissão de eventos (15). Ver
-  "Persistência de estado". (Falta só o gate de calibração LH2 pra gravar posição.)
+  "Persistência de estado". Gate de calibração LH2 pra gravar posição: FEITO na
+  API (depende da borda mandar o `lh2`).
 - **Bloco F (Orchestrator): nível 1 e nível 2 FEITOS** (menos recarga) - atribuição
   automática task↔robô Auto + regras reativas (robô `Lost` solta a task, `waypoint_idx`
   no fim conclui) via `OrchestratorListener`. A regra de **bateria baixa** hoje é
@@ -829,8 +836,11 @@ swarmit 0.11.0 gravado por cabo - fica para depois, de propósito.
    robô. Fora do modo `mari` responde que não se aplica.
 7. `Classes/Swarm/Swarm.Service.ts` - `positionOf`: (0,0) = sem fix (`null`);
    `direction` -1000 ou -1 = `null`; manter o `0xFFFFFFFF` por compatibilidade.
-8. `Robot.State.ts`: campo **`lh2: { homographyCount, valid } | null`** no
-   `robot:state` e no `GET /v1/robots`. `null` = transporte sem SwarmIT
+8. `Robot.State.ts`: campo **`lh2: { valid, deviceCount } | null`** no
+   `robot:state` e no `GET /v1/robots` - **exatamente esses nomes**, que são os
+   do `Lh2Data` da API (`deviceCount` = `lh2HomographyCount` do DEVICE_INFO;
+   `valid` = bit `VALID` do `lh2Flags`). Nome diferente chega `undefined` na API
+   sem erro de compilação. `null` = transporte sem SwarmIT
    (simulador/MQTT) - **não pode quebrar a frota simulada**. Precisa de um jeito
    opcional do adapter informar isso (ex. método opcional no
    `GatewayAdapter.interface`), sem o `SwarmService` conhecer o Mari.
@@ -838,29 +848,40 @@ swarmit 0.11.0 gravado por cabo - fica para depois, de propósito.
    Swagger).
 10. Atualizar `Edge/README.md` com o contrato novo (`lh2` no estado, rotas).
 
-#### Backend (`Backend/server/src`) - o que fazer
+#### Backend (`Backend/server/src`) - FEITO (2026-10-15)
 
-1. `Classes/Edge/Edge.Types.ts`: copiar o campo `lh2` (cópia permitida entre
-   borda e API).
-2. `Classes/Swarm/Swarm.Service.ts`: guardar o `lh2` por address no
-   `handleState`; no `persistRobot`, gravar `robots.calibrated` (contagem de
-   estações; 0 = sem calibração) **só quando mudar**, junto do throttle que já
-   existe. Não usar o `calibrated` do advertisement (é 0xFF fixo).
-3. Gate de posição no `persistPosition`: com `lh2` presente, só grava se
-   `valid`; com `lh2 === null` (simulador) mantém o comportamento de hoje. A
-   borda já devolve `position = null` sem fix.
-4. Gate de atribuição: `RobotRepository.getFreeRobots` e
-   `OrchestratorService.assignTaskManually` só entregam task a robô
-   **calibrado com posição válida** (no manual, erro 409/400 explicando o
-   motivo). Calibração vem do banco; posição válida do estado em memória do
-   `SwarmService`.
-5. Tasks com **no máximo 16 waypoints**: validar no DTO de waypoints da task e
-   no `sendCommandToRobot` (task maior nunca conclui).
-6. Expor `calibrated` no que o front já recebe do robô (o model já tem a
-   coluna; conferir DTO/`robot:new`).
+Regra que vale em todos os itens: **`lh2 === null` = "não sei"** (transporte sem
+SwarmIT: simulador/MQTT, ou borda que ainda não manda o campo - o `handleState`
+faz `edgeState.lh2 ?? null`). Nesse caso tudo segue como antes; só `lh2`
+presente e inválido bloqueia algo.
 
-Itens 2-5 do Backend e 7-9 da borda não dependem da base station e já resolvem
-as tasks presas em `InProgress` (robô sem pose não recebe mais task).
+1. `Classes/Edge/Edge.Types.ts`: `EdgeRobotState.lh2: Lh2Data | null`, com
+   `Lh2Data = { valid, deviceCount }`.
+2. `Classes/Swarm/Swarm.Service.ts`: o `RobotState` guarda `lh2` e `position`;
+   o `persistRobot` grava `robots.calibrated` **só quando muda**, no mesmo
+   throttle de status/bateria (`persisted`). **Divergência do plano**: grava
+   **1/0** (calibrado e válido / não), não a contagem de estações. `lh2` null não
+   mexe na coluna. Não usa o `calibrated` do advertisement (0xFF fixo).
+3. Gate de posição no `persistPosition`: LH2 com `lh2` presente e não `valid`
+   (ou `deviceCount` 0) é descartada antes do throttle; GPS e `lh2` null gravam
+   como antes.
+4. Gate de atribuição: `SwarmService.taskBlockReason(address)` devolve o motivo
+   (sem estado da borda / calibração inválida / sem posição) ou `null`; o
+   `OrchestratorService.robotRejection` usa ele no automático (filtra os livres)
+   e no manual (409 com o motivo). **Divergência do plano**: a decisão lê a
+   **memória**, não o banco - no simulador o `lh2` é null e a coluna fica 0, um
+   filtro `calibrated > 0` no `getFreeRobots` bloquearia a frota inteira. O
+   `OrchestratorModule` importa o `SwarmModule` (sem ciclo).
+5. Máximo de 16 waypoints: `MAX_WAYPOINTS` + `@ArrayMaxSize` no
+   `waypoints.dto.ts` (e `maxItems` no Swagger); no Orchestrator via
+   `taskRejection` (automático pula, manual 400). Ainda não há rota que crie
+   waypoints de task (só o seed) - quando existir, validar lá também.
+6. `calibrated` já chegava ao front: `robot:new` e `GET /robots` mandam o
+   `RobotModel` inteiro.
+
+Com a borda atual (sem `lh2`), a única mudança visível é que robô sem posição
+não recebe mais task. O resto liga quando a borda fizer os itens 7-9 + o campo
+`lh2` (item 8), e resolve as tasks presas em `InProgress`.
 
 **Fora deste pacote (conhecido)**: ao receber task nova o robô pode mandar um ou
 dois advertisements com o `waypoint_idx` da task anterior antes do primeiro

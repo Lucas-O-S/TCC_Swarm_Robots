@@ -53,8 +53,8 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
 
     private readonly knownRobots = new Set<string>();
 
-    // Último {status, bateria} que gravamos no banco por address. Serve de
-    // throttle: só escrevemos quando muda de verdade (não a cada pacote).
+    // Último {status, bateria, calibração} que gravamos no banco por address.
+    // Serve de throttle: só escrevemos quando muda de verdade (não a cada pacote).
     private readonly persisted = new Map<string, { status: RobotStatus; battery: number; calibrated : number }>();
 
     // Última posição gravada por address, pro throttle por distância abaixo.
