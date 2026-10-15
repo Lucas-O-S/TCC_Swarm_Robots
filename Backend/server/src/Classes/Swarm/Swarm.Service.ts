@@ -8,7 +8,7 @@ import { PositionService } from "../Positions/Position.Service";
 import { PositionSource } from "src/Enums/PositionSource.enum";
 import { PositionModel } from "src/Model/Position.Model";
 import { EdgeClient } from "../Edge/Edge.Client";
-import { DOTBOT_ADVERTISEMENT, EdgeRobotPosition, EdgeRobotState, EdgeRobotStatusEvent } from "../Edge/Edge.Types";
+import { DOTBOT_ADVERTISEMENT, EdgeRobotPosition, EdgeRobotState, EdgeRobotStatusEvent, Lh2Data } from "../Edge/Edge.Types";
 import { normalizeAddress } from "src/Helpers/Address";
 import { RobotUpdateEvent } from "src/Websockets/Socket.Events";
 import { RobotModel } from "src/Model/Robot.Model";
@@ -25,6 +25,7 @@ class RobotState {
         public readonly payloadType: number,
         public readonly data: any,
         public readonly updatedAt: Date = new Date(),
+        public readonly lh2: Lh2Data | null = null
     ) {}
 }
 
@@ -53,7 +54,7 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
 
     // Último {status, bateria} que gravamos no banco por address. Serve de
     // throttle: só escrevemos quando muda de verdade (não a cada pacote).
-    private readonly persisted = new Map<string, { status: RobotStatus; battery: number }>();
+    private readonly persisted = new Map<string, { status: RobotStatus; battery: number; calibrated : number }>();
 
     // Última posição gravada por address, pro throttle por distância abaixo.
     private readonly lastPosition = new Map<string, { x: number; y: number }>();
@@ -167,7 +168,25 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
         const batteryChanged = batteryVolts !== null
             && (!last || Math.abs(last.battery - batteryVolts) >= this.BATTERY_DELTA_V);
 
-        if (!statusChanged && !batteryChanged) {
+        let calibrated : number | null = null;
+
+        if(state.lh2){
+            if (state.lh2.valid && state.lh2.deviceCount > 0) {
+                calibrated = 1;
+            } 
+            else {
+                calibrated = 0;
+            }
+        }
+
+        const calibratedChanged = 
+            calibrated !== null 
+            && (
+                !last 
+                || calibrated !== last.calibrated
+            );
+
+        if (!statusChanged && !batteryChanged && !calibratedChanged) {
             return;
         }
 
@@ -177,29 +196,44 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
             return; // anunciou na rede mas não está cadastrado no banco
         }
 
-        const changes: { status?: RobotStatus; battery?: number; lastSync: Date } = {
-            lastSync: state.updatedAt,
+        const changes: 
+        {
+            status?: RobotStatus; 
+            battery?: number;
+            calibrated? : number; 
+            lastSync: Date; 
+        } = {
+            lastSync: state.updatedAt
         };
 
         if (statusChanged) changes.status = status;
 
         if (batteryChanged) changes.battery = batteryVolts as number;
 
+        if( calibratedChanged) changes.calibrated = calibrated as number;
+
         let robot: RobotModel;
 
         try {
+            
             robot = await this.robots.update(uuid, changes);
+
         } catch (error) {
+            
             if (error instanceof NotFoundException) {
+            
                 this.forgetRobot(address); // apagado do banco: resolve de novo na próxima
                 return;
+            
             }
+            
             throw error;
         }
 
         this.persisted.set(address, {
             status,
             battery: batteryChanged ? (batteryVolts as number) : (last?.battery ?? robot.battery),
+            calibrated: calibratedChanged ? (calibrated as number) : (last?.calibrated ?? robot.calibrated),
         });
 
         if (statusChanged) {
@@ -301,20 +335,23 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
             this.verifyCreateRobot(address);
         }
 
-        const state = new RobotState(edgeState.payloadType, edgeState.data, new Date(edgeState.updatedAt));
+        const lh2 = edgeState.lh2 ?? null;
+
+        const state = new RobotState(edgeState.payloadType, edgeState.data, new Date(edgeState.updatedAt), lh2);
 
         this.states.set(address, state);   // guarda no quadro (memória)
+        
         this.ws.queueUpdate(this.toUpdateEvent(address, state, edgeState.position)); // vai pro front no próximo lote
 
         // Grava a posição no histórico (throttled por distância). Fire-and-forget:
         // não queremos travar o processamento por um write no banco.
-        this.persistPosition(address, edgeState.position).catch(error =>
+        this.persistPosition(address, edgeState.position, lh2).catch(error =>
             console.error("[SWARM] erro ao gravar posição:", error),
         );
 
 
         //Gera o evento de advertisement
-        this.events.emit( EventCommands.advertisement, { address, data: edgeState.data });
+        this.events.emit( EventCommands.advertisement, { address, data: edgeState.data});
     }
 
     /**
@@ -342,10 +379,19 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
      * igual ao PyDotBot). LH2 vem em mm; GPS em graus. A borda já descartou as
      * leituras inválidas (position = null).
      */
-    private async persistPosition(address: string, position: EdgeRobotPosition | null): Promise<void> {
+    private async persistPosition(address: string, position: EdgeRobotPosition | null, lh2: Lh2Data | null): Promise<void> {
 
         if (!position) {
             return; // payload sem posição (ou sem leitura)
+        }
+
+        if (position.source === PositionSource.LH2
+            && lh2 
+            && (
+                !lh2.valid || lh2.deviceCount === 0
+            )
+        ) {
+            return;
         }
 
         const { source, x, y, direction } = position;
@@ -422,4 +468,6 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
     getAll(): Record<string, RobotState> {
         return Object.fromEntries(this.states);
     }
+
+    
 }
