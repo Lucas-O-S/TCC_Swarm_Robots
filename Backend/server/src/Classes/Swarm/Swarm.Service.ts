@@ -25,7 +25,8 @@ class RobotState {
         public readonly payloadType: number,
         public readonly data: any,
         public readonly updatedAt: Date = new Date(),
-        public readonly lh2: Lh2Data | null = null
+        public readonly lh2: Lh2Data | null = null,
+        public readonly position: EdgeRobotPosition | null = null
     ) {}
 }
 
@@ -337,7 +338,13 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
 
         const lh2 = edgeState.lh2 ?? null;
 
-        const state = new RobotState(edgeState.payloadType, edgeState.data, new Date(edgeState.updatedAt), lh2);
+        const state = new RobotState(
+            edgeState.payloadType,
+            edgeState.data,
+            new Date(edgeState.updatedAt),
+            lh2,
+            edgeState.position
+        );
 
         this.states.set(address, state);   // guarda no quadro (memória)
         
