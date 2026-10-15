@@ -11,6 +11,7 @@ import { EventsCommands } from "src/Enums/Events.Enum";
 import { RobotStatus } from "src/Enums/RobotStatus.enum";
 import { orchestratorConfig } from "src/config/orchestrator.config";
 import { MAX_WAYPOINTS } from "../Robots/DTO/waypoints.dto";
+import { SwarmService } from "../Swarm/Swarm.Service";
 
 
 @Injectable()
@@ -39,7 +40,8 @@ export class OrchestratorService implements OnModuleInit {
 
     constructor(
         private readonly taskService: TaskService,
-        private readonly robotService: RobotService
+        private readonly robotService: RobotService,
+        private readonly swarmService: SwarmService
     ) { }
 
 
@@ -154,6 +156,13 @@ export class OrchestratorService implements OnModuleInit {
         // Manual é dirigido no joystick; não recebe task. (Auto e SemiAuto podem.)
         if (robot.mode === RobotControlMode.Manual) {
             throw new BadRequestException(`Robô ${address} está em modo Manual`);
+        }
+
+        const blocked = this.swarmService.taskBlockReason(address);
+
+
+        if (blocked) {
+            throw new ConflictException(`Robô ${address} não pode receber task: ${blocked}`);
         }
 
         if (robot.taskId) {

@@ -268,6 +268,24 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
         this.persisted.delete(address);
     }
 
+    /** Motivo para não entregar task ao robô, ou null se pode. */
+    public taskBlockReason(address: string): string | null {
+
+        const state = this.states.get(normalizeAddress(address));
+
+        if (!state)
+            return "nenhum estado recebido da borda";
+
+        if (state.lh2 && (!state.lh2.valid || state.lh2.deviceCount === 0)) 
+            return "calibração LH2 ausente ou inválida";
+
+        if (!state.position) 
+            return "sem posição válida (sem fix da lighthouse)";
+
+        return null;
+    }
+
+
 
     private async verifyCreateRobot(address: string): Promise<void> {
         if (this.knownRobots.has(address)) {
