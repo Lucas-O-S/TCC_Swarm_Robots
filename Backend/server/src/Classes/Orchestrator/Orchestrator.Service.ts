@@ -10,6 +10,7 @@ import { OnEvent } from "@nestjs/event-emitter";
 import { EventsCommands } from "src/Enums/Events.Enum";
 import { RobotStatus } from "src/Enums/RobotStatus.enum";
 import { orchestratorConfig } from "src/config/orchestrator.config";
+import { MAX_WAYPOINTS } from "../Robots/DTO/waypoints.dto";
 
 
 @Injectable()
@@ -93,7 +94,9 @@ export class OrchestratorService implements OnModuleInit {
             
             // Task sem pontos não é atribuível (ex.: a "Tarefa padrão" do seed,
             // que é Pending mas não tem waypoints). Pula sem gastar um robô.
-            if (!task.waypoints?.length) {
+            // Acima de MAX_WAYPOINTS também: o robô cortaria o excedente e a
+            // task nunca concluiria.
+            if (!task.waypoints?.length || task.waypoints.length > MAX_WAYPOINTS) {
                 continue;
             }
 
@@ -165,6 +168,12 @@ export class OrchestratorService implements OnModuleInit {
 
         if (!task.waypoints?.length) {
             throw new BadRequestException(`Task ${taskId} não tem waypoints`);
+        }
+
+        if (task.waypoints.length > MAX_WAYPOINTS) {
+            throw new BadRequestException(
+                `Task ${taskId} tem ${task.waypoints.length} waypoints; o robô aceita no máximo ${MAX_WAYPOINTS}`,
+            );
         }
 
         // Em andamento = já é de outro robô (inclusive de um Auto, se o loop

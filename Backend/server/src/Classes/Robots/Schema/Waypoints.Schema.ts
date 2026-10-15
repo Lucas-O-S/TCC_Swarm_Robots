@@ -1,3 +1,5 @@
+import { MAX_WAYPOINTS } from "../DTO/waypoints.dto";
+
 /** Schema manual pro @ApiBody do Swagger (estilo ApiGameHit). */
 export const WaypointsSchema = {
     schema: {
@@ -6,6 +8,8 @@ export const WaypointsSchema = {
             threshold: { type: 'number', example: 100 },
             waypoints: {
                 type: 'array',
+                minItems: 1,
+                maxItems: MAX_WAYPOINTS,
                 items: {
                     type: 'object',
                     properties: {
