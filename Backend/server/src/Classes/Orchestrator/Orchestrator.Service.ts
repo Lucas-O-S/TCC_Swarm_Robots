@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleInit } from "@nestjs/common";
+import { BadRequestException, ConflictException, HttpException, Injectable, NotFoundException, OnModuleInit } from "@nestjs/common";
 import { RobotControlMode } from "src/Enums/RobotControlMode.enum";
 import { TaskModel } from "src/Model/Task.Model";
 import { RobotService } from "../Robots/Robot.Service";
@@ -86,19 +86,19 @@ export class OrchestratorService implements OnModuleInit {
 
         const pendingTasks :  TaskModel[] = await this.taskService.getPendingTask() ?? [];
 
-        const freeRobots = await this.robotService.getFreeRobots() ?? [];
+        // Mesmas regras do assign manual (robotRejection): aqui só filtra.
+        const freeRobots = (await this.robotService.getFreeRobots() ?? [])
+            .filter(robot => !this.robotRejection(robot));
 
         const busyRobots : RobotModel[] = [];
 
         const tasksAssigned : TaskModel[] = [];
 
         for (const task of pendingTasks) {
-            
-            // Task sem pontos não é atribuível (ex.: a "Tarefa padrão" do seed,
-            // que é Pending mas não tem waypoints). Pula sem gastar um robô.
-            // Acima de MAX_WAYPOINTS também: o robô cortaria o excedente e a
-            // task nunca concluiria.
-            if (!task.waypoints?.length || task.waypoints.length > MAX_WAYPOINTS) {
+
+            // Task que não pode ser entregue (ver taskRejection) é pulada sem
+            // gastar um robô.
+            if (this.taskRejection(task)) {
                 continue;
             }
 
@@ -153,20 +153,10 @@ export class OrchestratorService implements OnModuleInit {
             throw new NotFoundException(`Nenhum robô com o endereço '${address}'`);
         }
 
-        // Manual é dirigido no joystick; não recebe task. (Auto e SemiAuto podem.)
-        if (robot.mode === RobotControlMode.Manual) {
-            throw new BadRequestException(`Robô ${address} está em modo Manual`);
-        }
+        const robotError = this.robotRejection(robot);
 
-        const blocked = this.swarmService.taskBlockReason(address);
-
-
-        if (blocked) {
-            throw new ConflictException(`Robô ${address} não pode receber task: ${blocked}`);
-        }
-
-        if (robot.taskId) {
-            throw new ConflictException(`Robô ${address} já está executando uma task`);
+        if (robotError) {
+            throw robotError;
         }
 
         const task = await this.taskService.getOneTaskWithWaypoints(taskId);
@@ -175,21 +165,10 @@ export class OrchestratorService implements OnModuleInit {
             throw new NotFoundException(`Nenhuma task com uuid '${taskId}'`);
         }
 
-        if (!task.waypoints?.length) {
-            throw new BadRequestException(`Task ${taskId} não tem waypoints`);
-        }
+        const taskError = this.taskRejection(task);
 
-        if (task.waypoints.length > MAX_WAYPOINTS) {
-            throw new BadRequestException(
-                `Task ${taskId} tem ${task.waypoints.length} waypoints; o robô aceita no máximo ${MAX_WAYPOINTS}`,
-            );
-        }
-
-        // Em andamento = já é de outro robô (inclusive de um Auto, se o loop
-        // automático pegou antes). Dois robôs na mesma task quebraria o
-        // release/conclusão, que andam pelo taskId do robô.
-        if (task.status === TaskStatus.InProgress) {
-            throw new ConflictException(`Task ${taskId} já está em andamento em outro robô`);
+        if (taskError) {
+            throw taskError;
         }
 
         const sent = await this.sendCommandToRobot(robot, task);
@@ -220,6 +199,56 @@ export class OrchestratorService implements OnModuleInit {
             console.error(`Erro ao enviar comando para o robô ${robot.address}:`, error);
             return false;
         }
+    }
+
+    /**
+     * Por que este robô não pode receber task agora (null = pode). Vale para o
+     * automático (filtra) e para o manual (lança o erro devolvido).
+     */
+    private robotRejection(robot: RobotModel): HttpException | null {
+
+        // Manual é dirigido no joystick; não recebe task. (Auto e SemiAuto podem.)
+        if (robot.mode === RobotControlMode.Manual) {
+            return new BadRequestException(`Robô ${robot.address} está em modo Manual`);
+        }
+
+        if (robot.taskId) {
+            return new ConflictException(`Robô ${robot.address} já está executando uma task`);
+        }
+
+        // Calibração LH2 e posição: estado em memória que vem da borda.
+        const blocked = this.swarmService.taskBlockReason(robot.address);
+
+        if (blocked) {
+            return new ConflictException(`Robô ${robot.address} não pode receber task: ${blocked}`);
+        }
+
+        return null;
+    }
+
+    /** Por que esta task não pode ser entregue (null = pode). */
+    private taskRejection(task: TaskModel): HttpException | null {
+
+        // Sem pontos não há o que mandar (ex.: a "Tarefa padrão" do seed).
+        if (!task.waypoints?.length) {
+            return new BadRequestException(`Task ${task.uuid} não tem waypoints`);
+        }
+
+        // Acima de MAX_WAYPOINTS o robô corta o excedente e a task nunca conclui.
+        if (task.waypoints.length > MAX_WAYPOINTS) {
+            return new BadRequestException(
+                `Task ${task.uuid} tem ${task.waypoints.length} waypoints; o robô aceita no máximo ${MAX_WAYPOINTS}`,
+            );
+        }
+
+        // Em andamento = já é de outro robô (inclusive de um Auto, se o loop
+        // automático pegou antes). Dois robôs na mesma task quebraria o
+        // release/conclusão, que andam pelo taskId do robô.
+        if (task.status === TaskStatus.InProgress) {
+            return new ConflictException(`Task ${task.uuid} já está em andamento em outro robô`);
+        }
+
+        return null;
     }
 
     async handleRobotLost(payload: {address : string}) : Promise<void>{
