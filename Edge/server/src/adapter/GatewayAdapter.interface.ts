@@ -1,4 +1,5 @@
 import { PayloadType } from "src/Enums/PayloadType.enum";
+import { Lh2State } from "src/Protocols/Swarmit/Swarmit.Protocol";
 
 /**
  * Token de injeção. Como `GatewayAdapter` é uma interface (some em runtime),
@@ -19,7 +20,16 @@ export interface GatewayAdapter{
 
 
     onFrameReceived(
-            callback : (frame : Buffer) => void
-        ) : void;
+        callback : (frame : Buffer) => void
+    ) : void;
+
+
+    /**
+     * Calibração LH2 do robô, para o transporte que sabe (só o Mari, via
+     * SwarmIT). Opcional: simulador e MQTT não implementam, e o estado sai com
+     * lh2 = null - para a API, "transporte sem SwarmIT", sem checar calibração.
+     */
+    lh2Of?(address : string) : Lh2State | null;
+
 
 }

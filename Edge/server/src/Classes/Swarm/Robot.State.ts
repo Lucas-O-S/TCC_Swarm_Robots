@@ -1,6 +1,7 @@
 import { PayloadType } from "src/Enums/PayloadType.enum";
 import { PositionSource } from "src/Enums/PositionSource.enum";
 import { RobotStatus } from "src/Enums/RobotStatus.enum";
+import { Lh2State } from "src/Protocols/Swarmit/Swarmit.Protocol";
 
 /**
  * Posição já extraída do payload pela borda, para o cliente não precisar
@@ -19,6 +20,8 @@ export interface RobotPosition {
  * nas rotas GET. `type` é o nome do payload (ex.: "DOTBOT_ADVERTISEMENT");
  * `payloadType` é o mesmo em número. `data` traz os campos do decoder como
  * vieram do robô (battery em mV, pos_x/pos_y em mm, waypoint_idx...).
+ * `lh2` é a calibração LH2 que o transporte reporta (só o Mari, via SwarmIT);
+ * null = transporte sem SwarmIT (simulador/MQTT), a API não checa calibração.
  */
 /**
  * Evento `robot:states`: os RobotState decodificados desde o último envio,
@@ -37,6 +40,7 @@ export class RobotState {
         public readonly payloadType: PayloadType,
         public readonly data: any,
         public readonly position: RobotPosition | null,
+        public readonly lh2: Lh2State | null,
         public readonly updatedAt: Date = new Date(),
     ) {
         this.type = PayloadType[payloadType];

@@ -11,7 +11,7 @@ import { EdgeEvent } from "src/Enums/EdgeEvent.enum";
 import { mariConfig } from "src/config/Mari.Config";
 import { SwarmitPayloadType } from "src/Enums/SwarmitPayloadType.enum";
 import { Lh2Flags, SwarmitDeviceStatus } from "src/Enums/SwarmitDeviceStatus.enum";
-import { SwarmitProtocol } from "src/Protocols/Swarmit/Swarmit.Protocol";
+import { Lh2State, SwarmitProtocol } from "src/Protocols/Swarmit/Swarmit.Protocol";
 import { SwarmitFleet, SwarmitNode } from "./SwarmitFleet";
 import { HOST_ADDRESS } from "src/Constants/Address.Constants";
 import { FRAME_TYPE_DATA, FRAME_VERSION } from "src/Constants/Frame.Constants";
@@ -150,6 +150,12 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
 
     onFrameReceived(callback: (frame: Buffer) => void): void {
         this.frameCallback = callback;
+    }
+
+    // Robô que a malha nunca reportou = não calibrado. Nunca null no modo mari:
+    // null diria à API que o transporte não tem SwarmIT.
+    lh2Of(address: string): Lh2State {
+        return this.fleet.lh2Of(address);
     }
 
     // Visão da malha para quem quiser expor num endpoint ou alimentar o twin.

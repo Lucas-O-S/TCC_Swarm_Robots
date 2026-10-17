@@ -105,7 +105,11 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
         // Quem mandou = campo `source` do header (offset 10, 8 bytes) -> hex.
         const address = Protocol.readAddress(frame.header, FRAME_SOURCE_OFFSET);
 
-        const state = new RobotState(address, frame.payloadType, data, this.positionOf(frame.payloadType, data));
+        // Só o transporte com SwarmIT (Mari) sabe a calibração; os outros não
+        // implementam lh2Of e o estado sai com lh2 = null.
+        const lh2 = this.gateway.lh2Of?.(address) ?? null;
+
+        const state = new RobotState(address, frame.payloadType, data, this.positionOf(frame.payloadType, data), lh2);
 
         this.states.set(address, state);
 
