@@ -10,3 +10,9 @@ export const LH2_MAX_WAYPOINTS = 16;
 
 // pos_x/pos_y = 0xFFFFFFFF no advertisement = "sem leitura de posição".
 export const LH2_NO_POSITION = 0xFFFFFFFF;
+
+// direction sem heading: -1000 é o DB_DIRECTION_INVALID do firmware 1.23.0;
+// o legado mandava 0xFFFF, que vira -1 no decode com sinal.
+export const LH2_DIRECTION_INVALID = -1000;
+
+export const LH2_DIRECTION_INVALID_LEGACY = -1;

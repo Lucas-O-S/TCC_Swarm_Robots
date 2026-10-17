@@ -9,7 +9,8 @@ import { PositionSource } from "src/Enums/PositionSource.enum";
 import { EdgeWebsockets } from "src/Websockets/Edge.Websockets";
 import { RobotPosition, RobotSnapshot, RobotState } from "./Robot.State";
 import { FRAME_MIN_LEN, FRAME_SOURCE_OFFSET } from "src/Constants/Frame.Constants";
-import { LH2_NO_POSITION } from "src/Constants/Lh2.Constants";
+import { LH2_DIRECTION_INVALID, LH2_DIRECTION_INVALID_LEGACY, LH2_NO_POSITION } from "src/Constants/Lh2.Constants";
+import { Lh2State } from "src/Protocols/Swarmit/Swarmit.Protocol";
 
 /**
  * Estado "quente" da frota visto pela borda (mirror do Controller.dotbots do
@@ -109,7 +110,7 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
         // implementam lh2Of e o estado sai com lh2 = null.
         const lh2 = this.gateway.lh2Of?.(address) ?? null;
 
-        const state = new RobotState(address, frame.payloadType, data, this.positionOf(frame.payloadType, data), lh2);
+        const state = new RobotState(address, frame.payloadType, data, this.positionOf(frame.payloadType, data, lh2), lh2);
 
         this.states.set(address, state);
 
@@ -127,19 +128,29 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
      * GPS (SailBot) em graus. Sentinelas de "sem leitura" viram null aqui, para
      * nenhum cliente precisar conhecê-las.
      */
-    private positionOf(payloadType: PayloadType, data: any): RobotPosition | null {
+    private positionOf(payloadType: PayloadType, data: any, lh2: Lh2State | null): RobotPosition | null {
 
         if (payloadType === PayloadType.DOTBOT_ADVERTISEMENT) {
             // 0xFFFFFFFF = "sem leitura de posição" (robô ainda não localizado).
             if (data.pos_x === LH2_NO_POSITION || data.pos_y === LH2_NO_POSITION) {
                 return null;
             }
+
+            // O firmware 1.23.0 manda (0,0) enquanto a LH2 não tem fix. Só vale
+            // com lh2 != null (transporte com SwarmIT = robô real): no simulador
+            // (0,0) é uma posição de verdade.
+            if (lh2 !== null && data.pos_x === 0 && data.pos_y === 0) {
+                return null;
+            }
+
+            const noHeading = data.direction === LH2_DIRECTION_INVALID
+                || data.direction === LH2_DIRECTION_INVALID_LEGACY;
+
             return {
                 source: PositionSource.LH2,
                 x: data.pos_x,
                 y: data.pos_y,
-                // 0xFFFF (sem leitura) vira -1 no decode com sinal.
-                direction: data.direction === -1 ? null : data.direction,
+                direction: noHeading ? null : data.direction,
             };
         }
 
