@@ -13,6 +13,9 @@ import { SwarmitPayloadType } from "src/Enums/SwarmitPayloadType.enum";
 import { SwarmitDeviceStatus } from "src/Enums/SwarmitDeviceStatus.enum";
 import { SwarmitProtocol } from "src/Protocols/Swarmit/Swarmit.Protocol";
 import { SwarmitFleet, SwarmitNode } from "./SwarmitFleet";
+import { HOST_ADDRESS } from "src/Constants/Address.Constants";
+import { FRAME_TYPE_DATA, FRAME_VERSION } from "src/Constants/Frame.Constants";
+import { MARI_TYPE_DATA, MARI_VERSION } from "src/Constants/Mari.Constants";
 
 @Injectable()
 export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModuleDestroy {
@@ -83,11 +86,11 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
 
     private sendPacket(destination: string, nextProto: NextProto, packet: Buffer): void {
         const header: MariHeader = {
-            version: 3,
-            type: 16,
+            version: MARI_VERSION,
+            type: MARI_TYPE_DATA,
             networkId: mariConfig.networkId,
             destination,
-            source: "0000000000000000",
+            source: HOST_ADDRESS,
             nextProto,
         };
    
@@ -184,7 +187,7 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
     // Traduz o Mari frame pro formato interno de 18B (source@10 + payloadType@18)
     // que o SwarmService já lê - por isso Swarm/Robot/Orchestrator não mudam.
     private toInternalFrame(mari: MariFrame): Buffer {
-        const header = Protocol.buildHeader(mari.header.destination, 1, 16, mari.header.source);
+        const header = Protocol.buildHeader(mari.header.destination, FRAME_VERSION, FRAME_TYPE_DATA, mari.header.source);
         return Buffer.concat([header, mari.payload]);
     }
 }

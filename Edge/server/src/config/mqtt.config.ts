@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { MARI_DEFAULT_NETWORK_ID } from 'src/Constants/Mari.Constants';
 
 /**
  * Broker MQTT do RobotSwarmSimulator (fronteira /mari/{NETID}/to_edge|to_cloud).
@@ -15,6 +16,6 @@ import 'dotenv/config';
  */
 export const mqttConfig = {
     url: process.env.MQTT_URL ?? 'mqtt://localhost:1883',
-    networkId: Number(process.env.MARI_NETWORK_ID ?? 0x0001),
+    networkId: Number(process.env.MARI_NETWORK_ID ?? MARI_DEFAULT_NETWORK_ID),
     protocolVersion: (process.env.MQTT_PROTOCOL_VERSION === '4' ? 4 : 5) as 4 | 5,
 };

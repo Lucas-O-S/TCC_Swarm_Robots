@@ -8,6 +8,8 @@ import { RobotStatus } from "src/Enums/RobotStatus.enum";
 import { PositionSource } from "src/Enums/PositionSource.enum";
 import { EdgeWebsockets } from "src/Websockets/Edge.Websockets";
 import { RobotPosition, RobotSnapshot, RobotState } from "./Robot.State";
+import { FRAME_MIN_LEN, FRAME_SOURCE_OFFSET } from "src/Constants/Frame.Constants";
+import { LH2_NO_POSITION } from "src/Constants/Lh2.Constants";
 
 /**
  * Estado "quente" da frota visto pela borda (mirror do Controller.dotbots do
@@ -83,7 +85,7 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
     /** Frame chegou: desmonta, escolhe o decoder pelo tipo, decodifica e publica. */
     private handleFrame(bytes: Buffer): void {
         // Frame válido = 18 (header) + 1 (tipo) + corpo. Menos que isso, ignora.
-        if (bytes.length < 19) {
+        if (bytes.length < FRAME_MIN_LEN) {
             return;
         }
 
@@ -101,7 +103,7 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
         const data = decoder.decodePayload(frame.body);
 
         // Quem mandou = campo `source` do header (offset 10, 8 bytes) -> hex.
-        const address = Protocol.readAddress(frame.header, 10);
+        const address = Protocol.readAddress(frame.header, FRAME_SOURCE_OFFSET);
 
         const state = new RobotState(address, frame.payloadType, data, this.positionOf(frame.payloadType, data));
 
@@ -125,7 +127,7 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
 
         if (payloadType === PayloadType.DOTBOT_ADVERTISEMENT) {
             // 0xFFFFFFFF = "sem leitura de posição" (robô ainda não localizado).
-            if (data.pos_x === 0xFFFFFFFF || data.pos_y === 0xFFFFFFFF) {
+            if (data.pos_x === LH2_NO_POSITION || data.pos_y === LH2_NO_POSITION) {
                 return null;
             }
             return {

@@ -1,5 +1,6 @@
 import { SwarmitPayloadType } from "src/Enums/SwarmitPayloadType.enum";
-import { SwarmitDeviceStatus, SwarmitDeviceType } from "src/Enums/SwarmitDeviceStatus.enum";
+import { Lh2Flags, SwarmitDeviceStatus, SwarmitDeviceType } from "src/Enums/SwarmitDeviceStatus.enum";
+import { LH2_MATRIX_LEN, LH2_MAX_STATIONS } from "src/Constants/Lh2.Constants";
 
 // Codec do protocolo SwarmIT, byte a byte igual ao swarmit 0.9.0
 // (swarmit/testbed/protocol.py). Só os payloads que o backend precisa:
@@ -170,12 +171,60 @@ export class SwarmitProtocol {
     // armazenada vai com V^2 e o robô apaga em 0,6 V, então a fração útil é
     // entre os quadrados, não entre as tensões (swarmit: battery_pct).
     static batteryPct(device: SwarmitDeviceType, batteryMv: number): number {
+        
         const supercap = device === SwarmitDeviceType.DotBotV3;
+        
         const maxMv = 3000;
+        
         const emptyMv = supercap ? 600 : 0;
+        
         const num = supercap ? batteryMv ** 2 - emptyMv ** 2 : batteryMv - emptyMv;
+        
         const den = supercap ? maxMv ** 2 - emptyMv ** 2 : maxMv - emptyMv;
+        
         if (den <= 0) return 0;
+        
         return Math.max(0, Math.min(100, Math.trunc((num / den) * 100)));
     }
+
+    static buildLh2Calibration(count: number, index: number, matrix: Buffer): Buffer {
+        
+        if (matrix.length !== LH2_MATRIX_LEN) 
+            throw new Error(`matriz LH2 deve ter ${LH2_MATRIX_LEN} B`);
+        
+        if (count < 1 || count > LH2_MAX_STATIONS) 
+            throw new Error(`count deve estar entre 1 e ${LH2_MAX_STATIONS}`);
+        
+        if (index < 0 || index >= count)
+            throw new Error("index fora da contagem");
+
+
+        const head = Buffer.alloc(1 + 4 + 4);
+        
+        head.writeUInt8(SwarmitPayloadType.SWARMIT_LH2_CALIBRATION, 0);
+        
+        head.writeUInt32LE(count, 1);
+        
+        head.writeUInt32LE(index, 5);
+        
+        return Buffer.concat([head, matrix]);
+    }
+
+    static isLh2Calibrated(info: SwarmitDeviceInfo, expectedCount: number): boolean {
+        return info.lh2HomographyCount === expectedCount && (info.lh2Flags & Lh2Flags.valid) !== 0;
+    }
+
+    static lh2State(info: SwarmitDeviceInfo | undefined): { valid: boolean; deviceCount: number } {
+    
+        if (!info)
+            return {
+                valid: false, deviceCount: 0 
+            };
+            
+        return {
+            valid: (info.lh2Flags & Lh2Flags.valid) !== 0, 
+            deviceCount: info.lh2HomographyCount 
+        };
+    }
+
 }

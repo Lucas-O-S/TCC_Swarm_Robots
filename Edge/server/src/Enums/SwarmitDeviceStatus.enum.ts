@@ -23,3 +23,8 @@ export enum SwarmitDeviceType {
     nRF5340DK = 3,
     nRF52840DK = 4,
 }
+
+export enum Lh2Flags {
+    valid = 0x01,
+    fromFlash = 0x02
+}

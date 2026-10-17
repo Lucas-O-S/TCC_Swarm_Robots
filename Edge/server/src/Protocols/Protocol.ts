@@ -1,4 +1,12 @@
 import { PayloadType, isValidPayloadType } from "src/Enums/PayloadType.enum";
+import { ADDRESS_HEX_LEN, HOST_ADDRESS } from "src/Constants/Address.Constants";
+import {
+    FRAME_DESTINATION_OFFSET,
+    FRAME_HEADER_LEN,
+    FRAME_SOURCE_OFFSET,
+    FRAME_TYPE_DATA,
+    FRAME_VERSION,
+} from "src/Constants/Frame.Constants";
 
 
 
@@ -29,27 +37,27 @@ export class Protocol{
 
     /** Lê um endereço de 8 bytes (little-endian) já na forma canônica. */
     static readAddress(buffer: Buffer, offset: number): string {
-        return Protocol.normalizeAddress(buffer.readBigUInt64LE(offset).toString(16).padStart(16, "0"));
+        return Protocol.normalizeAddress(buffer.readBigUInt64LE(offset).toString(16).padStart(ADDRESS_HEX_LEN, "0"));
     }
 
     static buildHeader(
         destination : string,
-        version : number = 1,
-        type : number = 16,
-        source : string = "0000000000000000"
+        version : number = FRAME_VERSION,
+        type : number = FRAME_TYPE_DATA,
+        source : string = HOST_ADDRESS
     ): Buffer
     {
 
-        const buffer = Buffer.alloc(18);
+        const buffer = Buffer.alloc(FRAME_HEADER_LEN);
 
         //Geralmente 16 e 1 para comando e tipo
         buffer.writeUInt8(version,0);
         buffer.writeUInt8(type,1);
 
-        buffer.writeBigUInt64LE(BigInt("0x" + destination), 2);
+        buffer.writeBigUInt64LE(BigInt("0x" + destination), FRAME_DESTINATION_OFFSET);
 
         // source=0 (host) pra envio; frames que ENTRAM passam o endereço real do robô
-        buffer.writeBigUInt64LE(BigInt("0x" + source),10)
+        buffer.writeBigUInt64LE(BigInt("0x" + source), FRAME_SOURCE_OFFSET)
 
         return buffer;
 
@@ -74,11 +82,11 @@ export class Protocol{
 
     static parseFrame(frame : Buffer) : Frame {
 
-        const header : Buffer = frame.subarray(0,18);
+        const header : Buffer = frame.subarray(0, FRAME_HEADER_LEN);
 
-        const payloadType : PayloadType | null = this.validatePayloadType(frame.readUInt8(18));
+        const payloadType : PayloadType | null = this.validatePayloadType(frame.readUInt8(FRAME_HEADER_LEN));
         
-        const body : Buffer = frame.subarray(19);
+        const body : Buffer = frame.subarray(FRAME_HEADER_LEN + 1);
 
         return new Frame(header, payloadType, body);
 
