@@ -18,4 +18,6 @@ export enum SwarmitPayloadType {
     SWARMIT_REQUEST_MESSAGE = 0x8E,
     // robô -> host, resposta do REQUEST_MESSAGE
     SWARMIT_DEVICE_INFO_RESP = 0x8F,
+    // host -> robô, homografia de uma estação LH2
+    SWARMIT_LH2_CALIBRATION = 0xA1,
 }
