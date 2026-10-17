@@ -58,6 +58,14 @@ export interface SwarmitDeviceInfo {
     lh2Flags: number;
 }
 
+// Calibração LH2 do robô, como vai para os clientes da borda (campo `lh2` do
+// estado). Mesmo formato do Lh2Data da API. `deviceCount` = nº de estações
+// calibradas; `valid` = bit VALID do lh2Flags.
+export interface Lh2State {
+    valid: boolean;
+    deviceCount: number;
+}
+
 export class SwarmitProtocol {
 
     // --- envio -------------------------------------------------------------
@@ -214,8 +222,10 @@ export class SwarmitProtocol {
         return info.lh2HomographyCount === expectedCount && (info.lh2Flags & Lh2Flags.valid) !== 0;
     }
 
-    static lh2State(info: SwarmitDeviceInfo | undefined): { valid: boolean; deviceCount: number } {
-    
+    // Sem device-info ainda = não calibrado. Nunca null: para a API, null quer
+    // dizer "transporte sem SwarmIT" e libera task sem checar calibração.
+    static lh2State(info: SwarmitDeviceInfo | undefined): Lh2State {
+
         if (!info)
             return {
                 valid: false, deviceCount: 0 
