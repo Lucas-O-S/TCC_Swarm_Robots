@@ -39,6 +39,11 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
 
     onModuleInit(): void {
         this.connect();
+        
+        this.fleet.configure({
+            autoStart: mariConfig.autoStart 
+        });
+
         if (mariConfig.autoStart) {
             // O bootloader do swarmit nunca dá boot sozinho num power-on, e o
             // status chega de segundo em segundo: um tick curto faz o backend
