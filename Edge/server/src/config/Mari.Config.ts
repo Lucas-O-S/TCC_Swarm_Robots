@@ -9,8 +9,8 @@ export const mariConfig = {
     networkId : Number(process.env.MARI_NETWORK_ID ?? MARI_DEFAULT_NETWORK_ID),
 
     // Dar START sozinho nos robôs que aparecerem em Bootloader com imagem
-    // gravada. Desligado por padrão: com isso em false o backend só ESCUTA os
-    // frames SwarmIT (nada é transmitido), o que é o comportamento seguro para
-    // quem não espera o backend comandando a malha.
+    // gravada. Desligado por padrão: com isso em false a borda não comanda a
+    // malha - só pede o device-info (leitura: imagem e calibração LH2) e, se
+    // LH2_CALIBRATION_FILE estiver preenchido, manda a calibração.
     autoStart : (process.env.MARI_AUTO_START ?? "false") === "true",
 }
