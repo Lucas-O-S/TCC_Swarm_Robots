@@ -1,10 +1,17 @@
-import { readFileSync } from "fs";
-import { extname } from "path";
+import { mkdirSync, readFileSync, writeFileSync } from "fs";
+import { extname, join } from "path";
 import { LH2_MATRIX_LEN, LH2_MAX_STATIONS } from "src/Constants/Lh2.Constants";
 
 // schema_version que o PyDotBot 0.30.0 grava. Outro valor = outro formato
 // (a 1.25.0 do firmware usa schema 3, com outro modelo de LH2).
 const TOML_SCHEMA_VERSION = 1;
+
+// Metadados que vão no [metadata] do TOML, como o PyDotBot grava.
+export interface Lh2CalibrationMeta {
+    distanceMm: number;
+    tag?: string;
+    createdAt?: Date;
+}
 
 // Calibração LH2 lida do arquivo do PyDotBot, já fatiada em uma matriz por
 // estação - cada uma vai num SWARMIT_LH2_CALIBRATION (buildLh2Calibration).
@@ -19,6 +26,59 @@ export class Lh2Calibration {
 
     get count(): number {
         return this.matrices.length;
+    }
+
+    // 1 B de contagem + N × 36 B: o data_hex do TOML e o calibration.out.
+    get payload(): Buffer {
+        return Buffer.concat([Buffer.from([this.count]), ...this.matrices]);
+    }
+
+    // Calibração calculada pela própria borda (captura LH2), passando pela
+    // mesma validação do arquivo.
+    static fromMatrices(matrices: Buffer[], source: string): Lh2Calibration {
+        return Lh2Calibration.fromPayload(Buffer.concat([Buffer.from([matrices.length]), ...matrices]), source);
+    }
+
+    // Mesmo texto do save_calibration do PyDotBot 0.30.0 (schema 1), para o
+    // arquivo servir também ao `dotbot swarm lh2-calibration push`.
+    toToml(meta: Lh2CalibrationMeta): string {
+        const now = meta.createdAt ?? new Date();
+        const slug = meta.tag ? Lh2Calibration.slug(meta.tag) : "";
+
+        return (
+            `schema_version = ${TOML_SCHEMA_VERSION}\n` +
+            "\n" +
+            "[metadata]\n" +
+            `created_at = "${now.toISOString().slice(0, 19)}Z"\n` +
+            `calibration_distance_mm = ${Math.trunc(meta.distanceMm)}\n` +
+            `num_lh_stations = ${this.count}\n` +
+            (slug ? `tag = "${slug}"\n` : "") +
+            "\n" +
+            "[calibration]\n" +
+            "# 1-byte homography count + N x 36-byte int32 LE matrices,\n" +
+            "# hex-encoded. Same bytes as the legacy calibration.out.\n" +
+            `data_hex = "${this.payload.toString("hex")}"\n`
+        );
+    }
+
+    // Grava em dir/calibration[-tag]-<UTC>.toml (nome do PyDotBot) e devolve
+    // o caminho. Não grava o calibration.out legado: a borda e o CLI 0.30.0
+    // já leem o TOML.
+    saveToml(dir: string, meta: Lh2CalibrationMeta): string {
+        const now = meta.createdAt ?? new Date();
+        const stamp = now.toISOString().slice(0, 19).replace(/:/g, "-") + "Z";
+        const slug = meta.tag ? Lh2Calibration.slug(meta.tag) : "";
+        const path = join(dir, slug ? `calibration-${slug}-${stamp}.toml` : `calibration-${stamp}.toml`);
+
+        mkdirSync(dir, { recursive: true });
+        writeFileSync(path, this.toToml({ ...meta, createdAt: now }), "utf8");
+        return path;
+    }
+
+    // _slug_tag do PyDotBot: letras ASCII, dígitos, ponto, hífen e sublinhado;
+    // tira hífens e pontos das pontas (um "../x" não vira caminho).
+    static slug(tag: string): string {
+        return tag.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[-.]+|[-.]+$/g, "");
     }
 
     static fromFile(path: string): Lh2Calibration {

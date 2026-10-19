@@ -40,12 +40,17 @@ export interface SwarmitNode {
     calibrateMark: { bootCount: number; uptimeS: number } | null;
     forceCalibration: boolean;
     calibrationFailedWarned: boolean;
+    // Reservado para a captura LH2: fica em Bootloader (recebe STOP se estiver
+    // rodando) e não recebe calibração nem START até ser liberado.
+    held: boolean;
+    lastStopAt: number | null;
 }
 
 export interface SwarmitActions {
     requestInfo: string[];
     calibrate: string[];
     start: string[];
+    stop: string[];
 }
 
 export interface SwarmitFleetOptions {
@@ -122,6 +127,8 @@ export class SwarmitFleet {
             calibrateMark: null,
             forceCalibration: false,
             calibrationFailedWarned: false,
+            held: false,
+            lastStopAt: null,
         };
 
         // info_gen mudou => o bloco device-info que estava em cache envelheceu.
@@ -167,7 +174,7 @@ export class SwarmitFleet {
     // O que mandar agora. Já registra o envio nos contadores do nó, então o
     // chamador precisa efetivamente enviar o que veio aqui.
     plan(now: number = Date.now()): SwarmitActions {
-        const actions: SwarmitActions = { requestInfo: [], calibrate: [], start: [] };
+        const actions: SwarmitActions = { requestInfo: [], calibrate: [], start: [], stop: [] };
 
         for (const node of this.nodes.values()) {
 
@@ -183,6 +190,18 @@ export class SwarmitFleet {
             // envelhece na hora; espera assentar.
             if (state !== SwarmitDeviceStatus.Bootloader && state !== SwarmitDeviceStatus.Running)
                 continue;
+
+            // Reservado para a captura LH2: a captura só roda em Bootloader,
+            // então quem estiver rodando leva STOP (reenviado no mesmo ritmo
+            // do START, o enlace não tem ack) e ninguém mexe nele até soltar.
+            if (node.held) {
+                const ultimoStop = node.lastStopAt;
+                if (state === SwarmitDeviceStatus.Running && (ultimoStop === null || now - ultimoStop >= this.options.startIntervalMs)) {
+                    node.lastStopAt = now;
+                    actions.stop.push(node.address);
+                }
+                continue;
+            }
 
             // Sem o bloco device-info não se sabe se existe imagem carregada
             // nem se a LH2 está calibrada - e o frame de status não carrega
@@ -263,6 +282,24 @@ export class SwarmitFleet {
         }
 
         return targets.map((n) => n.address);
+    }
+
+    // Reserva o robô para a captura LH2 (ver `held`). Devolve o nó, ou
+    // undefined se a malha nunca reportou esse endereço.
+    hold(address: string): SwarmitNode | undefined {
+        const node = this.nodes.get(SwarmitFleet.key(address));
+        if (!node) return undefined;
+        node.held = true;
+        node.lastStopAt = null;
+        node.startAttempts = 0;
+        return node;
+    }
+
+    release(address: string): void {
+        const node = this.nodes.get(SwarmitFleet.key(address));
+        if (!node) return;
+        node.held = false;
+        node.lastStopAt = null;
     }
 
     // Calibração LH2 do robô para o estado que sai aos clientes. Robô sem

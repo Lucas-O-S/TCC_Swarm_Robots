@@ -838,6 +838,30 @@ swarmit 0.11.0 gravado por cabo - fica para depois, de propósito.
    Swagger).
 10. Atualizar `Edge/README.md` com o contrato novo (`lh2` no estado, rotas).
 
+#### Captura pela própria borda - FEITO em 2026-10-19
+
+A calibração deixou de depender do `dotbot swarm lh2-calibration collect`. Lido
+no PyDotBot 0.30.0 (`dotbot/calibration/ota.py`, `cli/swarm_lh2.py`,
+`calibration/lighthouse2.py`) e no swarmit 0.9.0 (`testbed/protocol.py`):
+- Pedido: SwarmIT **`SWARMIT_LH2_CAPTURE = 0xA2`**, sem corpo, endereçado, só
+  com o robô em **Bootloader**. Sem ack: reenvio a cada 5 s, 3 vezes.
+- Resposta: **`SWARMIT_EVENT_LOG = 0x89`** = timestamp u32 + count u8 + dados;
+  dados = tag **`0xCA`** + amostras de 9 B (`lh_index` u8, `count1` u32 LE,
+  `count2` u32 LE). Log de texto comum não começa com a tag.
+- Só a estação **índice 0 (canal 1 da base)** é calibrada, como no PyDotBot
+  0.30.0. Amostra de outro índice vira aviso de canal errado no timeout.
+- Conta: contagens → ponto de câmera (`LH_PERIODS`), homografia dos 4 cantos
+  para (0,4/0,6 × 5 × lado) mm, int32 × 1000 truncado. Sem OpenCV: com 4 pontos
+  é um sistema 8 × 8. O spec compara com vetores gerados pelo próprio PyDotBot
+  (diferença de no máximo 1 unidade no int32: o cv2 refina por mínimos
+  quadrados).
+- Onde está: `Protocols/Swarmit/Lh2Homography.ts`, `adapter/Mari/Lh2CaptureSession.ts`,
+  `SwarmitFleet.hold/release` (robô reservado leva STOP e não recebe
+  calibração/START), rotas `/v1/lh2/calibration/session*` (contrato no
+  `Edge/README.md`). O `solve` grava o TOML schema 1 em `LH2_CALIBRATION_DIR`
+  (default `~/.dotbot/calibrations`), carrega e força o envio para a frota.
+- O PyDotBot continua necessário só para gravar firmware (cabo e OTA) e o gateway.
+
 #### Backend (`Backend/server/src`) - o que fazer
 
 1. `Classes/Edge/Edge.Types.ts`: copiar o campo `lh2` (cópia permitida entre
@@ -868,8 +892,9 @@ passo de controle; se a task nova tiver o mesmo número de pontos ou menos, o
 Orchestrator pode concluí-la na hora. Raro; tratar depois (ex. ignorar
 `waypoint_idx` até ver `mode` Auto com `waypoint_idx` < total).
 
-**Validação no hardware (ordem)**: (1) calibrar com a ferramenta do `dotbot`
-0.30.0 e conferir o arquivo; (2) borda com `LH2_CALIBRATION_FILE` + robô em
+**Validação no hardware (ordem)**: (1) calibrar pela borda (rotas
+`/v1/lh2/calibration/session*`) ou com a ferramenta do `dotbot` 0.30.0 e
+conferir o arquivo; (2) borda com `LH2_CALIBRATION_FILE` + robô em
 Bootloader → ver o envio, o reboot e o device-info com `1 basestation (valid,
 from flash)`; (3) START → advertisement com posição ≠ (0,0); (4) task de 1-2
 pontos em Auto → robô anda e a task conclui por `waypoint_idx`.

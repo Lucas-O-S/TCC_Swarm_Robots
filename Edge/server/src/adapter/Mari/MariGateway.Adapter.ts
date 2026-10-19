@@ -11,13 +11,16 @@ import { EdgeEvent } from "src/Enums/EdgeEvent.enum";
 import { mariConfig } from "src/config/Mari.Config";
 import { SwarmitPayloadType } from "src/Enums/SwarmitPayloadType.enum";
 import { Lh2Flags, SwarmitDeviceStatus } from "src/Enums/SwarmitDeviceStatus.enum";
-import { Lh2State, SwarmitProtocol } from "src/Protocols/Swarmit/Swarmit.Protocol";
+import { Lh2Sample, Lh2State, SwarmitProtocol } from "src/Protocols/Swarmit/Swarmit.Protocol";
 import { SwarmitFleet, SwarmitNode } from "./SwarmitFleet";
 import { HOST_ADDRESS } from "src/Constants/Address.Constants";
 import { FRAME_TYPE_DATA, FRAME_VERSION } from "src/Constants/Frame.Constants";
 import { MARI_TYPE_DATA, MARI_VERSION } from "src/Constants/Mari.Constants";
 import { Lh2Calibration } from "src/Protocols/Swarmit/Lh2Calibration";
 import { lh2Config } from "src/config/lh2.config";
+import { Lh2Homography } from "src/Protocols/Swarmit/Lh2Homography";
+import { Lh2Corner } from "src/Enums/Lh2Corner.enum";
+import { Lh2CaptureSession } from "./Lh2CaptureSession";
 
 // Espaço entre as matrizes de um mesmo envio (uma por estação). O swarmit usa
 // 0,3 s: o enlace não é confiável e uma rajada pode estourar a fila do gateway.
@@ -50,6 +53,9 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
     // setTimeouts das matrizes ainda por sair, para não escrever na serial
     // depois do onModuleDestroy.
     private readonly pendingSends = new Set<NodeJS.Timeout>();
+
+    // Captura LH2 em andamento (uma por vez: a borda tem um gateway só).
+    private capture: Lh2CaptureSession | null = null;
 
     onModuleInit(): void {
         // Antes da serial: arquivo configurado e inválido derruba a borda no
@@ -89,6 +95,9 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
             clearTimeout(timer);
         
         this.pendingSends.clear();
+
+        this.capture?.cancel("borda desligando");
+        this.capture = null;
         
         try { 
             this.port?.close?.();
@@ -180,6 +189,83 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
         return this.fleet.forceCalibrate(address);
     }
 
+    // --- captura LH2 (o `lh2-calibration collect`, dentro da borda) ---------
+
+    // Reserva o robô: a borda dá STOP se ele estiver rodando e não calibra nem
+    // dá START nele até solve/cancel. Uma captura por vez.
+    beginLh2Capture(address: string, distanceMm: number, tag: string | null): Lh2CaptureSession {
+        if (this.capture)
+            throw new Error(`já existe captura em andamento para ${this.capture.address} - resolva ou cancele antes`);
+
+        const node = this.fleet.hold(address);
+        if (!node)
+            throw new Error(`a malha SwarmIT nunca reportou o robô '${Protocol.normalizeAddress(address)}'`);
+
+        this.capture = new Lh2CaptureSession(node.address, distanceMm, tag, () => {
+            this.sendSwarmit(node.address, SwarmitProtocol.buildLh2Capture());
+        });
+
+        console.log(`[LH2] captura iniciada em ${node.address} (quadrado de ${distanceMm} mm)`);
+        return this.capture;
+    }
+
+    lh2CaptureSession(): Lh2CaptureSession | null {
+        return this.capture;
+    }
+
+    // O robô precisa estar em Bootloader: em Running o lado seguro não atende.
+    captureLh2Corner(corner: Lh2Corner): Promise<Lh2Sample> {
+        const session = this.capture;
+        if (!session) return Promise.reject(new Error("nenhuma captura em andamento"));
+
+        const state = this.fleet.get(session.address)?.status.status;
+        if (state !== SwarmitDeviceStatus.Bootloader) {
+            const nome = state === undefined ? "sumiu da malha" : SwarmitDeviceStatus[state];
+            return Promise.reject(new Error(`${session.address} não está em Bootloader (${nome}) - espere o STOP pegar`));
+        }
+
+        return session.capture(corner).then((sample) => {
+            console.log(`[LH2] ${session.address} ${corner}: count1=${sample.count1} count2=${sample.count2}`);
+            return sample;
+        });
+    }
+
+    // Calcula a homografia, grava o TOML (mesmo formato do PyDotBot), adota
+    // como calibração carregada e marca a frota toda para receber - arena
+    // recalibrada vale para todos os robôs. Solta o robô reservado.
+    solveLh2Capture(): { calibration: Lh2Calibration; marked: string[] } {
+        const session = this.capture;
+        if (!session) throw new Error("nenhuma captura em andamento");
+
+        const matrix = Lh2Homography.toWire(Lh2Homography.fromCorners(session.corners(), session.distanceMm));
+        const draft = Lh2Calibration.fromMatrices([matrix], "captura");
+        const path = draft.saveToml(lh2Config.calibrationDir, { distanceMm: session.distanceMm, tag: session.tag ?? undefined });
+        const calibration = Lh2Calibration.fromPayload(draft.payload, path);
+
+        this.calibration = calibration;
+        this.fleet.configure({ lh2StationCount: calibration.count });
+        const marked = this.fleet.forceCalibrate();
+
+        this.fleet.release(session.address);
+        this.capture = null;
+
+        console.log(
+            `[LH2] calibração salva em ${path} e carregada - ` +
+            `para continuar valendo depois de reiniciar a borda, ponha esse caminho no LH2_CALIBRATION_FILE`
+        );
+        return { calibration, marked };
+    }
+
+    cancelLh2Capture(): boolean {
+        const session = this.capture;
+        if (!session) return false;
+        session.cancel();
+        this.fleet.release(session.address);
+        this.capture = null;
+        console.log(`[LH2] captura de ${session.address} cancelada`);
+        return true;
+    }
+
     private onEdgePayload(payload: Buffer): void {
         if (payload.length < 1 || payload[0] !== EdgeEvent.NODE_DATA) return;
         const mari = MariProtocol.parseMariFrame(payload.subarray(1));
@@ -215,6 +301,14 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
                     `${(status.batteryMv / 1000).toFixed(2)}V (${pct}%)`
                 );
             }
+            return;
+        }
+
+        if (packet[0] === SwarmitPayloadType.SWARMIT_EVENT_LOG) {
+            const log = SwarmitProtocol.parseEventLog(packet);
+            if (!log) return;
+            const samples = SwarmitProtocol.parseLh2Samples(log.data);
+            if (samples.length > 0) this.capture?.onSamples(address, samples);
             return;
         }
 
@@ -263,6 +357,12 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
 
         for (const address of actions.calibrate) {
             this.sendCalibration(address);
+        }
+
+        for (const address of actions.stop) {
+            // Robô reservado para a captura LH2: ela só roda em Bootloader.
+            console.log(`[SWARMIT] stop -> ${address} (captura LH2)`);
+            this.sendSwarmit(address, SwarmitProtocol.buildStop());
         }
 
         for (const address of actions.start) {

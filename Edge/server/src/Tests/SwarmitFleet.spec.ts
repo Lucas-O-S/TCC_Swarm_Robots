@@ -62,7 +62,7 @@ describe("SwarmitFleet - device-info", () => {
     it("não pede nada em estado de transição", () => {
         const fleet = new SwarmitFleet();
         fleet.onStatus(A, status(SwarmitDeviceStatus.Programming), 0);
-        expect(fleet.plan(0)).toEqual({ requestInfo: [], calibrate: [], start: [] });
+        expect(fleet.plan(0)).toEqual({ requestInfo: [], calibrate: [], start: [], stop: [] });
     });
 
     it("lh2Of: desconhecido = não calibrado, e não pisca quando o infoGen muda", () => {
@@ -101,15 +101,15 @@ describe("SwarmitFleet - calibração", () => {
     it("calibra antes do START e só dá START depois de confirmar", () => {
         const fleet = fleetWith({ autoStart: true, lh2StationCount: 1 });
 
-        expect(fleet.plan(0)).toEqual({ requestInfo: [], calibrate: [A], start: [] });
+        expect(fleet.plan(0)).toEqual({ requestInfo: [], calibrate: [A], start: [], stop: [] });
 
         // Reiniciou depois da última matriz: status novo, infoGen novo.
         fleet.onStatus(A, status(SwarmitDeviceStatus.Bootloader, 2), 1000);
-        expect(fleet.plan(1000)).toEqual({ requestInfo: [], calibrate: [], start: [] });
+        expect(fleet.plan(1000)).toEqual({ requestInfo: [], calibrate: [], start: [], stop: [] });
         expect(fleet.plan(2000).requestInfo).toEqual([A]);
 
         fleet.onDeviceInfo(A, info({ infoGen: 2, bootCount: 2, uptimeS: 1, ...CALIBRATED }), 2100);
-        expect(fleet.plan(2100)).toEqual({ requestInfo: [], calibrate: [], start: [A] });
+        expect(fleet.plan(2100)).toEqual({ requestInfo: [], calibrate: [], start: [A], stop: [] });
         expect(fleet.get(A)?.calibrateAttempts).toBe(0);
     });
 
@@ -130,7 +130,7 @@ describe("SwarmitFleet - calibração", () => {
             if (attempt < 4) expect(fleet.plan(t + 2100).calibrate).toEqual([]);
         }
 
-        expect(fleet.plan(22100)).toEqual({ requestInfo: [], calibrate: [], start: [A] });
+        expect(fleet.plan(22100)).toEqual({ requestInfo: [], calibrate: [], start: [A], stop: [] });
         expect(fleet.takeCalibrationFailures()).toEqual([A]);
         expect(fleet.takeCalibrationFailures()).toEqual([]);
     });
@@ -152,10 +152,43 @@ describe("SwarmitFleet - calibração", () => {
         expect(fleet.plan(7010).requestInfo).toEqual([A]);
         fleet.onDeviceInfo(A, info({ bootCount: 2, uptimeS: 1, ...CALIBRATED }), 7100);
         expect(fleet.get(A)?.forceCalibration).toBe(false);
-        expect(fleet.plan(20000)).toEqual({ requestInfo: [], calibrate: [], start: [] });
+        expect(fleet.plan(20000)).toEqual({ requestInfo: [], calibrate: [], start: [], stop: [] });
     });
 
     it("forceCalibrate de robô desconhecido não marca ninguém", () => {
         expect(fleetWith({ autoStart: false, lh2StationCount: 1 }).forceCalibrate("0000000000000001")).toEqual([]);
+    });
+});
+
+describe("SwarmitFleet - reserva para a captura LH2", () => {
+
+    it("robô reservado não recebe calibração nem START", () => {
+        const fleet = fleetWith({ autoStart: true, lh2StationCount: 1 });
+        fleet.hold(A.toLowerCase());
+        expect(fleet.plan(0)).toEqual({ requestInfo: [], calibrate: [], start: [], stop: [] });
+    });
+
+    it("reservado em Running leva STOP no ritmo do START até parar", () => {
+        const fleet = fleetWith({ autoStart: true, lh2StationCount: null });
+        fleet.onStatus(A, status(SwarmitDeviceStatus.Running), 0);
+        fleet.hold(A);
+
+        expect(fleet.plan(0).stop).toEqual([A]);
+        expect(fleet.plan(300).stop).toEqual([]);
+        expect(fleet.plan(700).stop).toEqual([A]);
+
+        fleet.onStatus(A, status(SwarmitDeviceStatus.Bootloader), 800);
+        expect(fleet.plan(1500).stop).toEqual([]);
+    });
+
+    it("solto, volta ao fluxo normal", () => {
+        const fleet = fleetWith({ autoStart: true, lh2StationCount: null });
+        fleet.hold(A);
+        fleet.release(A);
+        expect(fleet.plan(0).start).toEqual([A]);
+    });
+
+    it("hold de robô desconhecido devolve undefined", () => {
+        expect(new SwarmitFleet().hold(A)).toBeUndefined();
     });
 });

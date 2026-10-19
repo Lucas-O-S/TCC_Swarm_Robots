@@ -1,10 +1,11 @@
 import { SwarmitPayloadType } from "src/Enums/SwarmitPayloadType.enum";
 import { Lh2Flags, SwarmitDeviceStatus, SwarmitDeviceType } from "src/Enums/SwarmitDeviceStatus.enum";
-import { LH2_MATRIX_LEN, LH2_MAX_STATIONS } from "src/Constants/Lh2.Constants";
+import { LH2_CALIB_TAG, LH2_MATRIX_LEN, LH2_MAX_STATIONS, LH2_SAMPLE_LEN } from "src/Constants/Lh2.Constants";
 
 // Codec do protocolo SwarmIT, byte a byte igual ao swarmit 0.9.0
-// (swarmit/testbed/protocol.py). Só os payloads que o backend precisa:
-// STATUS e DEVICE_INFO na recepção; START, STOP e REQUEST_MESSAGE no envio.
+// (swarmit/testbed/protocol.py). Só os payloads que a borda precisa:
+// STATUS, DEVICE_INFO e EVENT_LOG (captura LH2) na recepção; START, STOP,
+// REQUEST_MESSAGE, LH2_CALIBRATION e LH2_CAPTURE no envio.
 //
 // Tudo little-endian, como no dotbot_utils.protocol.Payload.to_bytes().
 
@@ -58,6 +59,20 @@ export interface SwarmitDeviceInfo {
     lh2Flags: number;
 }
 
+// PayloadEvent: timestamp (u32) + count (u8) + count bytes de dados.
+export interface SwarmitEventLog {
+    timestamp: number;
+    data: Buffer;
+}
+
+// Uma leitura bruta da LH2 (LH2CalibrationSample do PyDotBot). lhIndex é o
+// canal da base station menos 1.
+export interface Lh2Sample {
+    lhIndex: number;
+    count1: number;
+    count2: number;
+}
+
 // Calibração LH2 do robô, como vai para os clientes da borda (campo `lh2` do
 // estado). Mesmo formato do Lh2Data da API. `deviceCount` = nº de estações
 // calibradas; `valid` = bit VALID do lh2Flags.
@@ -89,7 +104,37 @@ export class SwarmitProtocol {
         ]);
     }
 
+    // PayloadLH2Capture é PayloadEmpty: só o byte do tipo. O robô só atende
+    // em Bootloader e responde com um SWARMIT_EVENT_LOG (parseLh2Samples).
+    static buildLh2Capture(): Buffer {
+        return Buffer.from([SwarmitPayloadType.SWARMIT_LH2_CAPTURE]);
+    }
+
     // --- recepção ----------------------------------------------------------
+
+    static parseEventLog(packet: Buffer): SwarmitEventLog | null {
+        if (packet.length < 6 || packet[0] !== SwarmitPayloadType.SWARMIT_EVENT_LOG) return null;
+        const count = packet.readUInt8(5);
+        const data = packet.subarray(6, 6 + count);
+        // count maior que o que veio = frame cortado: descarta.
+        if (data.length !== count) return null;
+        return { timestamp: packet.readUInt32LE(1), data: Buffer.from(data) };
+    }
+
+    // Amostras de captura dentro dos dados de um EVENT_LOG. Log de texto comum
+    // não começa com a tag e devolve [] (parse_capture_payload do PyDotBot).
+    static parseLh2Samples(data: Buffer): Lh2Sample[] {
+        if (data.length < 1 || data[0] !== LH2_CALIB_TAG) return [];
+        const samples: Lh2Sample[] = [];
+        for (let o = 1; o + LH2_SAMPLE_LEN <= data.length; o += LH2_SAMPLE_LEN) {
+            samples.push({
+                lhIndex: data.readUInt8(o),
+                count1: data.readUInt32LE(o + 1),
+                count2: data.readUInt32LE(o + 5),
+            });
+        }
+        return samples;
+    }
 
     // Recebe o pacote SwarmIT completo (byte de tipo + corpo).
     static parseStatus(packet: Buffer): SwarmitStatus | null {
