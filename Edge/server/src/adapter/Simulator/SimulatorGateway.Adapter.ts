@@ -3,6 +3,8 @@ import { Protocol, Frame } from "src/Protocols/Protocol";
 import { GatewayAdapter } from "../GatewayAdapter.interface";
 import { PayloadType } from "src/Enums/PayloadType.enum";
 import { simulatorConfig } from "src/config/simulator.config";
+import { HOST_ADDRESS } from "src/Constants/Address.Constants";
+import { FRAME_TYPE_DATA, FRAME_VERSION } from "src/Constants/Frame.Constants";
 
 
 @Injectable()
@@ -51,7 +53,7 @@ export class SimulatorGatewayAdapter implements GatewayAdapter{
         );
 
         setInterval(() => {
-            const header = Protocol.buildHeader("0000000000000000", 1, 16, fakeRobot);
+            const header = Protocol.buildHeader(HOST_ADDRESS, FRAME_VERSION, FRAME_TYPE_DATA, fakeRobot);
 
             const frame = Protocol.buildFrame(
                 new Frame(header, PayloadType.DOTBOT_ADVERTISEMENT, advBody)

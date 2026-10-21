@@ -8,6 +8,9 @@ import { NextProto } from "src/Enums/NextProto.enum";
 import { EdgeEvent } from "src/Enums/EdgeEvent.enum";
 import { Protocol } from "src/Protocols/Protocol";
 import { mqttConfig } from "src/config/mqtt.config";
+import { HOST_ADDRESS } from "src/Constants/Address.Constants";
+import { FRAME_TYPE_DATA, FRAME_VERSION } from "src/Constants/Frame.Constants";
+import { MARI_TYPE_DATA, MARI_VERSION } from "src/Constants/Mari.Constants";
 
 // NETID = network_id em 4 hex MAIÚSCULOS (igual marilib/simulador).
 const netid = (n: number) => n.toString(16).padStart(4, "0").toUpperCase();
@@ -58,11 +61,11 @@ export class MqttGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
         const packet = Buffer.concat([Buffer.from([payloadType]), body]); // DotBot Packet
 
         const header: MariHeader = {
-            version: 3,
-            type: 16,
+            version: MARI_VERSION,
+            type: MARI_TYPE_DATA,
             networkId: mqttConfig.networkId,
             destination,
-            source: "0000000000000000",
+            source: HOST_ADDRESS,
             nextProto: NextProto.DOTBOT_APP,
         };
 
@@ -97,7 +100,7 @@ export class MqttGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
     // Mari frame -> frame interno de 18B (source@10 + payloadType@18) que o SwarmService
     // já lê. IDÊNTICO ao MariGatewayAdapter - Swarm/Robot/Orchestrator não mudam.
     private toInternalFrame(mari: MariFrame): Buffer {
-        const header = Protocol.buildHeader(mari.header.destination, 1, 16, mari.header.source);
+        const header = Protocol.buildHeader(mari.header.destination, FRAME_VERSION, FRAME_TYPE_DATA, mari.header.source);
         return Buffer.concat([header, mari.payload]);
     }
 }

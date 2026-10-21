@@ -5,6 +5,7 @@ import { Protocol } from "src/Protocols/Protocol";
 import { PayloadSelector } from "src/Protocols/PayloadSelector";
 import { PayloadType } from "src/Enums/PayloadType.enum";
 import { Command } from "src/Enums/Command.enum";
+import { ADDRESS_REGEX } from "src/Constants/Address.Constants";
 
 /** Qual payload do protocolo carrega cada comando. */
 const PAYLOAD_OF: Record<Command, PayloadType> = {
@@ -14,8 +15,6 @@ const PAYLOAD_OF: Record<Command, PayloadType> = {
     [Command.Waypoints]: PayloadType.LH2_WAYPOINTS,
     [Command.XgoAction]: PayloadType.CMD_XGO_ACTION,
 };
-
-const ADDRESS_REGEX = /^[0-9A-Fa-f]{16}$/;
 
 /**
  * PONTO ÚNICO por onde todo comando sai pro rádio: valida o endereço, escolhe
