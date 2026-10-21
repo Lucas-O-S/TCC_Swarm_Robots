@@ -35,6 +35,7 @@ export interface EdgeRobotState {
     /** Posição já extraída pela borda (null = payload sem posição ou sem leitura). */
     position: EdgeRobotPosition | null;
     updatedAt: string;
+    lh2: Lh2Data | null;
 }
 
 /** Evento `robot:status`: status calculado pela borda pelo tempo de silêncio. */
@@ -50,3 +51,13 @@ export interface EdgeRobotSnapshot {
     status: RobotStatus;
     state: EdgeRobotState;
 }
+
+
+//dados do lh2 enviados pela edge
+export interface Lh2Data {
+    
+    valid: boolean;
+    deviceCount: number;
+
+}
+
