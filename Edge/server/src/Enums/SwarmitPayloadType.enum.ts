@@ -18,4 +18,11 @@ export enum SwarmitPayloadType {
     SWARMIT_REQUEST_MESSAGE = 0x8E,
     // robô -> host, resposta do REQUEST_MESSAGE
     SWARMIT_DEVICE_INFO_RESP = 0x8F,
+    // robô -> host, log de evento (timestamp + len + dados). Também carrega a
+    // captura LH2 bruta, marcada pela tag LH2_CALIB_TAG no 1º byte dos dados.
+    SWARMIT_EVENT_LOG = 0x89,
+    // host -> robô, homografia de uma estação LH2
+    SWARMIT_LH2_CALIBRATION = 0xA1,
+    // host -> robô, pede uma captura LH2 bruta (só em Bootloader). Sem corpo.
+    SWARMIT_LH2_CAPTURE = 0xA2,
 }

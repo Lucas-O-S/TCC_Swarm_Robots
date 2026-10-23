@@ -59,7 +59,7 @@ Corpo inválido → `400`.
 
 | Evento | Payload |
 | --- | --- |
-| `robot:state` | `{ address, type, payloadType, data, position, updatedAt }` |
+| `robot:states` | `{ states: [{ address, type, payloadType, data, position, updatedAt }, ...] }` — lote a cada ~20 ms, em ordem de chegada |
 | `robot:status` | `{ address, status, lastSync }` — `status`: 0 Active, 1 Inactive (>5 s sem frame), 2 Lost (>60 s) |
 | `robot:joined` | `{ address }` — primeiro advertisement desde que a borda subiu |
 
@@ -69,6 +69,31 @@ Corpo inválido → `400`.
 
 Ao conectar, um cliente deve chamar `GET /v1/robots` uma vez para pegar o
 quadro atual e daí em diante seguir os eventos.
+
+### Calibração LH2 (só `GATEWAY_MODE=mari`)
+
+Fora do modo `mari` o GET responde `supported: false` e as demais rotas, `409`.
+
+- `GET /v1/lh2/calibration` → arquivo carregado e a calibração reportada por robô.
+- `POST /v1/lh2/calibration/push` `{ address? }` → `202`; reenvia a calibração carregada (sem `address`, a frota toda).
+
+Captura pela própria borda (substitui o `dotbot swarm lh2-calibration collect`):
+base station em qualquer canal, quadrado marcado no chão, robô ligado. A
+sessão calibra uma estação: a do `channel` pedido ou, sem ele, a de menor canal
+que o robô enxergar na primeira leitura (`GET .../session` mostra em `channel`).
+A matriz vai no slot do índice da estação (canal 7 = 7 slots, os 6 primeiros
+zerados), que é como o firmware procura a homografia.
+
+| Rota | Corpo | O que faz |
+| --- | --- | --- |
+| `POST /v1/lh2/calibration/session` | `{ address, distanceMm?, tag?, channel? }` | reserva o robô (STOP se estiver rodando; sem calibração nem START até terminar). `distanceMm` = lado do quadrado, default 500; a arena útil é 5 × o lado |
+| `GET /v1/lh2/calibration/session` | - | cantos capturados, `missing`, `pending`, `station`/`channel` calibrados, `otherStations` (índices vistos e ignorados) |
+| `POST /v1/lh2/calibration/session/capture` | `{ corner }` | `top-left`, `top-right`, `bottom-left` ou `bottom-right`, com o fotodiodo do robô na marca. Espera a leitura (até ~20 s); `504` se não vier, `409` fora do Bootloader |
+| `POST /v1/lh2/calibration/session/solve` | - | calcula a homografia, grava o TOML (formato do PyDotBot 0.30.0, em `LH2_CALIBRATION_DIR`), carrega e marca a frota toda para receber. `400` se faltar canto ou as capturas forem inconsistentes |
+| `DELETE /v1/lh2/calibration/session` | - | cancela e solta o robô |
+
+O TOML gerado só continua carregado depois de reiniciar a borda se o caminho
+dele for para o `LH2_CALIBRATION_FILE`.
 
 ### Autenticação
 
@@ -89,6 +114,6 @@ server/src/
     Swarm/          estado vivo, status por silêncio, posição, GET /v1/robots
     Commands/       POST /v1/robots/:address/commands/*  (ponto único de envio)
     Auth/           token único (EDGE_TOKEN)
-  Websockets/       socket.io: robot:state / robot:status / robot:joined
+  Websockets/       socket.io: robot:states / robot:status / robot:joined
   Tests/            HDLC byte a byte contra o marilib (npm test)
 ```

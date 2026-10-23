@@ -2,13 +2,14 @@ import { NextProto } from "src/Enums/NextProto.enum";
 import { MariFrame, MariHeader } from "./Mari.Payload";
 import { EdgeEvent } from "src/Enums/EdgeEvent.enum";
 import { Protocol } from "src/Protocols/Protocol";
+import { MARI_HEADER_LEN } from "src/Constants/Mari.Constants";
 
 
 export class MariProtocol {
 
 
     static buildMariHeader (header : MariHeader) : Buffer {
-        const buffer = Buffer.alloc(21);
+        const buffer = Buffer.alloc(MARI_HEADER_LEN);
         
         buffer.writeUInt8(header.version,0);
         buffer.writeUInt8(header.type,1);
@@ -45,9 +46,9 @@ export class MariProtocol {
 
     static parseMariFrame (frame : Buffer) : MariFrame {
         
-        const header = this.parseMariHeader(frame.subarray(0, 21));
+        const header = this.parseMariHeader(frame.subarray(0, MARI_HEADER_LEN));
 
-        const payload = frame.subarray(21);
+        const payload = frame.subarray(MARI_HEADER_LEN);
 
         return {
             header: header,

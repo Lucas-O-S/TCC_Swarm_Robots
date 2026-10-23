@@ -4,8 +4,8 @@
  * renomear quebra os clientes.
  */
 export enum EdgeSocketEvents {
-    /** Novo dado decodificado de um robô (RobotState). */
-    RobotState = "robot:state",
+    /** Lote dos dados decodificados desde o último envio (RobotStatesEvent, ~20 ms). */
+    RobotStates = "robot:states",
     /** Mudança de status por silêncio (Active/Inactive/Lost). */
     RobotStatus = "robot:status",
     /** Primeiro advertisement de um robô desde que a borda subiu. */
