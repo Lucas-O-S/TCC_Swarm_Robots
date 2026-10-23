@@ -848,8 +848,17 @@ no PyDotBot 0.30.0 (`dotbot/calibration/ota.py`, `cli/swarm_lh2.py`,
 - Resposta: **`SWARMIT_EVENT_LOG = 0x89`** = timestamp u32 + count u8 + dados;
   dados = tag **`0xCA`** + amostras de 9 B (`lh_index` u8, `count1` u32 LE,
   `count2` u32 LE). Log de texto comum não começa com a tag.
-- Só a estação **índice 0 (canal 1 da base)** é calibrada, como no PyDotBot
-  0.30.0. Amostra de outro índice vira aviso de canal errado no timeout.
+- Calibra **uma estação, em qualquer canal** (o PyDotBot 0.30.0 fixa o índice
+  0): a do `channel` pedido no início da sessão ou, sem ele, a de menor índice
+  na primeira leitura - é a que o firmware prefere quando vê várias (o laço do
+  `localization_get_position` começa do 0). Fica fixa até o fim da sessão.
+  O firmware indexa a homografia pelo índice da estação
+  (`homography_matrix[lh_index]`, dotbot-libs do swarmit 0.9.0), então canal N
+  = N slots com os anteriores zerados (`Lh2Calibration.forStation`); o net core
+  aceita slot zerado e o `lh2HomographyCount` reportado é o nº de slots. Slot
+  zerado = estação sem calibração; só tudo zerado é recusado. Ressalva: se o
+  robô só enxergar uma estação sem matriz, a conta dá 0/0 e a posição sai
+  (0,0) (= sem fix) ou é descartada pelo salto de 500 mm.
 - Conta: contagens → ponto de câmera (`LH_PERIODS`), homografia dos 4 cantos
   para (0,4/0,6 × 5 × lado) mm, int32 × 1000 truncado. Sem OpenCV: com 4 pontos
   é um sistema 8 × 8. O spec compara com vetores gerados pelo próprio PyDotBot

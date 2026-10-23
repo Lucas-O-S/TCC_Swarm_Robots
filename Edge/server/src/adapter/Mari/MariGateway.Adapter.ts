@@ -20,7 +20,7 @@ import { Lh2Calibration } from "src/Protocols/Swarmit/Lh2Calibration";
 import { lh2Config } from "src/config/lh2.config";
 import { Lh2Homography } from "src/Protocols/Swarmit/Lh2Homography";
 import { Lh2Corner } from "src/Enums/Lh2Corner.enum";
-import { Lh2CaptureSession } from "./Lh2CaptureSession";
+import { LH2_CAPTURE_DEFAULTS, Lh2CaptureSession } from "./Lh2CaptureSession";
 
 // Espaço entre as matrizes de um mesmo envio (uma por estação). O swarmit usa
 // 0,3 s: o enlace não é confiável e uma rajada pode estourar a fila do gateway.
@@ -63,7 +63,7 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
         // sem ninguém perceber.
         if (lh2Config.calibrationFile) {
             this.calibration = Lh2Calibration.fromFile(lh2Config.calibrationFile);
-            console.log(`[LH2] calibração carregada: ${this.calibration.count} estação(ões) de ${this.calibration.source}`);
+            console.log(`[LH2] calibração carregada: ${MariGatewayAdapter.channels(this.calibration)} de ${this.calibration.source}`);
         }
 
         this.connect();
@@ -192,8 +192,9 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
     // --- captura LH2 (o `lh2-calibration collect`, dentro da borda) ---------
 
     // Reserva o robô: a borda dá STOP se ele estiver rodando e não calibra nem
-    // dá START nele até solve/cancel. Uma captura por vez.
-    beginLh2Capture(address: string, distanceMm: number, tag: string | null): Lh2CaptureSession {
+    // dá START nele até solve/cancel. Uma captura por vez. station null = a
+    // sessão usa a estação que o robô enxergar na primeira leitura.
+    beginLh2Capture(address: string, distanceMm: number, tag: string | null, station: number | null = null): Lh2CaptureSession {
         if (this.capture)
             throw new Error(`já existe captura em andamento para ${this.capture.address} - resolva ou cancele antes`);
 
@@ -203,9 +204,10 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
 
         this.capture = new Lh2CaptureSession(node.address, distanceMm, tag, () => {
             this.sendSwarmit(node.address, SwarmitProtocol.buildLh2Capture());
-        });
+        }, LH2_CAPTURE_DEFAULTS, station);
 
-        console.log(`[LH2] captura iniciada em ${node.address} (quadrado de ${distanceMm} mm)`);
+        const canal = station === null ? "canal: o primeiro que o robô enxergar" : `canal ${station + 1}`;
+        console.log(`[LH2] captura iniciada em ${node.address} (quadrado de ${distanceMm} mm, ${canal})`);
         return this.capture;
     }
 
@@ -225,7 +227,7 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
         }
 
         return session.capture(corner).then((sample) => {
-            console.log(`[LH2] ${session.address} ${corner}: count1=${sample.count1} count2=${sample.count2}`);
+            console.log(`[LH2] ${session.address} ${corner} (canal ${sample.lhIndex + 1}): count1=${sample.count1} count2=${sample.count2}`);
             return sample;
         });
     }
@@ -237,8 +239,10 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
         const session = this.capture;
         if (!session) throw new Error("nenhuma captura em andamento");
 
-        const matrix = Lh2Homography.toWire(Lh2Homography.fromCorners(session.corners(), session.distanceMm));
-        const draft = Lh2Calibration.fromMatrices([matrix], "captura");
+        const corners = session.corners();
+        const matrix = Lh2Homography.toWire(Lh2Homography.fromCorners(corners, session.distanceMm));
+        // corners() só devolve com os 4 cantos, então a estação já foi escolhida.
+        const draft = Lh2Calibration.forStation(session.calibratedStation!, matrix, "captura");
         const path = draft.saveToml(lh2Config.calibrationDir, { distanceMm: session.distanceMm, tag: session.tag ?? undefined });
         const calibration = Lh2Calibration.fromPayload(draft.payload, path);
 
@@ -382,7 +386,7 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
         const calibration = this.calibration;
         if (!calibration) return;
 
-        console.log(`[LH2] calibração -> ${address} (${calibration.count} estação(ões))`);
+        console.log(`[LH2] calibração -> ${address} (${MariGatewayAdapter.channels(calibration)}, ${calibration.count} slot(s))`);
 
         calibration.matrices.forEach((matrix, index) => {
             const packet = SwarmitProtocol.buildLh2Calibration(calibration.count, index, matrix);
@@ -406,5 +410,11 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
     private toInternalFrame(mari: MariFrame): Buffer {
         const header = Protocol.buildHeader(mari.header.destination, FRAME_VERSION, FRAME_TYPE_DATA, mari.header.source);
         return Buffer.concat([header, mari.payload]);
+    }
+
+    // "canal 7" / "canais 1, 3" - os slots zerados não contam.
+    private static channels(calibration: Lh2Calibration): string {
+        const canais = calibration.stations.map((i) => i + 1);
+        return `${canais.length > 1 ? "canais" : "canal"} ${canais.join(", ")}`;
     }
 }

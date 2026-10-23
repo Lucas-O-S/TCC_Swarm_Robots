@@ -25,7 +25,7 @@ export class Lh2Service {
         const mari = this.mari();
 
         if (!mari) {
-            return { supported: false, file: null, stationCount: null, robots: [] };
+            return { supported: false, file: null, stationCount: null, channels: null, robots: [] };
         }
 
         const calibration = mari.lh2Calibration();
@@ -35,6 +35,7 @@ export class Lh2Service {
             supported: true,
             file: calibration?.source ?? null,
             stationCount,
+            channels: calibration ? Lh2Service.channels(calibration.stations) : null,
             robots: mari.swarmitFleet().map((node) => this.robotView(node, stationCount)),
         };
     }
@@ -68,7 +69,8 @@ export class Lh2Service {
         if (!mari.swarmitFleet().some((node) => node.address === Protocol.normalizeAddress(dto.address)))
             throw new NotFoundException(`A malha SwarmIT nunca reportou o robô '${Protocol.normalizeAddress(dto.address)}'`);
 
-        return mari.beginLh2Capture(dto.address, dto.distanceMm ?? LH2_CALIBRATION_DISTANCE_DEFAULT, dto.tag ?? null).view();
+        const station = dto.channel === undefined ? null : dto.channel - 1;
+        return mari.beginLh2Capture(dto.address, dto.distanceMm ?? LH2_CALIBRATION_DISTANCE_DEFAULT, dto.tag ?? null, station).view();
     }
 
     getCapture(): Lh2CaptureView {
@@ -102,6 +104,7 @@ export class Lh2Service {
             return {
                 file: calibration.source,
                 stationCount: calibration.count,
+                channels: Lh2Service.channels(calibration.stations),
                 marked,
                 notInBootloader: this.notInBootloader(mari, marked),
             };
@@ -134,6 +137,10 @@ export class Lh2Service {
             .filter((node) => marked.includes(node.address))
             .filter((node) => node.status.status !== SwarmitDeviceStatus.Bootloader)
             .map((node) => node.address);
+    }
+
+    private static channels(stations: number[]): number[] {
+        return stations.map((index) => index + 1);
     }
 
     private mari(): MariGatewayAdapter | null {

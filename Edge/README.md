@@ -78,12 +78,16 @@ Fora do modo `mari` o GET responde `supported: false` e as demais rotas, `409`.
 - `POST /v1/lh2/calibration/push` `{ address? }` → `202`; reenvia a calibração carregada (sem `address`, a frota toda).
 
 Captura pela própria borda (substitui o `dotbot swarm lh2-calibration collect`):
-base station no **canal 1**, quadrado marcado no chão, robô ligado.
+base station em qualquer canal, quadrado marcado no chão, robô ligado. A
+sessão calibra uma estação: a do `channel` pedido ou, sem ele, a de menor canal
+que o robô enxergar na primeira leitura (`GET .../session` mostra em `channel`).
+A matriz vai no slot do índice da estação (canal 7 = 7 slots, os 6 primeiros
+zerados), que é como o firmware procura a homografia.
 
 | Rota | Corpo | O que faz |
 | --- | --- | --- |
-| `POST /v1/lh2/calibration/session` | `{ address, distanceMm?, tag? }` | reserva o robô (STOP se estiver rodando; sem calibração nem START até terminar). `distanceMm` = lado do quadrado, default 500; a arena útil é 5 × o lado |
-| `GET /v1/lh2/calibration/session` | - | cantos capturados, `missing`, `pending`, `otherStations` |
+| `POST /v1/lh2/calibration/session` | `{ address, distanceMm?, tag?, channel? }` | reserva o robô (STOP se estiver rodando; sem calibração nem START até terminar). `distanceMm` = lado do quadrado, default 500; a arena útil é 5 × o lado |
+| `GET /v1/lh2/calibration/session` | - | cantos capturados, `missing`, `pending`, `station`/`channel` calibrados, `otherStations` (índices vistos e ignorados) |
 | `POST /v1/lh2/calibration/session/capture` | `{ corner }` | `top-left`, `top-right`, `bottom-left` ou `bottom-right`, com o fotodiodo do robô na marca. Espera a leitura (até ~20 s); `504` se não vier, `409` fora do Bootloader |
 | `POST /v1/lh2/calibration/session/solve` | - | calcula a homografia, grava o TOML (formato do PyDotBot 0.30.0, em `LH2_CALIBRATION_DIR`), carrega e marca a frota toda para receber. `400` se faltar canto ou as capturas forem inconsistentes |
 | `DELETE /v1/lh2/calibration/session` | - | cancela e solta o robô |

@@ -49,8 +49,23 @@ describe("Lh2Calibration.fromPayload", () => {
         expect(() => Lh2Calibration.fromPayload(Buffer.concat([data, Buffer.from([0])]))).toThrow("esperava 37 B");
     });
 
-    it("recusa matriz zerada (estouro no PyDotBot)", () => {
-        expect(() => Lh2Calibration.fromPayload(payload(matrix(1), Buffer.alloc(36)))).toThrow("estação 1 zerada");
+    it("slot zerado é estação sem calibração", () => {
+        const cal = Lh2Calibration.fromPayload(payload(Buffer.alloc(36), matrix(1)));
+        expect(cal.count).toBe(2);
+        expect(cal.stations).toEqual([1]);
+    });
+
+    it("recusa tudo zerado (estouro no PyDotBot)", () => {
+        expect(() => Lh2Calibration.fromPayload(payload(Buffer.alloc(36), Buffer.alloc(36)))).toThrow("todas as matrizes zeradas");
+    });
+
+    it("forStation põe a matriz no slot do índice e zera os anteriores", () => {
+        const cal = Lh2Calibration.forStation(6, matrix(1), "captura");
+        expect(cal.count).toBe(7);
+        expect(cal.stations).toEqual([6]);
+        expect(cal.matrices[6].equals(matrix(1))).toBe(true);
+        expect(cal.payload.length).toBe(1 + 7 * 36);
+        expect(() => Lh2Calibration.forStation(16, matrix(1), "captura")).toThrow("fora de 0..15");
     });
 });
 

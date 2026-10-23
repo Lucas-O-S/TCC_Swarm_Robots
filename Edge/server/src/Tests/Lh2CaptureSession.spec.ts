@@ -4,9 +4,9 @@ import { Lh2Corner } from "../Enums/Lh2Corner.enum";
 const A = "BDF2B04BC00D2725";
 const OPTIONS = { timeoutMs: 1000, retries: 2 };
 
-const session = () => {
+const session = (station: number | null = null) => {
     const trigger = jest.fn();
-    return { trigger, s: new Lh2CaptureSession(A.toLowerCase(), 500, "arena", trigger, OPTIONS) };
+    return { trigger, s: new Lh2CaptureSession(A.toLowerCase(), 500, "arena", trigger, OPTIONS, station) };
 };
 
 describe("Lh2CaptureSession", () => {
@@ -14,7 +14,7 @@ describe("Lh2CaptureSession", () => {
     beforeEach(() => jest.useFakeTimers());
     afterEach(() => jest.useRealTimers());
 
-    it("pede a captura e fecha o canto com a amostra da estação 0", async () => {
+    it("pede a captura e fecha o canto com a primeira estação que responder", async () => {
         const { trigger, s } = session();
         const promise = s.capture(Lh2Corner.TopLeft);
 
@@ -24,7 +24,7 @@ describe("Lh2CaptureSession", () => {
         expect(s.onSamples(A, [{ lhIndex: 0, count1: 1, count2: 2 }])).toBe(true);
         await expect(promise).resolves.toEqual({ lhIndex: 0, count1: 1, count2: 2 });
 
-        expect(s.view()).toMatchObject({ address: A, pending: null, missing: [Lh2Corner.TopRight, Lh2Corner.BottomLeft, Lh2Corner.BottomRight] });
+        expect(s.view()).toMatchObject({ address: A, pending: null, station: 0, channel: 1, missing: [Lh2Corner.TopRight, Lh2Corner.BottomLeft, Lh2Corner.BottomRight] });
     });
 
     it("reenvia sem resposta e desiste depois dos retries", async () => {
@@ -41,16 +41,25 @@ describe("Lh2CaptureSession", () => {
         expect(s.view().pending).toBeNull();
     });
 
-    it("base em outro canal: o timeout diz qual", async () => {
+    it("vê mais de uma base: fica com a de menor índice, a que o firmware prefere", async () => {
         const { s } = session();
         const promise = s.capture(Lh2Corner.TopLeft);
-        const outcome = expect(promise).rejects.toThrow(/canal 3/);
 
-        expect(s.onSamples(A, [{ lhIndex: 2, count1: 1, count2: 2 }])).toBe(false);
+        expect(s.onSamples(A, [{ lhIndex: 12, count1: 3, count2: 4 }, { lhIndex: 6, count1: 1, count2: 2 }])).toBe(true);
+        await expect(promise).resolves.toEqual({ lhIndex: 6, count1: 1, count2: 2 });
+        expect(s.view()).toMatchObject({ station: 6, channel: 7, otherStations: [12] });
+    });
+
+    it("estação escolhida fica fixa: o timeout diz qual canal faltou e qual veio", async () => {
+        const { s } = session(6);
+        const promise = s.capture(Lh2Corner.TopLeft);
+        const outcome = expect(promise).rejects.toThrow(/canal 7, mas o robô só enxergou o canal 13/);
+
+        expect(s.onSamples(A, [{ lhIndex: 12, count1: 1, count2: 2 }])).toBe(false);
         jest.advanceTimersByTime(3000);
 
         await outcome;
-        expect(s.view().otherStations).toEqual([2]);
+        expect(s.view()).toMatchObject({ station: 6, otherStations: [12] });
     });
 
     it("ignora amostra de outro robô e recusa dois cantos ao mesmo tempo", async () => {
