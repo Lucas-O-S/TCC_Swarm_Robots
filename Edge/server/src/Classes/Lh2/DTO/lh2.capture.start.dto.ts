@@ -24,4 +24,14 @@ export class Lh2CaptureStartDto {
     @IsString({ message: "tag deve ser texto" })
     @MaxLength(64, { message: "tag deve ter até 64 caracteres" })
     tag?: string;
+
+    @ApiPropertyOptional({
+        description: "Canal da base station a calibrar (1 a 16). Sem ele, vale o de menor número que o robô enxergar na primeira leitura.",
+        example: 7,
+    })
+    @IsOptional()
+    @IsInt({ message: "channel deve ser um número inteiro" })
+    @Min(1, { message: "channel mínimo é 1" })
+    @Max(16, { message: "channel máximo é 16" })
+    channel?: number;
 }

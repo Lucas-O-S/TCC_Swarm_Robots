@@ -9,10 +9,13 @@ import { Protocol } from "src/Protocols/Protocol";
 // entrega a resposta é o adapter chamando onSamples() quando chega o
 // SWARMIT_EVENT_LOG. Assim dá para testar com timers falsos.
 //
-// Como no PyDotBot, só a estação de índice 0 (canal 1 da base) é calibrada.
-// Amostras de outros índices ficam anotadas para explicar um timeout.
-
-export const LH2_REFERENCE_STATION = 0;
+// Calibra uma estação só, como o PyDotBot. Ele fixa a de índice 0 (canal 1
+// da base); aqui vale a que o robô enxergar: a pedida no início da sessão ou,
+// sem pedido, a de menor índice na primeira leitura - é a que o firmware
+// prefere quando vê mais de uma (o laço do localization_get_position começa
+// do índice 0). Escolhida, fica fixa até o fim da sessão: os 4 cantos têm
+// que ser da mesma estação. Amostras de outros índices ficam anotadas para
+// explicar um timeout.
 
 export interface Lh2CaptureOptions {
     timeoutMs: number;
@@ -32,7 +35,10 @@ export interface Lh2CaptureView {
     missing: Lh2Corner[];
     // Canto esperando resposta do robô agora.
     pending: Lh2Corner | null;
-    // Estações (índice = canal - 1) que responderam mas não são a de referência.
+    // Estação calibrada (índice = canal - 1). null = ainda não escolhida.
+    station: number | null;
+    channel: number | null;
+    // Estações (índice = canal - 1) que responderam mas não são a calibrada.
     otherStations: number[];
 }
 
@@ -61,17 +67,23 @@ export class Lh2CaptureSession {
 
     private pending: PendingCapture | null = null;
 
+    // station null = escolhe pela primeira leitura.
     constructor(
         address: string,
         readonly distanceMm: number,
         readonly tag: string | null,
         private readonly trigger: () => void,
         private readonly options: Lh2CaptureOptions = LH2_CAPTURE_DEFAULTS,
+        private station: number | null = null,
     ) {
         this.address = Protocol.normalizeAddress(address);
     }
 
-    // Pede a captura e espera a amostra da estação de referência. O pedido
+    get calibratedStation(): number | null {
+        return this.station;
+    }
+
+    // Pede a captura e espera a amostra da estação calibrada. O pedido
     // não tem ack no enlace: sem resposta no prazo, reenvia (retries vezes).
     // Capturar de novo um canto substitui a amostra anterior.
     capture(corner: Lh2Corner): Promise<Lh2Sample> {
@@ -89,10 +101,13 @@ export class Lh2CaptureSession {
         const pending = this.pending;
         if (!pending || Protocol.normalizeAddress(address) !== this.address) return false;
 
-        const sample = samples.find((s) => s.lhIndex === LH2_REFERENCE_STATION);
+        if (this.station === null && samples.length > 0)
+            this.station = Math.min(...samples.map((s) => s.lhIndex));
+
+        const sample = samples.find((s) => s.lhIndex === this.station);
 
         for (const s of samples)
-            if (s.lhIndex !== LH2_REFERENCE_STATION) this.otherStations.add(s.lhIndex);
+            if (s.lhIndex !== this.station) this.otherStations.add(s.lhIndex);
 
         if (!sample) return false;
 
@@ -130,6 +145,8 @@ export class Lh2CaptureSession {
             captured: Object.fromEntries(this.samples),
             missing: this.missing(),
             pending: this.pending?.corner ?? null,
+            station: this.station,
+            channel: this.station === null ? null : this.station + 1,
             otherStations: [...this.otherStations].sort((a, b) => a - b),
         };
     }
@@ -163,9 +180,12 @@ export class Lh2CaptureSession {
             `${this.address} não mandou a leitura do canto ${pending.corner} ` +
             `depois de ${pending.attempt} tentativa(s)`;
 
-        if (this.otherStations.size > 0) {
+        if (this.station !== null && this.otherStations.size > 0) {
             const canais = [...this.otherStations].map((i) => i + 1).join(", ");
-            return `${base}. O robô só enxerga a base no canal ${canais}: a calibração usa a do canal 1 - mude o canal da base.`;
+            return (
+                `${base}. A sessão calibra a base do canal ${this.station + 1}, mas o robô só enxergou o canal ${canais}: ` +
+                `confira a visada da base do canal ${this.station + 1} ou recomece a sessão para usar outro canal.`
+            );
         }
 
         return `${base}. Confira se ele está em Bootloader e se o fotodiodo enxerga a base station.`;

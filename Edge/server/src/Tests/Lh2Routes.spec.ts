@@ -64,7 +64,7 @@ const simulatorService = () => new Lh2Service({ send: () => {}, onFrameReceived:
 describe("GET /v1/lh2/calibration", () => {
 
     it("fora do modo mari: não se aplica", () => {
-        expect(simulatorService().getCalibration()).toEqual({ supported: false, file: null, stationCount: null, robots: [] });
+        expect(simulatorService().getCalibration()).toEqual({ supported: false, file: null, stationCount: null, channels: null, robots: [] });
     });
 
     it("mostra o arquivo e cada robô comparado com ele", () => {
@@ -182,7 +182,7 @@ describe("/v1/lh2/calibration/session - captura pela borda", () => {
 
         const result = service.solveCapture();
 
-        expect(result).toMatchObject({ stationCount: 1, notInBootloader: [B] });
+        expect(result).toMatchObject({ stationCount: 1, channels: [1], notInBootloader: [B] });
         expect(result.marked).toEqual(expect.arrayContaining([A, B]));
         expect(result.file.startsWith(dir)).toBe(true);
         expect(result.file).toMatch(/calibration-arena-taak-.*\.toml$/);
@@ -196,6 +196,39 @@ describe("/v1/lh2/calibration/session - captura pela borda", () => {
         // Sessão encerrada e robô solto.
         expect(fleet.get(A)?.held).toBe(false);
         expect(() => service.getCapture()).toThrow(NotFoundException);
+    });
+
+    it("base em outro canal: calibra o que o robô enxerga, no slot do índice dele", async () => {
+        const { adapter, service } = mariSetup(false);
+        service.startCapture({ address: A });
+
+        for (const corner of Object.values(Lh2Corner)) {
+            const pending = service.captureCorner(corner);
+            reply(adapter, COUNTS[corner], 6);
+            await expect(pending).resolves.toMatchObject({ sample: { lhIndex: 6 } });
+        }
+        expect(service.getCapture()).toMatchObject({ station: 6, channel: 7 });
+
+        const result = service.solveCapture();
+        expect(result).toMatchObject({ stationCount: 7, channels: [7] });
+
+        // Slots 0..5 zerados: o firmware usa homography_matrix[lh_index].
+        const saved = Lh2Calibration.fromFile(result.file);
+        expect(saved.matrices.slice(0, 6).every((m) => m.every((b) => b === 0))).toBe(true);
+        expect(saved.stations).toEqual([6]);
+        expect(service.getCalibration()).toMatchObject({ stationCount: 7, channels: [7] });
+    });
+
+    it("channel no início fixa a estação: leitura de outro canal não fecha o canto", async () => {
+        const { adapter, service } = mariSetup(false);
+        expect(service.startCapture({ address: A, channel: 13 })).toMatchObject({ station: 12, channel: 13 });
+
+        const pending = service.captureCorner(Lh2Corner.TopLeft);
+        reply(adapter, COUNTS[Lh2Corner.TopLeft], 6);
+        expect(service.getCapture()).toMatchObject({ pending: Lh2Corner.TopLeft, otherStations: [6] });
+
+        reply(adapter, COUNTS[Lh2Corner.TopLeft], 12);
+        await expect(pending).resolves.toMatchObject({ sample: { lhIndex: 12 } });
     });
 
     it("captura sem resposta vira 504", async () => {

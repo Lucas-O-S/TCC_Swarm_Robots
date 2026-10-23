@@ -23,7 +23,10 @@ export interface Lh2CalibrationView {
     supported: boolean;
     // Arquivo carregado (null = LH2_CALIBRATION_FILE vazio).
     file: string | null;
+    // Slots do arquivo (= lh2HomographyCount do robô calibrado com ele).
     stationCount: number | null;
+    // Canais com matriz de verdade (os slots zerados ficam de fora).
+    channels: number[] | null;
     robots: Lh2RobotView[];
 }
 
@@ -47,6 +50,7 @@ export interface Lh2SolveResult {
     // TOML gravado (formato do PyDotBot 0.30.0) e já carregado pela borda.
     file: string;
     stationCount: number;
+    channels: number[];
     // Robôs que vão receber a calibração nova (a frota toda).
     marked: string[];
     // Só recebem quando estiverem em Bootloader.
