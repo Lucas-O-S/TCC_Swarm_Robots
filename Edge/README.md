@@ -43,12 +43,17 @@ Endereço (`address`) = 16 dígitos hex; a borda normaliza para MAIÚSCULAS.
 | --- | --- |
 | `move-raw` | `{ "left_x", "left_y", "right_x", "right_y" }` (-128..127; `left_y`/`right_y` = PWM das rodas) |
 | `rgb-led` | `{ "red", "green", "blue" }` (0..255) |
-| `control-mode` | `{ "mode": 0 \| 1 }` (0 Manual, 1 Auto — só o que o robô entende) |
+| `control-mode` | `{ "mode": 0 \| 1 }` (0 Manual, 1 Auto — só o que o robô entende). Para o robô: a borda manda `LH2_WAYPOINTS` vazio e depois o `CONTROL_MODE` |
 | `waypoints` | `{ "threshold": mm, "waypoints": [{ "x", "y" }] }` (mm, LH2) |
 | `xgo-action` | `{ "action": 0..255 }` |
 
 `202` quer dizer "entregue ao gateway" — o rádio não confirma execução.
 Corpo inválido → `400`.
+
+Por que o `control-mode` sai em dois pacotes: no firmware 1.23.0 o `CONTROL_MODE`
+só zera os motores uma vez (não troca o modo nem apaga a rota); em Auto o laço
+de controle religa no próximo fix da LH2. Só a lista de waypoints vazia tira o
+robô do Auto. Nos simuladores a lista vazia também para o robô.
 
 ### Leitura
 

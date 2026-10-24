@@ -6,6 +6,7 @@ import { PayloadSelector } from "src/Protocols/PayloadSelector";
 import { PayloadType } from "src/Enums/PayloadType.enum";
 import { Command } from "src/Enums/Command.enum";
 import { ADDRESS_REGEX } from "src/Constants/Address.Constants";
+import { Lh2WaypointsPayload } from "src/Protocols/Wrappers/Encode/Lh2WaypointsPayload.wrapper";
 
 /** Qual payload do protocolo carrega cada comando. */
 const PAYLOAD_OF: Record<Command, PayloadType> = {
@@ -15,6 +16,15 @@ const PAYLOAD_OF: Record<Command, PayloadType> = {
     [Command.Waypoints]: PayloadType.LH2_WAYPOINTS,
     [Command.XgoAction]: PayloadType.CMD_XGO_ACTION,
 };
+
+/**
+ * LH2_WAYPOINTS sem pontos. No firmware 1.23.0 é o único comando que tira o
+ * robô do Auto: zera a lista, volta para Manual e para os motores. O
+ * CONTROL_MODE sozinho só zera os motores uma vez (não muda o modo nem apaga
+ * a rota) e, em Auto, o laço de controle religa no próximo fix da LH2
+ * (100 ms) - o robô seguia a rota com a API achando que tinha parado.
+ */
+const CLEAR_WAYPOINTS: Lh2WaypointsPayload = { threshold: 0, waypoints: [] };
 
 /**
  * PONTO ÚNICO por onde todo comando sai pro rádio: valida o endereço, escolhe
@@ -34,7 +44,21 @@ export class CommandService {
         }
 
         const target = Protocol.normalizeAddress(address);
-        const payloadType = PAYLOAD_OF[command];
+
+        // Contrato do control-mode: para o robô e aborta os waypoints. A rota
+        // vazia vai antes, para o CONTROL_MODE ser o último a chegar (nos
+        // simuladores é ele que define o modo final).
+        if (command === Command.ControlMode) {
+            this.deliver(target, PayloadType.LH2_WAYPOINTS, CLEAR_WAYPOINTS);
+        }
+
+        this.deliver(target, PAYLOAD_OF[command], payload);
+
+        return { address: target, command, payload };
+    }
+
+    /** Codifica pelo tipo e entrega um pacote ao GatewayAdapter. */
+    private deliver(target: string, payloadType: PayloadType, payload: any): void {
 
         const codec = PayloadSelector.getPayloadCoder(payloadType);
         if (!codec) {
@@ -42,7 +66,5 @@ export class CommandService {
         }
 
         this.gateway.send(target, payloadType, codec.encodePayload(payload));
-
-        return { address: target, command, payload };
     }
 }
