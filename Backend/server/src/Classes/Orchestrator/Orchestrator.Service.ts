@@ -216,6 +216,17 @@ export class OrchestratorService implements OnModuleInit {
             return new ConflictException(`Robô ${robot.address} já está executando uma task`);
         }
 
+        // Sem isso a regra de bateria baixa do onAdvertisement soltava a task
+        // e o loop automático devolvia a mesma task ao mesmo robô 5 s depois
+        // (ele recomeçava a rota do ponto 0, sem fim).
+        const volts = this.swarmService.batteryVolts(robot.address);
+
+        if (volts !== null && this.isLowBattery(volts)) {
+            return new ConflictException(
+                `Robô ${robot.address} com bateria baixa (${volts.toFixed(2)} V, limite ${this.LOW_BATTERY_VOLTS} V)`,
+            );
+        }
+
         // Calibração LH2 e posição: estado em memória que vem da borda.
         const blocked = this.swarmService.taskBlockReason(robot.address);
 
@@ -277,7 +288,7 @@ export class OrchestratorService implements OnModuleInit {
         const { address, data } = payload;
 
         //Verifica bateria baixa (data.battery vem em mV; comparamos em Volts)
-        const lowBattery = data.battery / 1000 <= this.LOW_BATTERY_VOLTS;
+        const lowBattery = this.isLowBattery(data.battery / 1000);
 
         const signature = `${data.waypoint_idx}|${lowBattery}`;
 
@@ -315,7 +326,11 @@ export class OrchestratorService implements OnModuleInit {
         if (lowBattery){
 
             //To do task de recarregar
+            await this.stopRobot(robot);
+
             await this.resetTask(robot)
+
+            console.log(`[ORQ] robô ${address} com bateria baixa → parado, task ${robot.taskId} voltou pra fila`);
             return
         }
 
@@ -350,6 +365,24 @@ export class OrchestratorService implements OnModuleInit {
         console.log(`[ORQ] robô ${payload.address} trocou de modo → task ${taskId} voltou pra fila`);
     }
 
+    /** Bateria (em Volts) abaixo do limite de trabalho? */
+    private isLowBattery(volts: number): boolean {
+        return volts <= this.LOW_BATTERY_VOLTS;
+    }
+
+    /**
+     * Para o robô e aborta a rota no firmware. Soltar a task só no banco não
+     * para nada: o robô segue os waypoints que já recebeu. Falha no envio
+     * (borda fora) não impede soltar a task - só fica no log.
+     */
+    private async stopRobot(robot : RobotModel) : Promise<void>{
+        try {
+            await this.robotService.stop(robot);
+        } catch (error) {
+            console.error(`[ORQ] não consegui parar o robô ${robot.address}:`, error);
+        }
+    }
+
     private async resetTask(robot : RobotModel) : Promise<void>{
        
         const taskId : string = robot.taskId ?? "";
@@ -369,7 +402,11 @@ export class OrchestratorService implements OnModuleInit {
     }
 
     private async handleLostRobot(robot : RobotModel) : Promise<void>{
-       
+
+        // Silêncio no rádio não quer dizer parado: sem isso ele seguia a rota
+        // enquanto a task ia pra outro robô.
+        await this.stopRobot(robot);
+
         const taskId : string = robot.taskId ?? "";
        
         await this.taskService.update(taskId, {status : TaskStatus.Pending});
