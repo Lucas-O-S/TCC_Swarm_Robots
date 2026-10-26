@@ -1,0 +1,24 @@
+# Caddy: serve o front e faz proxy da API, com HTTPS automático
+# (certificado Let's Encrypt/ZeroSSL tirado sozinho na primeira subida).
+# {$DOMAIN} vem do deploy/.env, ex.: 54-12-34-56.sslip.io
+
+# Front (React/Vite). try_files manda qualquer rota da SPA (/visualizador,
+# /simulacao...) pro index.html, senão dar F5 nessas páginas daria 404.
+{$DOMAIN} {
+	encode zstd gzip
+	root * /srv
+	try_files {path} /index.html
+	file_server
+
+	# index.html sempre revalida (pega o deploy novo); /assets tem hash no
+	# nome, então pode ficar em cache "pra sempre".
+	@naoAssets not path /assets/*
+	header @naoAssets Cache-Control "no-cache"
+	header /assets/* Cache-Control "public, max-age=31536000, immutable"
+}
+
+# API (NestJS): REST, Swagger (/api) e socket.io. O Caddy já repassa
+# WebSocket sem configuração extra.
+api.{$DOMAIN} {
+	reverse_proxy backend:3000
+}
