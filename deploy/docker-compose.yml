@@ -1,0 +1,77 @@
+# Produção numa máquina só (EC2): banco + API + front com HTTPS.
+# Passo a passo completo no deploy/README.md.
+#
+#   navegador ──HTTPS──> web (Caddy) ──> /srv (front compilado)
+#                              └── api.<DOMAIN> ──> backend:3000 ──> db:5432
+#                                                       └── EDGE_URL (borda no Mac, via Tailscale)
+#
+# Rodar (dentro desta pasta):  sudo docker compose up -d --build
+# Variáveis: deploy/.env (o setup-ec2.sh cria a partir do .env.example).
+
+name: tcc
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-adm}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no deploy/.env}
+      POSTGRES_DB: ${DB_NAME:-mari_database}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      # Só roda na PRIMEIRA subida (volume vazio). Depois disso, mudança de
+      # schema é migração manual - ver "Banco" no README.
+      - ../Backend/server/database/sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    # Sem "ports": o banco NÃO fica exposto na internet, só a API enxerga.
+
+  backend:
+    build: ../Backend/server
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 3000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USERNAME: ${DB_USERNAME:-adm}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME:-mari_database}
+      AUTH_ACTIVATED: ${AUTH_ACTIVATED:-true}
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no deploy/.env}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1d}
+      ORCHESTRATOR_AUTO: ${ORCHESTRATOR_AUTO:-true}
+      EDGE_URL: ${EDGE_URL:?defina EDGE_URL no deploy/.env}
+      EDGE_TOKEN: ${EDGE_TOKEN:-}
+      EDGE_TIMEOUT_MS: ${EDGE_TIMEOUT_MS:-3000}
+
+  web:
+    build:
+      # Pasta onde está o clone que tem o Frontend/ (ver FRONT_DIR no .env).
+      context: ${FRONT_DIR:-../../front}/Frontend
+      args:
+        VITE_API_URL: https://api.${DOMAIN:?defina DOMAIN no deploy/.env}
+        VITE_MARI_NETWORK_ID: ${VITE_MARI_NETWORK_ID:-0x1200}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data      # certificados HTTPS (não apagar à toa)
+      - caddy_config:/config
+
+volumes:
+  db_data:
+  caddy_data:
+  caddy_config:
