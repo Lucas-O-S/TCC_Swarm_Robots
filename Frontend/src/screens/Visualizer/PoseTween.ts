@@ -13,23 +13,33 @@ interface Track {
   to: TweenPose;
   start: number;
   duration: number;
-  /** Quando chegou a última amostra (ms). */
+  /** Quando chegou a última pose diferente (ms). */
   lastAt: number;
-  /** Intervalo médio entre amostras (ms), suavizado — a duração de cada deslize. */
+  /** Intervalo médio entre poses diferentes (ms), suavizado — a duração de cada deslize. */
   interval: number | null;
   shown: TweenPose;
 }
 
 /** Peso da amostra nova na média do intervalo: segura o jitter da rede sem demorar a se adaptar. */
 const INTERVAL_SMOOTHING = 0.2;
-/** Faixa da duração do deslize (ms). */
+/** Faixa da duração do deslize (ms). Intervalo maior que o teto (rádio perdeu pacotes, robô ficou parado) entra na média já cortado nele. */
 const MIN_DURATION_MS = 30;
 const MAX_DURATION_MS = 600;
-/** Mais que isso sem amostra = robô estava parado/sumido: a próxima pula direto, sem deslizar. */
-const GAP_SNAP_MS = 1500;
+/**
+ * Salto maior que isso (mm) entre duas poses = robô recolocado à mão ou a
+ * localização se perdeu e voltou longe: aparece direto, sem deslizar. Por
+ * distância e não por tempo: com o rádio perdendo pacotes, um buraco de 1–2 s
+ * é normal e o robô tem que continuar deslizando (como o useSmoothPositions do
+ * PyDotBot).
+ */
+const SNAP_DISTANCE_MM = 1000;
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
+}
+
+function samePose(a: TweenPose, b: TweenPose): boolean {
+  return a.x === b.x && a.y === b.y && a.theta === b.theta;
 }
 
 function poseAt(track: Track, now: number): TweenPose {
@@ -44,23 +54,47 @@ function poseAt(track: Track, now: number): TweenPose {
 }
 
 // Suaviza a pose dos robôs da API entre uma amostra e outra. A telemetria
-// chega em degraus (10 Hz no simulador, ~2 Hz no robô real); a cada amostra
-// nova o robô desliza da pose desenhada agora até ela, durante o intervalo
-// médio entre amostras. Custo: o desenho fica até uma amostra atrás do dado.
-// Sem React: quem desenha chama `advance(now)` a cada quadro e lê `pose()`.
+// chega em degraus (10 Hz no simulador, 2 Hz no robô real, com perdas do
+// rádio); a cada pose nova o robô desliza da pose desenhada agora até ela,
+// durante o intervalo médio entre poses. Amostra repetida (a LH2 não leu de
+// novo) não conta: o deslize seguinte cobre o tempo todo desde a última pose
+// diferente, em vez de parar e depois correr. Custo: o desenho fica até uma
+// amostra atrás do dado. Sem React: quem desenha chama `advance(now)` a cada
+// quadro e lê `pose()`.
 export class PoseTween {
   private tracks = new Map<string, Track>();
 
   /** Amostra nova de `key`, recebida em `now` (ms). */
   push(key: string, target: TweenPose, now: number): void {
     const track = this.tracks.get(key);
-    if (!track || now - track.lastAt > GAP_SNAP_MS) {
+    if (!track) {
       this.tracks.set(key, { from: target, to: target, start: now, duration: 0, lastAt: now, interval: null, shown: target });
       return;
     }
-    const sample = now - track.lastAt;
+    
+    if (samePose(track.to, target)) return;
+
+    if (Math.hypot(target.x - track.to.x, target.y - track.to.y) > SNAP_DISTANCE_MM) {
+    
+      this.tracks.set(key, {
+          ...track,
+          from: target,
+          to: target,
+          start: now,
+          duration: 0,
+          lastAt: now,
+          shown: target
+        });
+      return;
+    
+    }
+    
+    const sample = Math.min(now - track.lastAt, MAX_DURATION_MS);
+    
     const interval = track.interval === null ? sample : lerp(track.interval, sample, INTERVAL_SMOOTHING);
+    
     const from = poseAt(track, now);
+    
     this.tracks.set(key, {
       from,
       to: target,
