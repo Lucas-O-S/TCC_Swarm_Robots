@@ -9,7 +9,6 @@ export interface ObstacleModel  {
     sizeX : number;
     startPointX : number;
     startPointY : number;
-    obstacles : boolean;
     /** `""` enquanto o cenário ainda não foi salvo. */
     scenarioId : string;
 }
