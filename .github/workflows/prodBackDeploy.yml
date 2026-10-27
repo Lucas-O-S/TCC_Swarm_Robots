@@ -1,11 +1,13 @@
 name: Deploy Backend em Produção (EC2)
 
-# Roda quando o back chega na main (merge do PR main-Back → main):
+# Roda quando o back chega na main-Back (merge do PR hml-Back → main-Back):
 #   1. verificar: instala, compila e testa o Backend/server num runner do GitHub
 #      (backVerify.yml, a mesma verificação do PR para main-Back);
-#   2. subir: no runner self-hosted da EC2 (label "prod"), põe o clone do
-#      servidor na main e reconstrói SÓ o container do backend (front e banco
-#      ficam como estão).
+#   2. subir: no runner self-hosted da EC2 (label "prod"), põe o clone do back
+#      do servidor no commit verificado da main-Back e reconstrói SÓ o
+#      container do backend (front e banco ficam como estão).
+# O front tem o deploy dele (prodFrontDeploy.yml, na main-Front): cada lado
+# sobe separado.
 # Se a verificação falhar, nada é enviado ao servidor. Se o build falhar no
 # servidor, o compose não troca o container e a versão anterior segue no ar.
 # Instalação do runner: deploy/README.md, seção "Deploy automático".
@@ -13,7 +15,7 @@ name: Deploy Backend em Produção (EC2)
 on:
   push:
     branches:
-      - main
+      - main-Back
     paths:
       - "Backend/server/**"
       - "deploy/**"
@@ -25,9 +27,14 @@ concurrency:
   group: deploy-prod-back
   cancel-in-progress: false
 
+env:
+  DEPLOY_BRANCH: main-Back
+
 jobs:
   verificar:
     name: Verificar backend
+    # Rodado na mão a partir de outra branch: não verifica nem sobe nada.
+    if: github.ref_name == 'main-Back'
     uses: ./.github/workflows/backVerify.yml
 
   subir:
@@ -40,11 +47,12 @@ jobs:
       SERVER_DIR: ${{ vars.SERVER_DIR || '/home/ec2-user/tcc/back' }}
 
     steps:
-      - name: Atualizar o servidor para a main
+      - name: Atualizar o servidor para a main-Back
         run: |
           cd "$SERVER_DIR"
-          git fetch --prune origin main
-          git checkout -B main origin/main
+          git fetch --prune origin "$DEPLOY_BRANCH"
+          # O commit que foi verificado (e não o que chegou depois na branch).
+          git checkout -B "$DEPLOY_BRANCH" "$GITHUB_SHA"
           echo "Versão: $(git log -1 --format='%h %s')"
 
       - name: Reconstruir e subir o backend

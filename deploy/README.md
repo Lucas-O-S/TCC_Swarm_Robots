@@ -95,7 +95,7 @@ git clone -b <branch-do-front> https://github.com/Lucas-O-S/TCC_Swarm_Robots.git
 
 Repo privado: *Username* = seu usuário do GitHub, *Password* = o token (não aparece nada enquanto você cola, é normal).
 
-> Front e back na mesma branch (ex.: `main` com tudo)? Clone uma vez só, como `back`, e depois do passo 6 troque `FRONT_DIR=../../front` por `FRONT_DIR=..` no `.env`.
+> Mantenha os dois clones separados (`back` e `front`): o deploy automático atualiza cada um na sua branch (`main-Back` e `main-Front`), um sem mexer no outro.
 
 ## Passo 6 — Preparar a máquina (um comando)
 
@@ -191,14 +191,18 @@ cd ~/tcc/front && git pull
 cd ~/tcc/back/deploy && sudo docker compose up -d --build
 ```
 
-## Deploy automático do back (GitHub Actions)
+## Deploy automático (GitHub Actions)
 
-O workflow `.github/workflows/prodBackDeploy.yml` roda sempre que um merge leva mudanças do back (`Backend/server/` ou `deploy/`) para a **main**:
+Dois workflows, um para cada lado, cada um preso à sua branch. Back e front sobem **separados**: um merge na `main-Back` não mexe no front, e vice-versa.
 
-1. **Verificar** (num computador do GitHub): `npm ci`, `npm run build` e `npm test` do back. Se falhar, para aqui e nada vai para o servidor.
-2. **Subir** (na própria EC2): põe o `~/tcc/back` na `main`, reconstrói **só o backend** (`docker compose up -d --build backend`) e confere se ele respondeu. Front e banco não são tocados. Se o build falhar, o container antigo continua no ar.
+| Workflow | Dispara com merge na | Verificar (computador do GitHub) | Subir (na EC2) |
+|---|---|---|---|
+| `prodBackDeploy.yml` | `main-Back` (mudança em `Backend/server/` ou `deploy/`) | `npm ci`, `npm run build`, `npm test` (`backVerify.yml`) | põe `~/tcc/back` no commit verificado da `main-Back` e reconstrói **só o `backend`**; confere se a API respondeu |
+| `prodFrontDeploy.yml` | `main-Front` (mudança em `Frontend/`) | `npm ci`, `npm run lint`, `npm run build` (`frontVerify.yml`) | põe `~/tcc/front` no commit verificado da `main-Front` e reconstrói **só o `web`**; confere se o site respondeu |
 
-Para a etapa 2 a EC2 precisa de um **runner self-hosted**: um programa do GitHub que executa os jobs dentro dela. Ele só faz conexão de saída para o GitHub, então não abre porta nem precisa de chave guardada em secret.
+Se a verificação falhar, nada vai para o servidor. Se o build falhar no servidor, o container antigo continua no ar. A `main` não dispara deploy.
+
+Para a etapa "Subir" a EC2 precisa de um **runner self-hosted**: um programa do GitHub que executa os jobs dentro dela. Ele só faz conexão de saída para o GitHub, então não abre porta nem precisa de chave guardada em secret.
 
 ### Instalar o runner (uma vez só)
 
@@ -209,7 +213,7 @@ Para a etapa 2 a EC2 precisa de um **runner self-hosted**: um programa do GitHub
 2. No GitHub: repositório → **Settings → Actions → Runners → New self-hosted runner** → **Linux**, **x64**.
 3. Cole na EC2, um por um, os comandos das partes *Download* e *Configure* da página. No `./config.sh`:
    - nome do runner: `tcc-aws`;
-   - **labels adicionais: `prod`** (é por ela que o workflow encontra esta máquina);
+   - **labels adicionais: `prod`** (é por ela que os workflows encontram esta máquina);
    - o resto: Enter.
 4. **Não** rode o `./run.sh` do fim da página. No lugar dele, ainda dentro da pasta `actions-runner`:
    ```bash
@@ -222,22 +226,27 @@ Para a etapa 2 a EC2 precisa de um **runner self-hosted**: um programa do GitHub
 
 ### Como usar
 
-- **Automático**: merge na `main` com mudança no back → aba **Actions** → *Deploy Backend em Produção (EC2)*.
-- **Na mão**: **Actions → Deploy Backend em Produção (EC2) → Run workflow** (o botão aparece depois que o arquivo estiver na `main`).
+- **Automático**: merge na `main-Back` ou na `main-Front` → aba **Actions** → *Deploy Backend em Produção (EC2)* ou *Deploy Frontend em Produção (EC2)*.
+- **Na mão**: **Actions →** o workflow **→ Run workflow**, escolhendo em *Use workflow from* a `main-Back` (back) ou a `main-Front` (front). Rodado de outra branch, o workflow não faz nada. O botão só aparece depois que o arquivo existir também na `main` (a branch padrão do repositório); até lá, use o merge.
 - **Learner Lab**: com a EC2 desligada o job fica **Queued** e roda quando você ligar a máquina. Se passar 24 h na fila ele vence; aí é só rodar na mão.
-- O primeiro deploy troca o `~/tcc/back` da `dev-Back` para a `main`. O `deploy/.env` não é versionado e continua lá.
-- Clone em outro caminho que não `/home/ec2-user/tcc/back`? Crie a variável `SERVER_DIR` em **Settings → Secrets and variables → Actions → Variables**.
+- O primeiro deploy de cada lado troca o clone do servidor de branch: `~/tcc/back` sai da `dev-Back` para a `main-Back`, `~/tcc/front` sai da `dev-Front` para a `main-Front`. O `deploy/.env` não é versionado e continua lá.
+- Clones em outro caminho? Crie as variáveis `SERVER_DIR` (padrão `/home/ec2-user/tcc/back`) e/ou `FRONT_SERVER_DIR` (padrão `/home/ec2-user/tcc/front`) em **Settings → Secrets and variables → Actions → Variables**.
 
-### Verificação no PR (main-Back)
+### Verificação no PR (main-Back e main-Front)
 
-O PR para a `main-Back` (`mainBackRule.yml`) roda dois checks: **deploy** (confere se a origem é a `hml-Back`) e **Verificar backend / Build e testes** (`npm ci`, `npm run build` e `npm test`, o mesmo `backVerify.yml` do deploy).
+Os PRs para `main-Back` e `main-Front` rodam a mesma verificação do deploy, antes do merge:
 
-Para o merge ficar **travado** quando um deles falhar (sem isso o check fica vermelho, mas o botão de merge continua liberado):
+| PR para | Checks |
+|---|---|
+| `main-Back` (`mainBackRule.yml`) | `deploy` (origem tem que ser `hml-Back`) e `Verificar backend / Build e testes` |
+| `main-Front` (`mainFrontRule.yml`) | `deploy` (origem tem que ser `hml-Front`) e `Verificar frontend / Lint e build` |
 
-1. Abra um PR para a `main-Back` e deixe os checks rodarem uma vez (o GitHub só lista checks que já rodaram).
+Para o merge ficar **travado** quando um deles falhar (sem isso o check fica vermelho, mas o botão de merge continua liberado), crie uma regra para cada branch:
+
+1. Abra um PR para a branch e deixe os checks rodarem uma vez (o GitHub só lista checks que já rodaram).
 2. **Settings → Branches → Add branch protection rule** (ou *Add classic branch protection rule*).
-3. *Branch name pattern*: `main-Back`.
-4. Marque **Require status checks to pass before merging** e, na busca, adicione `deploy` e `Verificar backend / Build e testes`.
+3. *Branch name pattern*: `main-Back` (ou `main-Front`).
+4. Marque **Require status checks to pass before merging** e, na busca, adicione os dois checks da tabela.
 5. Para valer também para você (admin), marque **Do not allow bypassing the above settings**. **Create**.
 
 ## Comandos úteis (sempre dentro de `~/tcc/back/deploy`)
