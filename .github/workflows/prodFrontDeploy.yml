@@ -1,0 +1,81 @@
+name: Deploy Frontend em Produção (EC2)
+
+# Roda quando o front chega na main-Front (merge do PR hml-Front → main-Front):
+#   1. verificar: instala, roda o lint e compila o Frontend num runner do
+#      GitHub (frontVerify.yml, a mesma verificação do PR para main-Front);
+#   2. subir: no runner self-hosted da EC2 (label "prod"), põe o clone do front
+#      do servidor no commit verificado da main-Front e reconstrói SÓ o
+#      container web (Caddy + front). Back e banco ficam como estão.
+# O back tem o deploy dele (prodBackDeploy.yml, na main-Back): cada lado sobe
+# separado.
+# Se a verificação falhar, nada é enviado ao servidor. Se o build falhar no
+# servidor, o compose não troca o container e a versão anterior segue no ar.
+# Instalação do runner: deploy/README.md, seção "Deploy automático".
+
+on:
+  push:
+    branches:
+      - main-Front
+    paths:
+      - "Frontend/**"
+      - ".github/workflows/prodFrontDeploy.yml"
+      - ".github/workflows/frontVerify.yml"
+  workflow_dispatch:
+
+# Um deploy do front por vez; o seguinte espera o anterior terminar.
+concurrency:
+  group: deploy-prod-front
+  cancel-in-progress: false
+
+env:
+  DEPLOY_BRANCH: main-Front
+
+jobs:
+  verificar:
+    name: Verificar frontend
+    # Rodado na mão a partir de outra branch: não verifica nem sobe nada.
+    if: github.ref_name == 'main-Front'
+    uses: ./.github/workflows/frontVerify.yml
+
+  subir:
+    name: Subir no servidor
+    needs: verificar
+    runs-on: [self-hosted, prod]
+    env:
+      # Clones no servidor. Outros caminhos? Crie as variáveis SERVER_DIR e/ou
+      # FRONT_SERVER_DIR em Settings → Secrets and variables → Actions → Variables.
+      SERVER_DIR: ${{ vars.SERVER_DIR || '/home/ec2-user/tcc/back' }}
+      FRONT_SERVER_DIR: ${{ vars.FRONT_SERVER_DIR || '/home/ec2-user/tcc/front' }}
+
+    steps:
+      - name: Atualizar o front do servidor para a main-Front
+        run: |
+          cd "$FRONT_SERVER_DIR"
+          git fetch --prune origin "$DEPLOY_BRANCH"
+          # O commit que foi verificado (e não o que chegou depois na branch).
+          git checkout -B "$DEPLOY_BRANCH" "$GITHUB_SHA"
+          echo "Versão: $(git log -1 --format='%h %s')"
+
+      - name: Reconstruir e subir o front
+        run: |
+          cd "$SERVER_DIR/deploy"
+          sudo docker compose up -d --build --no-deps web
+
+      - name: Conferir se o site respondeu
+        run: |
+          cd "$SERVER_DIR/deploy"
+          DOMAIN=$(grep '^DOMAIN=' .env | cut -d= -f2 | tr -d '[:space:]')
+          for _ in $(seq 1 20); do
+            if curl -fsS -o /dev/null --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/"; then
+              echo "✅ Site no ar: https://$DOMAIN"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "❌ O site não respondeu em 60 s. Últimos logs:"
+          sudo docker compose logs --tail 80 web
+          exit 1
+
+      - name: Limpar imagens antigas
+        if: always()
+        run: sudo docker image prune -f

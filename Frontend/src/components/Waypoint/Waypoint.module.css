@@ -1,0 +1,23 @@
+.waypoint {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--color-green);
+  border: 2px solid var(--color-dark);
+  box-shadow: 0 0 0 2px var(--color-surface);
+}
+
+.selected {
+  outline: 2px solid var(--color-orange);
+  outline-offset: 2px;
+}
+
+.order {
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--color-surface);
+  pointer-events: none;
+}

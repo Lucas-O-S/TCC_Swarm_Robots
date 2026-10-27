@@ -1,0 +1,65 @@
+/* Header das telas de mapa: cartão baixo com faixas (grupo à esquerda e à
+   direita); cada faixa quebra de linha em tela estreita. */
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 20px;
+}
+
+.row {
+  display: flex;
+  /* Página espelhada: o primeiro grupo de cada faixa fica à direita. */
+  flex-direction: row-reverse;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 24px;
+}
+
+/* Faixa separada da de cima por uma linha fina. */
+.divided {
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+.group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.error,
+.info,
+.muted {
+  font-size: 12px;
+  margin: 0;
+}
+
+.error {
+  color: var(--color-red);
+}
+
+.info {
+  color: var(--color-green);
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 780px) {
+  .header {
+    padding: 12px 16px;
+  }
+}

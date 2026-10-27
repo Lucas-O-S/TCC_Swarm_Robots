@@ -1,0 +1,76 @@
+/* Linha solta (cartões, drawers): os pedaços quebram de linha quando não
+   cabem e a bolinha fica alinhada com a primeira linha. */
+.line {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.line .dot {
+  margin-top: 4px;
+}
+
+.line > .text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* No header: em linha, sem quebrar. */
+.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.inline > .text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  background: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.on {
+  background: var(--color-green);
+}
+
+.warn {
+  background: var(--color-yellow);
+}
+
+.off {
+  background: var(--color-red);
+}
+
+.muted {
+  background: var(--color-text-muted);
+}
+
+.sep {
+  opacity: 0.5;
+}
+
+@media (max-width: 780px) {
+  .inline,
+  .inline > .text {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+}

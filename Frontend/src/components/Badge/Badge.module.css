@@ -1,0 +1,35 @@
+.badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.muted {
+  background: var(--color-text-muted);
+}
+
+.green {
+  background: var(--color-green);
+}
+
+.red {
+  background: var(--color-red);
+}
+
+.yellow {
+  background: var(--color-yellow);
+}
+
+.blue {
+  background: #2f6fed;
+}
+
+.dark {
+  background: var(--color-dark);
+}

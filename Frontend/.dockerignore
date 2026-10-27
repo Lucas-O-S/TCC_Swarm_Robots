@@ -1,0 +1,11 @@
+# Dependências e build são refeitos dentro da imagem; o .env local (localhost)
+# não pode entrar, senão o front sai apontando pra máquina de dev.
+node_modules
+dist
+dist-ssr
+*.tsbuildinfo
+.env
+.env.*
+*.local
+*.log
+.DS_Store

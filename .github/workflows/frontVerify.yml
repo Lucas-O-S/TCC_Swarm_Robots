@@ -1,0 +1,37 @@
+name: Verificar Frontend
+
+# Workflow reutilizável: instala, roda o lint e compila o Frontend
+# (npm run build = tsc -b + vite build, o mesmo que roda no Docker do servidor).
+# Chamado pelo PR para main-Front (mainFrontRule.yml) e pelo deploy em
+# produção (prodFrontDeploy.yml), para os dois rodarem a mesma verificação.
+
+on:
+  workflow_call:
+
+jobs:
+  verificar:
+    name: Lint e build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Frontend
+
+    steps:
+      - name: Checkout Codigo
+        uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Frontend/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Compilar
+        run: npm run build
