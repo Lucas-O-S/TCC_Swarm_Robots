@@ -1,6 +1,13 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { ArrayMinSize, IsArray, IsInt, Min, ValidateNested } from "class-validator";
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsInt, Min, ValidateNested } from "class-validator";
+
+/**
+ * Máximo de pontos que o firmware guarda (DB_MAX_WAYPOINTS no DotBot-firmware
+ * 1.23.0). O excedente é cortado em silêncio no robô, o waypoint_idx nunca
+ * chega ao total e a task não conclui - por isso recusamos antes de mandar.
+ */
+export const MAX_WAYPOINTS = 16;
 
 /** Um ponto de destino em coordenadas LH2 (mm). */
 export class WaypointDto {
@@ -27,9 +34,10 @@ export class WaypointsDto {
     @Min(0, { message: "threshold deve ser no mínimo 0" })
     threshold: number;
 
-    @ApiProperty({ description: "Lista de pontos de destino", type: [WaypointDto] })
+    @ApiProperty({ description: "Lista de pontos de destino", type: [WaypointDto], maxItems: MAX_WAYPOINTS })
     @IsArray({ message: "waypoints deve ser uma lista" })
     @ArrayMinSize(1, { message: "waypoints deve ter pelo menos um ponto" })
+    @ArrayMaxSize(MAX_WAYPOINTS, { message: `waypoints aceita no máximo ${MAX_WAYPOINTS} pontos (limite do firmware)` })
     @ValidateNested({ each: true })
     @Type(() => WaypointDto)
     waypoints: WaypointDto[];

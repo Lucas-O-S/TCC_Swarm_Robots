@@ -1,16 +1,17 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleInit } from "@nestjs/common";
+import { BadRequestException, ConflictException, HttpException, Injectable, NotFoundException, OnModuleInit } from "@nestjs/common";
 import { RobotControlMode } from "src/Enums/RobotControlMode.enum";
 import { TaskModel } from "src/Model/Task.Model";
 import { RobotService } from "../Robots/Robot.Service";
 import { TaskService } from "../Tasks/Task.Service";
 import { RobotModel } from "src/Model/Robot.Model";
 import { TaskStatus } from "src/Enums/TaskStatus.Enum";
-import { PayloadType } from "src/Enums/PayloadType.enum";
 import { Command } from "src/Enums/Command.enum";
 import { OnEvent } from "@nestjs/event-emitter";
 import { EventsCommands } from "src/Enums/Events.Enum";
 import { RobotStatus } from "src/Enums/RobotStatus.enum";
 import { orchestratorConfig } from "src/config/orchestrator.config";
+import { MAX_WAYPOINTS } from "../Robots/DTO/waypoints.dto";
+import { SwarmService } from "../Swarm/Swarm.Service";
 
 
 @Injectable()
@@ -21,12 +22,26 @@ export class OrchestratorService implements OnModuleInit {
     /** Limiar de bateria baixa, em Volts. O protocolo manda mV; convertemos ao comparar. */
     private LOW_BATTERY_VOLTS = 3.0;
 
+    /**
+     * Advertisement igual ao último conferido (mesmo waypoint_idx e mesma
+     * faixa de bateria) só volta a consultar o banco depois disso. Sem isso,
+     * cada pacote de cada robô virava SELECT de robô + task.
+     */
+    private readonly ADVERTISEMENT_RECHECK_MS = 2000;
+
+    /** Robôs com advertisement sendo conferido agora: um por vez por robô. */
+    private readonly checkingAdvertisement = new Set<string>();
+
+    /** Última conferência por robô: o que foi visto e quando. */
+    private readonly lastAdvertisementCheck = new Map<string, { signature: string; at: number }>();
+
     /** Atribuição automática ligada? Começa pelo .env e muda em runtime (setAutoEnabled). */
     private autoEnabled = orchestratorConfig.autoEnabled;
 
     constructor(
         private readonly taskService: TaskService,
-        private readonly robotService: RobotService
+        private readonly robotService: RobotService,
+        private readonly swarmService: SwarmService
     ) { }
 
 
@@ -71,17 +86,19 @@ export class OrchestratorService implements OnModuleInit {
 
         const pendingTasks :  TaskModel[] = await this.taskService.getPendingTask() ?? [];
 
-        const freeRobots = await this.robotService.getFreeRobots() ?? [];
+        // Mesmas regras do assign manual (robotRejection): aqui só filtra.
+        const freeRobots = (await this.robotService.getFreeRobots() ?? [])
+            .filter(robot => !this.robotRejection(robot));
 
         const busyRobots : RobotModel[] = [];
 
         const tasksAssigned : TaskModel[] = [];
 
         for (const task of pendingTasks) {
-            
-            // Task sem pontos não é atribuível (ex.: a "Tarefa padrão" do seed,
-            // que é Pending mas não tem waypoints). Pula sem gastar um robô.
-            if (!task.waypoints?.length) {
+
+            // Task que não pode ser entregue (ver taskRejection) é pulada sem
+            // gastar um robô.
+            if (this.taskRejection(task)) {
                 continue;
             }
 
@@ -136,13 +153,10 @@ export class OrchestratorService implements OnModuleInit {
             throw new NotFoundException(`Nenhum robô com o endereço '${address}'`);
         }
 
-        // Manual é dirigido no joystick; não recebe task. (Auto e SemiAuto podem.)
-        if (robot.mode === RobotControlMode.Manual) {
-            throw new BadRequestException(`Robô ${address} está em modo Manual`);
-        }
+        const robotError = this.robotRejection(robot);
 
-        if (robot.taskId) {
-            throw new ConflictException(`Robô ${address} já está executando uma task`);
+        if (robotError) {
+            throw robotError;
         }
 
         const task = await this.taskService.getOneTaskWithWaypoints(taskId);
@@ -151,15 +165,10 @@ export class OrchestratorService implements OnModuleInit {
             throw new NotFoundException(`Nenhuma task com uuid '${taskId}'`);
         }
 
-        if (!task.waypoints?.length) {
-            throw new BadRequestException(`Task ${taskId} não tem waypoints`);
-        }
+        const taskError = this.taskRejection(task);
 
-        // Em andamento = já é de outro robô (inclusive de um Auto, se o loop
-        // automático pegou antes). Dois robôs na mesma task quebraria o
-        // release/conclusão, que andam pelo taskId do robô.
-        if (task.status === TaskStatus.InProgress) {
-            throw new ConflictException(`Task ${taskId} já está em andamento em outro robô`);
+        if (taskError) {
+            throw taskError;
         }
 
         const sent = await this.sendCommandToRobot(robot, task);
@@ -177,7 +186,6 @@ export class OrchestratorService implements OnModuleInit {
         try {
             await this.robotService.sendCommand(
                 robot.address,
-                PayloadType.LH2_WAYPOINTS,
                 Command.Waypoints,
                 {
                     threshold: robot.waypointsThreshold,
@@ -191,6 +199,56 @@ export class OrchestratorService implements OnModuleInit {
             console.error(`Erro ao enviar comando para o robô ${robot.address}:`, error);
             return false;
         }
+    }
+
+    /**
+     * Por que este robô não pode receber task agora (null = pode). Vale para o
+     * automático (filtra) e para o manual (lança o erro devolvido).
+     */
+    private robotRejection(robot: RobotModel): HttpException | null {
+
+        // Manual é dirigido no joystick; não recebe task. (Auto e SemiAuto podem.)
+        if (robot.mode === RobotControlMode.Manual) {
+            return new BadRequestException(`Robô ${robot.address} está em modo Manual`);
+        }
+
+        if (robot.taskId) {
+            return new ConflictException(`Robô ${robot.address} já está executando uma task`);
+        }
+
+        // Calibração LH2 e posição: estado em memória que vem da borda.
+        const blocked = this.swarmService.taskBlockReason(robot.address);
+
+        if (blocked) {
+            return new ConflictException(`Robô ${robot.address} não pode receber task: ${blocked}`);
+        }
+
+        return null;
+    }
+
+    /** Por que esta task não pode ser entregue (null = pode). */
+    private taskRejection(task: TaskModel): HttpException | null {
+
+        // Sem pontos não há o que mandar (ex.: a "Tarefa padrão" do seed).
+        if (!task.waypoints?.length) {
+            return new BadRequestException(`Task ${task.uuid} não tem waypoints`);
+        }
+
+        // Acima de MAX_WAYPOINTS o robô corta o excedente e a task nunca conclui.
+        if (task.waypoints.length > MAX_WAYPOINTS) {
+            return new BadRequestException(
+                `Task ${task.uuid} tem ${task.waypoints.length} waypoints; o robô aceita no máximo ${MAX_WAYPOINTS}`,
+            );
+        }
+
+        // Em andamento = já é de outro robô (inclusive de um Auto, se o loop
+        // automático pegou antes). Dois robôs na mesma task quebraria o
+        // release/conclusão, que andam pelo taskId do robô.
+        if (task.status === TaskStatus.InProgress) {
+            return new ConflictException(`Task ${task.uuid} já está em andamento em outro robô`);
+        }
+
+        return null;
     }
 
     async handleRobotLost(payload: {address : string}) : Promise<void>{
@@ -208,18 +266,53 @@ export class OrchestratorService implements OnModuleInit {
 
     }
 
+    /**
+     * Filtro antes do banco: pula o advertisement se o mesmo robô já está
+     * sendo conferido (evita concluir a mesma task duas vezes) ou se nada que
+     * importa mudou desde a última conferência, há menos de
+     * ADVERTISEMENT_RECHECK_MS.
+     */
     async onAdvertisement( payload : {address : string, data : any}) : Promise<void>{
 
-        const robot = await this.robotService.getByAddress(payload.address);
+        const { address, data } = payload;
+
+        //Verifica bateria baixa (data.battery vem em mV; comparamos em Volts)
+        const lowBattery = data.battery / 1000 <= this.LOW_BATTERY_VOLTS;
+
+        const signature = `${data.waypoint_idx}|${lowBattery}`;
+
+        const now = Date.now();
+
+        const last = this.lastAdvertisementCheck.get(address);
+
+        if (this.checkingAdvertisement.has(address)) {
+            return;
+        }
+
+        if (last && last.signature === signature && now - last.at < this.ADVERTISEMENT_RECHECK_MS) {
+            return;
+        }
+
+        this.checkingAdvertisement.add(address);
+
+        this.lastAdvertisementCheck.set(address, { signature, at: now });
+
+        try {
+            await this.checkAdvertisement(address, data, lowBattery);
+        } finally {
+            this.checkingAdvertisement.delete(address);
+        }
+    }
+
+    private async checkAdvertisement(address: string, data: any, lowBattery: boolean): Promise<void> {
+
+        const robot = await this.robotService.getByAddress(address);
 
         if (!robot || !robot.taskId){
             return
         }
 
-        //Verifica bateria baixa (data.battery vem em mV; comparamos em Volts)
-        const batteryVolts = payload.data.battery / 1000;
-
-        if (batteryVolts <= this.LOW_BATTERY_VOLTS){
+        if (lowBattery){
 
             //To do task de recarregar
             await this.resetTask(robot)
@@ -230,7 +323,7 @@ export class OrchestratorService implements OnModuleInit {
 
         const howManyWaypoints = task?.waypoints.length ?? 0
 
-        if(payload.data.waypoint_idx >= howManyWaypoints){
+        if(data.waypoint_idx >= howManyWaypoints){
             await this.completeTask(robot);
             return
         }

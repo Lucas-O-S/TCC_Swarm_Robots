@@ -1,0 +1,11 @@
+# Nada disso entra na imagem: dependências e build são refeitos dentro dela,
+# e as variáveis vêm do docker-compose (deploy/.env), nunca do .env local.
+node_modules
+dist
+coverage
+*.tsbuildinfo
+.env
+.env.*
+example.env
+*.log
+.DS_Store

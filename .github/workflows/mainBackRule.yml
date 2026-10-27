@@ -2,6 +2,7 @@ name: Deploy to Preproduction Backend
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited]
     branches:
       - main-Back
 
@@ -17,12 +18,24 @@ jobs:
         env:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
-          if [[ "$HEAD_REF" != "dev-Back" ]]; then
-            echo "❌ ERRO: A branch de origem ('$HEAD_REF') não é 'dev-Back'. Merge bloqueado!"
+          if [[ "$HEAD_REF" != "hml-Back" ]]; then
+            echo "❌ ERRO: A branch de origem ('$HEAD_REF') não é 'hml-Back'. Merge bloqueado!"
             exit 1
           fi
           echo "✅ Branch de origem é '$HEAD_REF' — liberado."
 
-      - name: Executar Deploy
+      - name: Executar Logs e Deploy
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
+          echo "Branch de origem: $HEAD_REF"
+          echo "Branch de destino: $BASE_REF"
           echo "Fazendo deploy..."
+
+  # Compila e testa o back do PR. Para o merge ficar travado quando falhar,
+  # marque este check como obrigatório na regra da branch main-Back
+  # (deploy/README.md, "Verificação no PR").
+  verificar:
+    name: Verificar backend
+    uses: ./.github/workflows/backVerify.yml

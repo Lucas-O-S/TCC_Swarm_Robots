@@ -1,0 +1,71 @@
+name: Deploy Backend em Produção (EC2)
+
+# Roda quando o back chega na main (merge do PR main-Back → main):
+#   1. verificar: instala, compila e testa o Backend/server num runner do GitHub
+#      (backVerify.yml, a mesma verificação do PR para main-Back);
+#   2. subir: no runner self-hosted da EC2 (label "prod"), põe o clone do
+#      servidor na main e reconstrói SÓ o container do backend (front e banco
+#      ficam como estão).
+# Se a verificação falhar, nada é enviado ao servidor. Se o build falhar no
+# servidor, o compose não troca o container e a versão anterior segue no ar.
+# Instalação do runner: deploy/README.md, seção "Deploy automático".
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "Backend/server/**"
+      - "deploy/**"
+      - ".github/workflows/prodBackDeploy.yml"
+  workflow_dispatch:
+
+# Um deploy por vez; o seguinte espera o anterior terminar.
+concurrency:
+  group: deploy-prod-back
+  cancel-in-progress: false
+
+jobs:
+  verificar:
+    name: Verificar backend
+    uses: ./.github/workflows/backVerify.yml
+
+  subir:
+    name: Subir no servidor
+    needs: verificar
+    runs-on: [self-hosted, prod]
+    env:
+      # Clone do back no servidor. Outro caminho? Crie a variável SERVER_DIR em
+      # Settings → Secrets and variables → Actions → Variables.
+      SERVER_DIR: ${{ vars.SERVER_DIR || '/home/ec2-user/tcc/back' }}
+
+    steps:
+      - name: Atualizar o servidor para a main
+        run: |
+          cd "$SERVER_DIR"
+          git fetch --prune origin main
+          git checkout -B main origin/main
+          echo "Versão: $(git log -1 --format='%h %s')"
+
+      - name: Reconstruir e subir o backend
+        run: |
+          cd "$SERVER_DIR/deploy"
+          sudo docker compose up -d --build backend
+
+      - name: Conferir se o backend respondeu
+        run: |
+          cd "$SERVER_DIR/deploy"
+          for _ in $(seq 1 30); do
+            if sudo docker compose exec -T backend node -e "fetch('http://localhost:3000/api').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))" 2>/dev/null; then
+              echo "✅ Backend no ar."
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "❌ Backend não respondeu em 90 s. Últimos logs:"
+          sudo docker compose logs --tail 80 backend
+          exit 1
+
+      - name: Limpar imagens antigas
+        if: always()
+        run: sudo docker image prune -f

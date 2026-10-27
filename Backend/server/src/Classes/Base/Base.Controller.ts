@@ -14,8 +14,12 @@ import { BaseService } from "src/Classes/Base/Base.Service";
  * Robot), sobrescreva `create`/`update` redeclarando o método com o DTO
  * concreto no `@Body()` e chamando `super.create(dto)` / `super.update(...)`
  * - os métodos são "virtuais" como qualquer método de classe em TS.
+ *
+ * `D` é o tipo do body; default `Partial<T>`. Só precisa ser informado quando
+ * o DTO não é compatível com `Partial<T>` - ex.: Scenario, cujo `obstacles` é
+ * `ObstacleDto[]` e não `ObstacleModel[]`.
  */
-export abstract class BaseController<T extends Model> {
+export abstract class BaseController<T extends Model, D = Partial<T>> {
 
     protected constructor(protected readonly service: BaseService<T>) {}
 
@@ -30,13 +34,13 @@ export abstract class BaseController<T extends Model> {
     }
 
     @Post()
-    async create(@Body() dto: Partial<T>): Promise<T> {
-        return await this.service.create(dto);
+    async create(@Body() dto: D): Promise<T> {
+        return await this.service.create(dto as Partial<T>);
     }
 
     @Put(":uuid")
-    async update(@Param("uuid") uuid: string, @Body() dto: Partial<T>): Promise<T> {
-        return await this.service.update(uuid, dto);
+    async update(@Param("uuid") uuid: string, @Body() dto: Partial<D>): Promise<T> {
+        return await this.service.update(uuid, dto as Partial<T>);
     }
 
     @Delete(":uuid")
