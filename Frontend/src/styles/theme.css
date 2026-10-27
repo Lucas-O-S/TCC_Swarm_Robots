@@ -1,6 +1,6 @@
 /* Variáveis de tema (cores, raios, fontes) usadas por todo o app. */
 :root {
-  --color-bg: #e7dcc0;
+  --color-bg: #F5E7C6;
   --color-bg-login: #f3e8c8;
   --color-surface: #f5efdf;
   --color-surface-alt: #f2eada;
@@ -11,10 +11,16 @@
 
   --color-dark: #2d2d2d;
   --color-text: #333;
+  --color-text-muted: #6b6355;
+  --color-border: rgba(45, 45, 45, 0.15);
   --color-green: #1a9e45;
   --color-red: #c0392b;
+  --color-dark-red: rgba(192, 57, 43, 0.7);
+  --color-dark-brown: rgba(192, 57, 43, 0.35);
+  --color-yellow: #b8860b;
 
   --radius: 16px;
+  --radius-sm: 8px;
 
   --font-sans: 'DM Sans', Arial, Helvetica, sans-serif;
   --font-mono: 'DM Mono', monospace;
