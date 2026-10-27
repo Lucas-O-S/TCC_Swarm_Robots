@@ -191,6 +191,55 @@ cd ~/tcc/front && git pull
 cd ~/tcc/back/deploy && sudo docker compose up -d --build
 ```
 
+## Deploy automático do back (GitHub Actions)
+
+O workflow `.github/workflows/prodBackDeploy.yml` roda sempre que um merge leva mudanças do back (`Backend/server/` ou `deploy/`) para a **main**:
+
+1. **Verificar** (num computador do GitHub): `npm ci`, `npm run build` e `npm test` do back. Se falhar, para aqui e nada vai para o servidor.
+2. **Subir** (na própria EC2): põe o `~/tcc/back` na `main`, reconstrói **só o backend** (`docker compose up -d --build backend`) e confere se ele respondeu. Front e banco não são tocados. Se o build falhar, o container antigo continua no ar.
+
+Para a etapa 2 a EC2 precisa de um **runner self-hosted**: um programa do GitHub que executa os jobs dentro dela. Ele só faz conexão de saída para o GitHub, então não abre porta nem precisa de chave guardada em secret.
+
+### Instalar o runner (uma vez só)
+
+1. Na EC2, instale a biblioteca que o runner usa:
+   ```bash
+   sudo dnf install -y libicu
+   ```
+2. No GitHub: repositório → **Settings → Actions → Runners → New self-hosted runner** → **Linux**, **x64**.
+3. Cole na EC2, um por um, os comandos das partes *Download* e *Configure* da página. No `./config.sh`:
+   - nome do runner: `tcc-aws`;
+   - **labels adicionais: `prod`** (é por ela que o workflow encontra esta máquina);
+   - o resto: Enter.
+4. **Não** rode o `./run.sh` do fim da página. No lugar dele, ainda dentro da pasta `actions-runner`:
+   ```bash
+   sudo ./svc.sh install ec2-user
+   sudo ./svc.sh start
+   ```
+   Assim o runner sobe sozinho junto com a máquina.
+5. Confira em **Settings → Actions → Runners**: `tcc-aws` aparece **Idle**.
+6. Repositório público: **Settings → Actions → General → Fork pull request workflows** → marque **Require approval for all external contributors**. Sem isso, um PR de fora poderia tentar rodar código na sua EC2.
+
+### Como usar
+
+- **Automático**: merge na `main` com mudança no back → aba **Actions** → *Deploy Backend em Produção (EC2)*.
+- **Na mão**: **Actions → Deploy Backend em Produção (EC2) → Run workflow** (o botão aparece depois que o arquivo estiver na `main`).
+- **Learner Lab**: com a EC2 desligada o job fica **Queued** e roda quando você ligar a máquina. Se passar 24 h na fila ele vence; aí é só rodar na mão.
+- O primeiro deploy troca o `~/tcc/back` da `dev-Back` para a `main`. O `deploy/.env` não é versionado e continua lá.
+- Clone em outro caminho que não `/home/ec2-user/tcc/back`? Crie a variável `SERVER_DIR` em **Settings → Secrets and variables → Actions → Variables**.
+
+### Verificação no PR (main-Back)
+
+O PR para a `main-Back` (`mainBackRule.yml`) roda dois checks: **deploy** (confere se a origem é a `hml-Back`) e **Verificar backend / Build e testes** (`npm ci`, `npm run build` e `npm test`, o mesmo `backVerify.yml` do deploy).
+
+Para o merge ficar **travado** quando um deles falhar (sem isso o check fica vermelho, mas o botão de merge continua liberado):
+
+1. Abra um PR para a `main-Back` e deixe os checks rodarem uma vez (o GitHub só lista checks que já rodaram).
+2. **Settings → Branches → Add branch protection rule** (ou *Add classic branch protection rule*).
+3. *Branch name pattern*: `main-Back`.
+4. Marque **Require status checks to pass before merging** e, na busca, adicione `deploy` e `Verificar backend / Build e testes`.
+5. Para valer também para você (admin), marque **Do not allow bypassing the above settings**. **Create**.
+
 ## Comandos úteis (sempre dentro de `~/tcc/back/deploy`)
 
 | O quê | Comando |
@@ -231,6 +280,8 @@ cd ~/tcc/back/deploy && sudo docker compose up -d --build
 | Comandos respondem **502** | A borda não respondeu a tempo ou deu erro interno | Ver o terminal da borda; conferir o gateway no USB |
 | Build do `web` falha com `error TS...` | Erro de tipo no front (o `npm run build` roda `tsc -b` antes do Vite) | Corrigir no código, conferir com `npm run build` no Mac, fazer push e repetir o "Atualizar" |
 | `compose build requires buildx 0.17.0 or later` | Buildx antigo do pacote do Amazon Linux | Rodar de novo o `setup-ec2.sh` (versão atual da branch), que instala o Buildx novo |
+| Deploy automático fica **Queued** | Runner offline (EC2 desligada ou serviço parado) | Ligar a EC2; conferir com `cd ~/actions-runner && sudo ./svc.sh status` |
+| Deploy automático falha em "Atualizar o servidor para a main" | Alguém editou arquivo versionado direto no `~/tcc/back` | `cd ~/tcc/back && git status`; desfazer com `git checkout -- <arquivo>` e rodar o workflow de novo |
 | Build morre com `Killed` / código 137 | Falta de memória | `free -h` deve mostrar swap de 2G; se mostrar, troque para `t3.medium` (Actions → Instance settings → Change instance type, com a instância parada) |
 | Instance Connect não conecta | Porta 22 fechada | Inbound rule SSH 22 de `0.0.0.0/0`, ou use o Session Manager |
 | O endereço mudou | IP elástico não associado | Passo 3; depois corrija `DOMAIN` no `.env` e `sudo docker compose up -d --build` |
