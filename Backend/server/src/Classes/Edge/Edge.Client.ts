@@ -5,7 +5,7 @@ import { edgeConfig } from "src/config/edge.config";
 import { Command } from "src/Enums/Command.enum";
 import { EdgeSocketEvents } from "src/Enums/EdgeSocketEvents.enum";
 import { EdgeGateway } from "./Edge.Gateway";
-import { EdgeRobotSnapshot, EdgeRobotState, EdgeRobotStatesEvent, EdgeRobotStatusEvent } from "./Edge.Types";
+import { EdgeCommandAck, EdgeCommandRequest, EdgeRobotSnapshot, EdgeRobotState, EdgeRobotStatesEvent, EdgeRobotStatusEvent } from "./Edge.Types";
 
 /**
  * Único ponto da API que conversa com a borda. Substitui o antigo
@@ -107,9 +107,33 @@ export class EdgeClient implements OnModuleInit, OnModuleDestroy {
         this.statusListeners.push(callback);
     }
 
-    /** Manda um comando para o robô pela borda. Erro da borda vira HttpException aqui. */
+    /**
+     * Manda um comando para o robô pela borda. Erro da borda vira HttpException
+     * aqui: sem borda 503, 400/404 repassa, 5xx/token recusado/timeout 502.
+     * Sem borda no /edge e com EDGE_URL definido, vai por HTTP como antes.
+     */
     async sendCommand(address: string, command: Command, payload: any): Promise<unknown> {
-        return this.request("POST", `/v1/robots/${encodeURIComponent(address)}/commands/${command}`, payload);
+        const edge = this.edgeGateway.current;
+        if (!edge && edgeConfig.url) {
+            return this.request("POST", `/v1/robots/${encodeURIComponent(address)}/commands/${command}`, payload);
+        }
+        if (!edge) throw new ServiceUnavailableException("Nenhuma borda conectada");
+
+        const request: EdgeCommandRequest = { address, command, payload };
+        let ack: EdgeCommandAck;
+        try {
+            ack = await edge.timeout(edgeConfig.requestTimeoutMs).emitWithAck(EdgeSocketEvents.RobotCommand, request);
+        } catch {
+            throw new HttpException(`Borda não respondeu em ${edgeConfig.requestTimeoutMs} ms`, HttpStatus.BAD_GATEWAY);
+        }
+
+        if (typeof ack?.status !== "number") {
+            throw new HttpException("Borda: resposta inválida", HttpStatus.BAD_GATEWAY);
+        }
+        if (ack.status >= 200 && ack.status < 300) return ack.data;
+
+        const detail = Array.isArray(ack.message) ? ack.message.join("; ") : (ack.message ?? "erro sem mensagem");
+        throw new HttpException(`Borda: ${detail}`, this.toApiStatus(ack.status));
     }
 
     /** Quadro atual da frota segundo a borda. */
@@ -151,14 +175,17 @@ export class EdgeClient implements OnModuleInit, OnModuleDestroy {
 
         if (!response.ok) {
             const detail = Array.isArray(json?.message) ? json.message.join("; ") : (json?.message ?? response.statusText);
-            // 400/404 da borda são erro do pedido: repassa igual. Token recusado
-            // ou falha interna da borda são problema entre API e borda: 502.
-            const status = response.status >= 500 || response.status === 401 || response.status === 403
-                ? HttpStatus.BAD_GATEWAY
-                : response.status;
-            throw new HttpException(`Borda: ${detail}`, status);
+            throw new HttpException(`Borda: ${detail}`, this.toApiStatus(response.status));
         }
 
         return json as T;
+    }
+
+    // 400/404 da borda são erro do pedido: repassa igual. Token recusado
+    // ou falha interna da borda são problema entre API e borda: 502.
+    private toApiStatus(edgeStatus: number): number {
+        return edgeStatus >= 500 || edgeStatus === 401 || edgeStatus === 403
+            ? HttpStatus.BAD_GATEWAY
+            : edgeStatus;
     }
 }

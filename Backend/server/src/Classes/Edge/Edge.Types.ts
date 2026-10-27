@@ -45,6 +45,23 @@ export interface EdgeRobotStatusEvent {
     lastSync: string;
 }
 
+/** O que a API manda no `robot:command` (borda conectada no /edge). */
+export interface EdgeCommandRequest {
+    address: string;
+    command: string;
+    payload: any;
+}
+
+/**
+ * Ack do `robot:command`: status HTTP equivalente ao da rota de comando da
+ * borda (2xx = ok) + o mesmo corpo de erro (`message`) ou o retorno (`data`).
+ */
+export interface EdgeCommandAck {
+    status: number;
+    message?: string | string[];
+    data?: unknown;
+}
+
 /** Item de GET /v1/robots. */
 export interface EdgeRobotSnapshot {
     address: string;
