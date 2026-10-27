@@ -1,8 +1,10 @@
 import { HttpException, HttpStatus, Injectable, OnModuleDestroy, OnModuleInit, ServiceUnavailableException } from "@nestjs/common";
 import { io, Socket } from "socket.io-client";
+import { Socket as EdgeSocket } from "socket.io";
 import { edgeConfig } from "src/config/edge.config";
 import { Command } from "src/Enums/Command.enum";
 import { EdgeSocketEvents } from "src/Enums/EdgeSocketEvents.enum";
+import { EdgeGateway } from "./Edge.Gateway";
 import { EdgeRobotSnapshot, EdgeRobotState, EdgeRobotStatesEvent, EdgeRobotStatusEvent } from "./Edge.Types";
 
 /**
@@ -10,8 +12,11 @@ import { EdgeRobotSnapshot, EdgeRobotState, EdgeRobotStatesEvent, EdgeRobotStatu
  * GatewayAdapter: em vez de bytes, fala o contrato público da borda.
  *  - comandos: HTTP  POST {EDGE_URL}/v1/robots/:address/commands/:comando
  *  - telemetria: socket.io  robot:states (lote) / robot:status
- * Ao (re)conectar, puxa GET /v1/robots para não perder robô que anunciou
- * enquanto a API estava fora.
+ * Dois jeitos de receber a telemetria, os dois alimentam os mesmos listeners:
+ *  - borda conecta na API (namespace /edge, EdgeGateway) e manda
+ *    robot:snapshot ao conectar;
+ *  - API conecta na borda (só com EDGE_URL definido) e puxa GET /v1/robots
+ *    a cada (re)conexão.
  */
 @Injectable()
 export class EdgeClient implements OnModuleInit, OnModuleDestroy {
@@ -25,7 +30,13 @@ export class EdgeClient implements OnModuleInit, OnModuleDestroy {
     // Evita repetir o aviso de "borda fora" a cada tentativa de reconexão.
     private warnedOffline = false;
 
+    constructor(private readonly edgeGateway: EdgeGateway) {}
+
     onModuleInit(): void {
+        this.edgeGateway.onEdgeConnected((socket) => this.attach(socket));
+
+        if (!edgeConfig.url) return;
+
         this.socket = io(edgeConfig.url, {
             auth: edgeConfig.token ? { token: edgeConfig.token } : undefined,
             transports: ["websocket"],
@@ -50,12 +61,35 @@ export class EdgeClient implements OnModuleInit, OnModuleDestroy {
             console.warn(`[EDGE] não conectou na borda em ${edgeConfig.url} (${error.message}) - tentando de novo em segundo plano`);
         });
 
-        // A borda manda em lote; cada item segue pros listeners como antes.
-        this.socket.on(EdgeSocketEvents.RobotStates, (event: EdgeRobotStatesEvent) => {
-            for (const state of event.states) this.publishState(state);
-        });
-
+        this.socket.on(EdgeSocketEvents.RobotStates, (event: EdgeRobotStatesEvent) => this.onStates(event));
         this.socket.on(EdgeSocketEvents.RobotStatus, (event: EdgeRobotStatusEvent) => this.publishStatus(event));
+    }
+
+    /** Borda que acabou de entrar no /edge: mesmos eventos + o snapshot inicial. */
+    private attach(socket: EdgeSocket): void {
+        socket.on(EdgeSocketEvents.RobotSnapshot, (snapshots: EdgeRobotSnapshot[]) => {
+            if (!Array.isArray(snapshots)) return;
+            this.applySnapshot(snapshots);
+        });
+        socket.on(EdgeSocketEvents.RobotStates, (event: EdgeRobotStatesEvent) => this.onStates(event));
+        socket.on(EdgeSocketEvents.RobotStatus, (event: EdgeRobotStatusEvent) => this.publishStatus(event));
+    }
+
+    // A borda manda em lote; cada item segue pros listeners como antes.
+    private onStates(event: EdgeRobotStatesEvent): void {
+        if (!Array.isArray(event?.states)) return;
+        for (const state of event.states) this.publishState(state);
+    }
+
+    private async resync(): Promise<void> {
+        this.applySnapshot(await this.getRobots());
+    }
+
+    private applySnapshot(snapshots: EdgeRobotSnapshot[]): void {
+        for (const snapshot of snapshots) {
+            this.publishState(snapshot.state);
+            this.publishStatus({ address: snapshot.address, status: snapshot.status, lastSync: snapshot.state.updatedAt });
+        }
     }
 
     onModuleDestroy(): void {
@@ -81,14 +115,6 @@ export class EdgeClient implements OnModuleInit, OnModuleDestroy {
     /** Quadro atual da frota segundo a borda. */
     async getRobots(): Promise<EdgeRobotSnapshot[]> {
         return this.request<EdgeRobotSnapshot[]>("GET", "/v1/robots");
-    }
-
-    private async resync(): Promise<void> {
-        const snapshots = await this.getRobots();
-        for (const snapshot of snapshots) {
-            this.publishState(snapshot.state);
-            this.publishStatus({ address: snapshot.address, status: snapshot.status, lastSync: snapshot.state.updatedAt });
-        }
     }
 
     private publishState(state: EdgeRobotState): void {

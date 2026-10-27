@@ -9,7 +9,8 @@ import 'dotenv/config';
  * (borda com EDGE_AUTH_ACTIVATED=false).
  */
 export const edgeConfig = {
-    url: (process.env.EDGE_URL ?? 'http://localhost:3001').replace(/\/+$/, ''),
+    // Vazio = a API não conecta na borda; só aceita a borda no namespace /edge.
+    url: (process.env.EDGE_URL ?? '').replace(/\/+$/, ''),
     token: process.env.EDGE_TOKEN ?? '',
     requestTimeoutMs: Number(process.env.EDGE_TIMEOUT_MS ?? 3000),
 };

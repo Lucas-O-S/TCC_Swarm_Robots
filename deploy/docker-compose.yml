@@ -47,7 +47,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no deploy/.env}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1d}
       ORCHESTRATOR_AUTO: ${ORCHESTRATOR_AUTO:-true}
-      EDGE_URL: ${EDGE_URL:?defina EDGE_URL no deploy/.env}
+      EDGE_URL: ${EDGE_URL:-}
       EDGE_TOKEN: ${EDGE_TOKEN:-}
       EDGE_TIMEOUT_MS: ${EDGE_TIMEOUT_MS:-3000}
 
