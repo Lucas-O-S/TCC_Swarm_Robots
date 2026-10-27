@@ -9,9 +9,13 @@ import 'dotenv/config';
  * abertos (desenvolvimento). Com true, todo cliente manda
  * `Authorization: Bearer <EDGE_TOKEN>` no REST e `auth: { token }` no socket.io.
  * Não existe usuário nem escopo: a premissa é UM sistema usando a borda por vez.
+ *
+ * `backendUrl`: back para o qual a borda abre o uplink (socket.io-client, com
+ * o mesmo EDGE_TOKEN). Vazio = uplink desligado.
  */
 export const edgeConfig = {
     port: Number(process.env.EDGE_PORT ?? 3001),
     authActivated: process.env.EDGE_AUTH_ACTIVATED === 'true',
     token: process.env.EDGE_TOKEN ?? '',
+    backendUrl: process.env.BACKEND_URL ?? '',
 };
