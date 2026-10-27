@@ -53,13 +53,20 @@ export interface EdgeCommandRequest {
 }
 
 /**
- * Ack do `robot:command`: status HTTP equivalente ao da rota de comando da
- * borda (2xx = ok) + o mesmo corpo de erro (`message`) ou o retorno (`data`).
+ * Ack do `robot:command`. Espelha UplinkCommandReply da borda
+ * (Edge/server/src/Classes/Uplink/Uplink.Types.ts): `status` segue o HTTP
+ * da rota de comando (400 = corpo recusado, 500 = erro da borda).
  */
-export interface EdgeCommandAck {
-    status: number;
-    message?: string | string[];
-    data?: unknown;
+export type EdgeCommandAck =
+    | { ok: true; data: unknown }
+    | { ok: false; status: number; message: string };
+
+/**
+ * Evento `robot:snapshot`: quadro inteiro da frota, mandado pela borda a cada
+ * (re)conexão no /edge. Espelha RobotSnapshotEvent da borda.
+ */
+export interface EdgeRobotSnapshotEvent {
+    robots: EdgeRobotSnapshot[];
 }
 
 /** Item de GET /v1/robots. */

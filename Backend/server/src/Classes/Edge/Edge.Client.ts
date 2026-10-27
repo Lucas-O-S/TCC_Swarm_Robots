@@ -5,12 +5,13 @@ import { edgeConfig } from "src/config/edge.config";
 import { Command } from "src/Enums/Command.enum";
 import { EdgeSocketEvents } from "src/Enums/EdgeSocketEvents.enum";
 import { EdgeGateway } from "./Edge.Gateway";
-import { EdgeCommandAck, EdgeCommandRequest, EdgeRobotSnapshot, EdgeRobotState, EdgeRobotStatesEvent, EdgeRobotStatusEvent } from "./Edge.Types";
+import { EdgeCommandAck, EdgeCommandRequest, EdgeRobotSnapshot, EdgeRobotSnapshotEvent, EdgeRobotState, EdgeRobotStatesEvent, EdgeRobotStatusEvent } from "./Edge.Types";
 
 /**
  * Único ponto da API que conversa com a borda. Substitui o antigo
  * GatewayAdapter: em vez de bytes, fala o contrato público da borda.
- *  - comandos: HTTP  POST {EDGE_URL}/v1/robots/:address/commands/:comando
+ *  - comandos: `robot:command` com ack pela borda conectada no /edge; sem
+ *    ela e com EDGE_URL definido, HTTP POST {EDGE_URL}/v1/robots/:address/commands/:comando
  *  - telemetria: socket.io  robot:states (lote) / robot:status
  * Dois jeitos de receber a telemetria, os dois alimentam os mesmos listeners:
  *  - borda conecta na API (namespace /edge, EdgeGateway) e manda
@@ -67,9 +68,9 @@ export class EdgeClient implements OnModuleInit, OnModuleDestroy {
 
     /** Borda que acabou de entrar no /edge: mesmos eventos + o snapshot inicial. */
     private attach(socket: EdgeSocket): void {
-        socket.on(EdgeSocketEvents.RobotSnapshot, (snapshots: EdgeRobotSnapshot[]) => {
-            if (!Array.isArray(snapshots)) return;
-            this.applySnapshot(snapshots);
+        socket.on(EdgeSocketEvents.RobotSnapshot, (event: EdgeRobotSnapshotEvent) => {
+            if (!Array.isArray(event?.robots)) return;
+            this.applySnapshot(event.robots);
         });
         socket.on(EdgeSocketEvents.RobotStates, (event: EdgeRobotStatesEvent) => this.onStates(event));
         socket.on(EdgeSocketEvents.RobotStatus, (event: EdgeRobotStatusEvent) => this.publishStatus(event));
@@ -127,13 +128,11 @@ export class EdgeClient implements OnModuleInit, OnModuleDestroy {
             throw new HttpException(`Borda não respondeu em ${edgeConfig.requestTimeoutMs} ms`, HttpStatus.BAD_GATEWAY);
         }
 
-        if (typeof ack?.status !== "number") {
-            throw new HttpException("Borda: resposta inválida", HttpStatus.BAD_GATEWAY);
+        if (ack?.ok === true) return ack.data;
+        if (ack?.ok === false && typeof ack.status === "number") {
+            throw new HttpException(`Borda: ${ack.message ?? "erro sem mensagem"}`, this.toApiStatus(ack.status));
         }
-        if (ack.status >= 200 && ack.status < 300) return ack.data;
-
-        const detail = Array.isArray(ack.message) ? ack.message.join("; ") : (ack.message ?? "erro sem mensagem");
-        throw new HttpException(`Borda: ${detail}`, this.toApiStatus(ack.status));
+        throw new HttpException("Borda: resposta inválida", HttpStatus.BAD_GATEWAY);
     }
 
     /** Quadro atual da frota segundo a borda. */

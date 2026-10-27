@@ -3,7 +3,7 @@
 #
 #   navegador ──HTTPS──> web (Caddy) ──> /srv (front compilado)
 #                              └── api.<DOMAIN> ──> backend:3000 ──> db:5432
-#                                                       └── EDGE_URL (borda no Mac, via Tailscale)
+#                                                       └── /edge <── borda (conecta de fora, com EDGE_TOKEN)
 #
 # Rodar (dentro desta pasta):  sudo docker compose up -d --build
 # Variáveis: deploy/.env (o setup-ec2.sh cria a partir do .env.example).
@@ -48,7 +48,7 @@ services:
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1d}
       ORCHESTRATOR_AUTO: ${ORCHESTRATOR_AUTO:-true}
       EDGE_URL: ${EDGE_URL:-}
-      EDGE_TOKEN: ${EDGE_TOKEN:-}
+      EDGE_TOKEN: ${EDGE_TOKEN:?defina EDGE_TOKEN no deploy/.env (sem ele qualquer um entra como borda)}
       EDGE_TIMEOUT_MS: ${EDGE_TIMEOUT_MS:-3000}
 
   web:

@@ -4,8 +4,8 @@ Front e back rodando na nuvem, com HTTPS, e o robô real continuando ligado no s
 
 ```
  Navegador ──HTTPS──►  EC2 na AWS (1 máquina, 3 containers)           Seu Mac
-                       ├─ web      Caddy: front + certificado HTTPS   ├─ Edge/server (borda, :3001)
-                       ├─ backend  NestJS ─────── Tailscale ────────► │   └─ USB ─ gateway ─ rádio ─ robô
+                       ├─ web      Caddy: front + certificado HTTPS   ├─ Edge/server (borda)
+                       ├─ backend  NestJS ◄──── wss …/edge ───────── │   └─ USB ─ gateway ─ rádio ─ robô
                        └─ db       Postgres (sem porta pública)
 ```
 
@@ -13,7 +13,7 @@ Front e back rodando na nuvem, com HTTPS, e o robô real continuando ligado no s
 - **Endereço grátis com HTTPS**: o [sslip.io](https://sslip.io) transforma o IP em nome (`54-12-34-56.sslip.io` → `54.12.34.56`) e o Caddy tira o certificado sozinho.
   - Front: `https://54-12-34-56.sslip.io`
   - API + Swagger: `https://api.54-12-34-56.sslip.io` (`/api` = Swagger)
-- **A borda fica no Mac** (precisa do USB do gateway). O back na nuvem chega nela por uma rede privada grátis, o [Tailscale](https://tailscale.com). A borda **não** fica exposta na internet.
+- **A borda fica no Mac** (precisa do USB do gateway) e é **ela que conecta no back** (`wss://api.<domínio>/edge`, com o `EDGE_TOKEN`), como um navegador abrindo um site. Funciona em qualquer rede com internet, sem abrir porta no Mac e sem VPN. Telemetria e comandos passam por essa mesma conexão.
 
 Arquivos desta pasta:
 
@@ -22,7 +22,7 @@ Arquivos desta pasta:
 | `docker-compose.yml` | Sobe `db`, `backend` e `web` |
 | `Caddyfile` | Domínio, HTTPS, rotas da SPA e proxy da API |
 | `.env.example` | Modelo das variáveis (senhas, domínio, borda) |
-| `setup-ec2.sh` | Prepara a EC2 do zero (Docker, swap, Tailscale, `.env`) |
+| `setup-ec2.sh` | Prepara a EC2 do zero (Docker, swap, `.env`) |
 | `../Backend/server/Dockerfile` | Imagem da API |
 | `Frontend/Dockerfile` (na branch do front) | Build do Vite servido pelo Caddy |
 
@@ -39,8 +39,7 @@ Arquivos desta pasta:
    - branch do back: esta pasta `deploy/` + `Backend/server/Dockerfile` + `Backend/server/.dockerignore`
    - branch do front: `Frontend/Dockerfile` + `Frontend/.dockerignore`
    - o front tem que passar no **`npm run build`** (em `Frontend/`, no seu Mac). É o mesmo comando que roda na EC2: se der `error TS...` aí, o deploy do front falha igual.
-2. **Conta no Tailscale** (grátis): entre em <https://login.tailscale.com> com GitHub ou Google.
-3. **Se o repositório for privado**: crie um token no GitHub (Settings → Developer settings → Personal access tokens → *Fine-grained* → acesso só a este repo, permissão *Contents: Read-only*). Ele é a "senha" no `git clone`.
+2. **Se o repositório for privado**: crie um token no GitHub (Settings → Developer settings → Personal access tokens → *Fine-grained* → acesso só a este repo, permissão *Contents: Read-only*). Ele é a "senha" no `git clone`.
 
 ---
 
@@ -104,74 +103,14 @@ Repo privado: *Username* = seu usuário do GitHub, *Password* = o token (não ap
 bash ~/tcc/back/deploy/setup-ec2.sh
 ```
 
-Leva uns 2–3 minutos. Ele instala Docker, Docker Compose, Buildx, git e Tailscale, cria 2 GB de swap (memória extra pro build) e gera o `deploy/.env` com:
+Leva uns 2–3 minutos. Ele instala Docker, Docker Compose, Buildx e git, cria 2 GB de swap (memória extra pro build) e gera o `deploy/.env` com:
 
 - `DOMAIN` a partir do IP público — **confira se é o IP elástico do passo 3**;
 - senha do banco, `JWT_SECRET` e `EDGE_TOKEN` aleatórios.
 
 Pode rodar de novo quantas vezes quiser: ele pula o que já está feito e nunca sobrescreve o `.env`.
 
-## Passo 7 — Colocar a EC2 no Tailscale
-
-```bash
-sudo tailscale up --hostname tcc-aws --accept-dns=false
-```
-
-(`--accept-dns=false`: a EC2 continua usando o DNS da AWS; a borda é acessada pelo IP `100.x`, sem precisar do DNS do Tailscale.)
-
-Aparece um link `https://login.tailscale.com/a/...`. Abra no navegador do Mac, entre na sua conta e clique **Connect**.
-
-Recomendado: em <https://login.tailscale.com/admin/machines>, na máquina `tcc-aws`, menu **⋯ → Disable key expiry** (senão ela sai da rede em 180 dias).
-
-## Passo 8 — Colocar o Mac no Tailscale e proteger a borda
-
-No **Mac**:
-
-1. Instale o Tailscale: <https://tailscale.com/download> → macOS. Abra e faça login com a **mesma conta**.
-2. Pegue o IP do Mac na rede Tailscale: ícone do Tailscale na barra de menus → seu Mac → copie o endereço **`100.x.y.z`**.
-3. Na EC2, mostre o token gerado:
-   ```bash
-   grep EDGE_TOKEN ~/tcc/back/deploy/.env
-   ```
-4. No **`Edge/server/.env` do Mac**, ligue o token com esse mesmo valor:
-   ```
-   EDGE_AUTH_ACTIVATED=true
-   EDGE_TOKEN=<o valor que apareceu na EC2>
-   ```
-   Se você também roda o `Backend` local no Mac apontando para essa borda, ponha o mesmo `EDGE_TOKEN` no `Backend/server/.env` dele.
-5. Suba a borda como sempre (`npm run start:hw` ou `npm run start` em `Edge/server`). Se o macOS perguntar se o `node` pode aceitar conexões, **Permitir**.
-6. **O Mac não pode dormir** enquanto o robô estiver em uso. Deixe um terminal aberto com:
-   ```bash
-   caffeinate -dims
-   ```
-   (`Ctrl+C` para soltar.)
-
-## Passo 9 — Apontar o back para a borda
-
-Na **EC2**:
-
-```bash
-nano ~/tcc/back/deploy/.env
-```
-
-Troque a linha `EDGE_URL` pelo IP do Mac do passo 8:
-
-```
-EDGE_URL=http://100.x.y.z:3001
-```
-
-Salvar e sair do `nano`: `Ctrl+O`, `Enter`, `Ctrl+X`.
-
-Teste se a EC2 enxerga a borda (com a borda rodando no Mac):
-
-```bash
-set -a; . ~/tcc/back/deploy/.env; set +a
-curl -H "Authorization: Bearer $EDGE_TOKEN" "$EDGE_URL/v1/robots"
-```
-
-Respondeu um JSON → ok. Travou ou deu erro → tabela de problemas no fim.
-
-## Passo 10 — Subir tudo
+## Passo 7 — Subir tudo
 
 ```bash
 cd ~/tcc/back/deploy
@@ -188,7 +127,40 @@ Os três (`db`, `backend`, `web`) devem estar **running** (o `db` também **heal
 
 Abra `https://<seu DOMAIN>` (ex.: `https://54-12-34-56.sslip.io`). No primeiro acesso o certificado pode levar ~1 minuto para sair.
 
-## Passo 11 — Criar o primeiro usuário
+## Passo 8 — Ligar a borda no back
+
+A borda é quem conecta no back, então a configuração fica toda no **Mac**.
+
+1. Na EC2, veja o domínio e o token:
+   ```bash
+   grep -E '^(DOMAIN|EDGE_TOKEN)=' ~/tcc/back/deploy/.env
+   ```
+2. No **`Edge/server/.env` do Mac**:
+   ```
+   BACKEND_URL=https://api.<seu DOMAIN>/edge
+   EDGE_TOKEN=<o EDGE_TOKEN da EC2>
+   EDGE_ID=mac-lab
+   EDGE_AUTH_ACTIVATED=true
+   ```
+   - O `BACKEND_URL` **tem que terminar em `/edge`**. Sem isso a borda cai no socket do front e é ignorada.
+   - `EDGE_ID` é o nome da borda no log do back (vazio = nome do Mac).
+   - `EDGE_AUTH_ACTIVATED=true` protege a API local da borda (porta 3001) na rede do Mac; o uplink não depende dele.
+3. Suba a borda como sempre (`npm run start:hw` ou `npm run start` em `Edge/server`). Ela reconecta sozinha se a internet ou o back caírem.
+4. **O Mac não pode dormir** enquanto o robô estiver em uso. Deixe um terminal aberto com:
+   ```bash
+   caffeinate -dims
+   ```
+   (`Ctrl+C` para soltar.)
+5. Confira na EC2:
+   ```bash
+   cd ~/tcc/back/deploy
+   sudo docker compose logs backend | grep EDGE
+   ```
+   Tem que aparecer `[EDGE] borda conectada: edgeId=mac-lab, ip=...`. No terminal da borda aparece `[UPLINK] conectado no back em ...`.
+
+> Enquanto a borda estiver ligada na nuvem, não deixe um back local (do Mac) conectado nela também pelo `EDGE_URL`: os dois mandariam no robô.
+
+## Passo 9 — Criar o primeiro usuário
 
 O `.env` sobe com `AUTH_ACTIVATED=true`, então o front pede login.
 
@@ -206,8 +178,8 @@ O `.env` sobe com `AUTH_ACTIVATED=true`, então o front pede login.
 
 1. **Start Lab** → bolinha verde → **AWS**.
 2. **EC2 → Instances → `tcc-server` → Instance state → Start instance**.
-3. Espere 1–2 min. Docker, containers e Tailscale sobem sozinhos; o site volta no mesmo endereço.
-4. No Mac: Tailscale ligado, borda rodando, `caffeinate -dims`.
+3. Espere 1–2 min. Docker e containers sobem sozinhos; o site volta no mesmo endereço.
+4. No Mac: borda rodando e `caffeinate -dims`. Se a borda já estava ligada, ela reconecta sozinha quando o back voltar.
 
 **Desligar**: o lab desliga sozinho no fim da sessão. Para economizar crédito antes disso: **Instance state → Stop instance**. Nunca *Terminate*.
 
@@ -253,9 +225,12 @@ cd ~/tcc/back/deploy && sudo docker compose up -d --build
 | Site não abre (timeout) | Instância parada ou portas 80/443 fechadas | Instância **Running**? Em **Security → Security groups → Edit inbound rules**, ter HTTP 80 e HTTPS 443 de `0.0.0.0/0` |
 | Erro de certificado nos primeiros minutos | Caddy ainda tirando o certificado | Esperar 1–2 min; ver `sudo docker compose logs web` |
 | Front abre, mas login/robôs dão erro de rede | `DOMAIN` errado (front compilado com outro IP) | `DOMAIN` = IP elástico com traços; depois `sudo docker compose up -d --build` |
-| Comandos ao robô respondem **503** | O back não alcança a borda | Mac acordado? Borda rodando? Tailscale ligado nos dois? `EDGE_URL` certo? Refaça o teste do passo 9 |
-| Comandos respondem **502** | Token diferente entre EC2 e Mac | Mesmo `EDGE_TOKEN` nos dois `.env` e `EDGE_AUTH_ACTIVATED=true` na borda; reiniciar a borda |
+| Comandos ao robô respondem **503** ("Nenhuma borda conectada") | A borda não está conectada no back | Mac acordado e com internet? Borda rodando? `BACKEND_URL` termina em `/edge`? Ver `sudo docker compose logs backend \| grep EDGE` e o `[UPLINK]` no terminal da borda |
+| Log do back: `borda recusada: token inválido` | `EDGE_TOKEN` diferente entre EC2 e Mac | Mesmo valor nos dois `.env`; a borda tenta de novo sozinha a cada 30 s (ou reinicie ela) |
+| Log do back: `borda recusada: ... já está conectada` | Outra borda (outro `EDGE_ID`) já está ligada nesse back | Desligar a outra; o back aceita uma borda por vez |
+| Comandos respondem **502** | A borda não respondeu a tempo ou deu erro interno | Ver o terminal da borda; conferir o gateway no USB |
 | Build do `web` falha com `error TS...` | Erro de tipo no front (o `npm run build` roda `tsc -b` antes do Vite) | Corrigir no código, conferir com `npm run build` no Mac, fazer push e repetir o "Atualizar" |
+| `compose build requires buildx 0.17.0 or later` | Buildx antigo do pacote do Amazon Linux | Rodar de novo o `setup-ec2.sh` (versão atual da branch), que instala o Buildx novo |
 | Build morre com `Killed` / código 137 | Falta de memória | `free -h` deve mostrar swap de 2G; se mostrar, troque para `t3.medium` (Actions → Instance settings → Change instance type, com a instância parada) |
 | Instance Connect não conecta | Porta 22 fechada | Inbound rule SSH 22 de `0.0.0.0/0`, ou use o Session Manager |
 | O endereço mudou | IP elástico não associado | Passo 3; depois corrija `DOMAIN` no `.env` e `sudo docker compose up -d --build` |
@@ -265,5 +240,6 @@ cd ~/tcc/back/deploy && sudo docker compose up -d --build
 
 - `deploy/.env` tem senhas: **nunca** faça commit (já está no `.gitignore` desta pasta).
 - O Postgres não tem porta aberta para a internet; só o `backend` enxerga.
-- A borda só é acessível pela rede Tailscale e exige `EDGE_TOKEN`.
+- A borda não recebe conexões de fora: é ela que conecta no back, por HTTPS, com o `EDGE_TOKEN`. O back aceita uma borda por vez e registra no log o `edgeId` e o IP de cada conexão.
+- Quem tiver o `EDGE_TOKEN` consegue se passar pela borda: trate como senha. Vazou? Gere outro (`openssl rand -hex 24`) e troque nos dois `.env`.
 - Mantenha `AUTH_ACTIVATED=true` em servidor público.
