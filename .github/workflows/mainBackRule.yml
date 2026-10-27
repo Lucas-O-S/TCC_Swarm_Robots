@@ -32,3 +32,10 @@ jobs:
           echo "Branch de origem: $HEAD_REF"
           echo "Branch de destino: $BASE_REF"
           echo "Fazendo deploy..."
+
+  # Compila e testa o back do PR. Para o merge ficar travado quando falhar,
+  # marque este check como obrigatório na regra da branch main-Back
+  # (deploy/README.md, "Verificação no PR").
+  verificar:
+    name: Verificar backend
+    uses: ./.github/workflows/backVerify.yml
