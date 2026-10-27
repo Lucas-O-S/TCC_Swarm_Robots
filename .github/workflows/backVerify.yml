@@ -1,0 +1,37 @@
+name: Verificar Backend
+
+# Workflow reutilizável: instala, compila e testa o Backend/server.
+# Chamado pelo PR para main-Back (mainBackRule.yml) e pelo deploy em
+# produção (prodBackDeploy.yml), para os dois rodarem exatamente a mesma
+# verificação.
+
+on:
+  workflow_call:
+
+jobs:
+  verificar:
+    name: Build e testes
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Backend/server
+
+    steps:
+      - name: Checkout Codigo
+        uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Backend/server/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Compilar
+        run: npm run build
+
+      - name: Testes
+        run: npm test
