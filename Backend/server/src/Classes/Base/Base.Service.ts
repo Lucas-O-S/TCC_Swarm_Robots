@@ -16,6 +16,10 @@ export abstract class BaseService<T extends Model> {
         return await this.repository.insert(dto);
     }
 
+    async createMany(dtos: Partial<T>[]): Promise<T[]> {
+        return await this.repository.insertMany(dtos);
+    }
+
     async getOne(uuid: string): Promise<T> {
         const entity = await this.repository.get(uuid);
         if (!entity) {

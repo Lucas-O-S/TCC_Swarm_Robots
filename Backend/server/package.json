@@ -20,10 +20,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "frota": "node ../../scripts/frota/frota.mjs",
     "frota:list": "node ../../scripts/frota/frota.mjs list",
-    "frota:stop": "node ../../scripts/frota/frota.mjs stop",
-    "swarm:up": "bash ../../scripts/swarm/up.sh",
-    "swarm:status": "bash ../../scripts/swarm/up.sh --status",
-    "start:hw": "bash ../../scripts/swarm/up.sh && nest start"
+    "frota:stop": "node ../../scripts/frota/frota.mjs stop"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.23",
@@ -40,7 +37,6 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "dotenv": "^17.4.2",
-    "mqtt": "^5.15.2",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.21.0",
@@ -49,8 +45,8 @@
     "rxjs": "^7.8.1",
     "sequelize": "^6.37.8",
     "sequelize-typescript": "^2.1.6",
-    "serialport": "^12.0.0",
     "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.4",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
   },

@@ -7,7 +7,8 @@
  * confundir o que é interno com o que o front consome.
  */
 export enum SocketEvents {
-    RobotUpdate = "robot:update",
+    /** Lote de `RobotUpdateEvent` (ver `RobotUpdatesEvent`), um emit a cada ~33 ms. */
+    RobotUpdates = "robot:updates",
     RobotStatus = "robot:status",
     RobotNew = "robot:new",
 }

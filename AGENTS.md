@@ -81,9 +81,76 @@ resposta é "depende do nível", ainda nenhum foi implementado:
 
 ## Stack
 
-- **Backend**: NestJS 11, Sequelize (`@nestjs/sequelize` + `sequelize-typescript`), PostgreSQL (`pg`)
+- **Backend** (API do front, `Backend/server`): NestJS 11, Sequelize (`@nestjs/sequelize` + `sequelize-typescript`), PostgreSQL (`pg`)
+- **Borda** (`Edge/server`): NestJS 11 sem banco - serial/HDLC/Mari, MQTT do simulador, socket.io. Ver "Divisão API × borda"
 - **Frontend**: pasta existe (`Frontend/`), ainda vazia - será decidido depois (o PyDotBot usa React + TypeScript + Vite, mapa via react-leaflet, joystick)
 - **Repo**: [github.com/Lucas-O-S/TCC_Swarm_Robots](https://github.com/Lucas-O-S/TCC_Swarm_Robots), branch de trabalho atual `Merge/Back/ClasseRobot`
+
+## Divisão API × borda (`Edge/`) - FEITO em 2026-10-10
+
+Pedido do dono: separar em dois processos, cada um na sua pasta (como
+`Frontend/` e `Backend/`), com a **borda independente** - "se a pessoa quiser só
+a edge ela deve ser independente", pensando em outros sistemas acessando no
+futuro. Branch `Merge/Back/EdgeSeparation`.
+
+**O corte**: tudo que é do DISPOSITIVO está em `Edge/server`; tudo que é
+NEGÓCIO do nosso sistema ficou em `Backend/server`.
+
+- `Edge/server` (porta 3001): `Protocols/`, `adapter/` (Mari, Mqtt, Simulator),
+  `GatewayModule` (`GATEWAY_MODE`), configs `MARI_*`/`MQTT_*`/
+  `SIMULATOR_FAKE_ADVERTISEMENT`, enums de protocolo, teste do HDLC. Código
+  novo: `Swarm` (estado vivo em memória, status por silêncio 5 s/60 s,
+  descoberta, posição já extraída), `Commands` (ponto único de envio
+  `CommandService.send`), socket.io e token opcional. Detalhes e contrato em
+  `Edge/README.md`.
+- `Backend/server` (porta 3000): Auth, Users, Robots (CRUD + rotas de comando),
+  Tasks, Positions, Scenario, Orchestrator, socket.io pro front. Não fala mais
+  binário: `src/Classes/Edge/Edge.Client.ts` é o único ponto que conversa com a
+  borda (`EDGE_URL`, `EDGE_TOKEN`).
+
+**Contrato API↔borda** (sem MQTT entre elas):
+- Comandos: HTTP `POST /v1/robots/:address/commands/<comando>` com os mesmos
+  campos dos DTOs (move-raw, rgb-led, control-mode, waypoints, xgo-action).
+  Na borda o control-mode só aceita 0/1; SemiAuto→Auto e `robots.mode` seguem
+  na API (`RobotService.setControlMode`).
+- Telemetria: socket.io da borda, eventos `robot:states` (lote a cada ~20 ms,
+  `STATES_FLUSH_MS`; o `EdgeClient` desmonta e entrega cada item aos listeners) /
+  `robot:status` / `robot:joined`. status e joined esvaziam o lote antes de sair,
+  pra manter a ordem. A API conecta como cliente e, a cada (re)conexão, puxa
+  `GET /v1/robots` para não perder robô que anunciou com ela fora.
+- O MQTT `/mari/{NETID}/to_edge|to_cloud` ficou só entre a borda e o
+  RobotSwarmSimulator.
+
+**O que mudou na API**:
+- `RobotService.dispatch` → `EdgeClient.sendCommand` (era codec +
+  `gateway.send`). `sendCommand(address, command, payload)` não recebe mais
+  `PayloadType`; o Orchestrator manda waypoints por ele igual antes.
+- `SwarmService.handleFrame` → `handleState` (estado já decodificado vindo da
+  borda) + `handleStatus` (status calculado pela borda). Sair de Active gera o
+  evento interno `robot.lost` uma vez por período de silêncio - mesmo
+  momento de antes (5 s). Cadastro automático, histórico de posição (throttle
+  por distância), persistência de status/bateria e `robot:updates/status/new`
+  pro front continuam aqui.
+- Erros da borda viram HTTP na API: borda fora = `503`, corpo recusado = `400`,
+  token errado/erro interno da borda = `502`.
+- `normalizeAddress` local em `src/Helpers/Address.ts`.
+- Saíram `serialport` e `mqtt` do `package.json`; entrou `socket.io-client`.
+  Os scripts `swarm:up`/`swarm:status`/`start:hw` foram para `Edge/server`.
+
+**Regras que valem a partir daqui**:
+- Entre `Edge/` e `Backend/` **pode copiar** código (enums, DTOs, tipos de
+  evento, `normalizeAddress`): nenhum dos dois importa o outro nem um pacote
+  compartilhado. Dentro de cada projeto, continua valendo não copiar.
+- Premissa: **um** sistema usando a borda por vez. Sem lease/arbitragem/escopos
+  até o dono pedir; se precisar, entra em `CommandService.send`, sem mudar rota.
+- As seções abaixo que falam de `src/Protocols/`, `src/adapter/`,
+  `GatewayModule`, `GATEWAY_MODE`, `MARI_*`, `MQTT_*` e "backend abrindo a
+  serial" descrevem código que **mudou de casa sem mudar** - hoje é
+  `Edge/server/src/...` e "a borda".
+
+**Subir tudo**: Postgres (`cd Backend && docker compose up -d`) → borda
+(`cd Edge/server && npm run start:dev`) → API (`cd Backend/server && npm run
+start:dev`). A API sobe mesmo com a borda fora e reconecta sozinha.
 
 ## Padrão de código de referência: `ApiGameHit`
 
@@ -224,6 +291,10 @@ separação em módulos NestJS:
   - `Position.Model.ts` - tabela `position`, `@BelongsTo(() => RobotModel)`.
   - `User.Model.ts` - tabela `users` (conceito nosso, auth - não existe no
     DotBot/protocolo).
+  - `Scenario.Model.ts` - tabela `scenario` (área `sizeX`/`sizeY` +
+    obstáculos), conceito nosso. `@HasMany(() => ObstacleModel)`.
+  - `Obstacle.Model.ts` - tabela `obstacle`, `@BelongsTo(() => ScenarioModel)`
+    via `scenarioId`. Ver "Scenario e Obstacle" abaixo.
 - `src/Classes/Robots/` - camada de API do robô, seguindo o padrão
   Controller → Service → Repository (ver seção "Padrão de código de
   referência" acima). `Robot.Repository.ts`, `Robot.Service.ts` e
@@ -296,6 +367,9 @@ Esta seção descreve o que já existe de verdade no código (supera as descriç
 antigas em "Correspondência com o DotBot", que eram planejamento). **Nota de
 pasta**: a implementação ficou em `src/Protocols/` (plural) e os enums de
 protocolo em `src/Enums/` (não `src/Protocol/Enums/` como o texto antigo dizia).
+**Desde 2026-10-10 tudo desta seção (Protocols, adapter, Gateway) mora em
+`Edge/server/src/`** - ver "Divisão API × borda". As rotas de comando da API
+continuam em `Backend/server/src/Classes/Robots/`, mas repassam à borda.
 
 Tudo foi conferido **byte a byte contra o PyDotBot original** (move, rgb,
 control-mode, waypoints, xgo-action e dotbot-advertisement), e o round-trip do
@@ -437,11 +511,21 @@ esse campo - pra tipar certo precisaria também tratar o `ADVERTISEMENT` (0x04).
 ### WebSocket (bloco G, tempo real) - FEITO
 
 - `RobotWebsockets` (`src/Websockets/Robot.Websockets.ts`, `@WebSocketGateway({ cors })`)
-  com `@WebSocketServer() server` e `emitUpdate(address, state)` →
-  `server.emit("robot:update", ...)`.
-- O `SwarmService` injeta ele e chama `emitUpdate` no fim do `handleFrame` - cada
-  estado decodificado é empurrado ao vivo pro front (evento `robot:update`), sem
-  polling.
+  com `@WebSocketServer() server` e `queueUpdate(event)`, que junta os estados
+  e emite `server.emit("robot:updates", { updates })` a cada ~33 ms
+  (`UPDATES_FLUSH_MS`), com todos os itens em ordem (o rastro usa todos).
+- O `SwarmService` injeta ele e chama `queueUpdate` no `handleState` - todo
+  estado que chega da borda vai pro front, sem polling e sem descartar amostra;
+  só o envio é agrupado (com 100 robôs a 10 Hz seriam 1000 emits/s por cliente).
+- **Contrato dos eventos** em `src/Websockets/Socket.Events.ts`
+  (`RobotUpdateEvent`/`RobotUpdatesEvent`/`RobotStatusEvent`/`RobotNewEvent`). O item do `robot:updates` NÃO
+  manda o payload cru: `toUpdateEvent` converte pra `{ address, position, battery,
+  waypointIdx, updatedAt }` - `position` é a que a borda já extraiu (null = sem
+  leitura, sentinela já descartado), `battery` em **Volts** (igual `robots.battery`).
+  Decidido com o dono: **sem envelope `ApiResponse`** nos eventos (push não tem
+  requisição nem erro; só faria sentido no ack se um dia o front mandar comando
+  pelo socket) e **sem `RobotModel`** nos itens do `robot:updates` (exigiria query por pacote;
+  posição/direção nem são colunas). O payload cru segue em `GET /robots/:address/status`.
 - `emitNew(robot)` → `server.emit("robot:new", { robot })`: robô recém-descoberto
   (auto-cadastro, ver seção acima). Manda o `RobotModel` inteiro - não só
   address+status - em canal separado do `robot:status`, pro front desenhar o
@@ -465,8 +549,13 @@ esse campo - pra tipar certo precisaria também tratar o `ADVERTISEMENT` (0x04).
   (`robotService.getFreeRobots`, `taskId=null` e `mode=Auto`), emparelha 1:1; pra
   cada par manda os waypoints (reusa `sendCommand`) e **só então** marca a task
   InProgress + grava `taskId` no robô (persiste só o campo mudado).
-- Guardas: pula task sem waypoints; envio protegido (retorna bool) - só atribui se
-  o envio funcionou (o próximo ciclo tenta de novo se falhar).
+- Guardas: as regras de "pode atribuir?" ficam em dois métodos usados pelo
+  automático e pelo manual - `robotRejection(robot)` (Manual, já tem task, sem
+  calibração LH2/posição via `SwarmService.taskBlockReason`) e
+  `taskRejection(task)` (sem waypoints, mais de `MAX_WAYPOINTS`, já em andamento).
+  Devolvem a exception (400/409) ou `null`: o manual lança, o automático só filtra/
+  pula. Envio protegido (retorna bool) - só atribui se o envio funcionou (o
+  próximo ciclo tenta de novo se falhar).
 - Gatilho: `onModuleInit` + `setInterval(assignPending, 5000)` com `.catch` (é job
   de fundo, sem o ExceptionFilter do HTTP - por isso o catch é obrigatório).
 - **Liga/desliga** (`autoEnabled` no `OrchestratorService`): estado inicial por
@@ -502,6 +591,9 @@ quem detecta de quem age:
   - `onAdvertisement` → se `waypoint_idx >= nº de waypoints`, conclui a task
     (`Completed`) e libera o robô. Se a bateria (mV/1000 → Volts) está abaixo do
     `LOW_BATTERY_VOLTS`, hoje só solta a task (placeholder - recarga adiada).
+    Antes do banco há um filtro: um robô por vez (`checkingAdvertisement`) e,
+    se `waypoint_idx` e a faixa de bateria não mudaram, só reconfere depois de
+    `ADVERTISEMENT_RECHECK_MS` (2 s) - sem isso cada pacote virava SELECT.
 
 **Atribuição manual (SemiAuto)**: `OrchestratorController` expõe
 `PUT /orchestrator/robots/:address/assign` (body `{ taskId }`). Faz o mesmo que
@@ -526,6 +618,10 @@ dispara. As releases novas preenchem `mode`/`waypoint_idx` (prefixo do
 advertisement igual ao nosso decoder), mas o formato do `LH2_WAYPOINTS` mudou a
 partir da **1.24.0** (não da 1.25.0 como estava anotado antes) - conferir o encoder
 antes de atualizar o robô. Detalhes e matriz de versões em "Lighthouse (LH2)" abaixo.
+**Atualização 2026-10-15**: a sandbox que deve estar no robô é a **1.23.0**
+(ver memória do OTA), e nela `mode`, `waypoint_idx`, pwm e encoders já vêm
+preenchidos - a regra de conclusão volta a valer. A regra de NUNCA gravar o
+`mode` do advertisement continua (a fonte da verdade segue `robots.mode`).
 
 **Bugs corrigidos junto** (auditoria): `handleRobotLost` chamava a si mesmo
 (recursão infinita) - era pra chamar `handleLostRobot`; o `OrchestratorListener`
@@ -542,27 +638,54 @@ periódico (1s, mesmo timer do `checkLost`), espelhando o
   de silêncio, com os limiares exatos do PyDotBot - `INACTIVE_DELAY = 5s`,
   `LOST_DELAY = 60s` (< 5s = Active, 5–60s = Inactive, > 60s = Lost). O status
   **nunca vem do robô**, é calculado.
-- **Throttle de graça**: grava `status`/`battery`/`lastSync` só quando o status
-  ou a bateria mudam desde a última gravação (guardado num `Map` em memória por
-  address). Vários pacotes viram no máximo 1 write/robô/ciclo, e nada se o robô
+- **Throttle de graça**: grava `status`/`battery`/`calibrated`/`lastSync` só
+  quando o status, a bateria ou a calibração mudam desde a última gravação
+  (guardado num `Map` em memória por address; `lh2` null não conta como mudança). Vários pacotes viram no máximo 1 write/robô/ciclo, e nada se o robô
   está parado. `battery` é gravada em **Volts** (o fio manda mV → divide por
-  1000, igual PyDotBot).
+  1000, igual PyDotBot). A bateria só regrava quando varia `BATTERY_DELTA_V`
+  (0,05 V), senão a oscilação de mV gravava todo robô todo ciclo. O uuid do
+  robô fica em cache por address (`robotUuidOf`), o ciclo não roda sobreposto
+  (`persisting`) e um robô com erro não interrompe os outros.
 - **Histórico de posição** (tabela `position`, via `PositionService`): grava a
   posição decodificada com throttle por **distância** - descarta se moveu menos
   que `LH2_DISTANCE_MM = 20` (LH2, mm) ou `GPS_DISTANCE_M = 5` (GPS, metros por
   haversine). Trata `DOTBOT_ADVERTISEMENT` (LH2, com guarda do sentinela
-  `0xFFFFFFFF` = "sem localização") e `GPS_POSITION`. **Nota**: o PyDotBot só
-  grava LH2 quando o robô está totalmente calibrado; esse gate ainda não existe
-  aqui (não temos o estado de calibração no backend), só a guarda do sentinela.
+  `0xFFFFFFFF` = "sem localização") e `GPS_POSITION`. Como no PyDotBot, LH2 só
+  é gravada com o robô calibrado: se a borda manda `lh2` e ele não é `valid` (ou
+  `deviceCount` é 0), a amostra é descartada antes do throttle; `lh2` null
+  (simulador/MQTT) grava como antes. GPS não passa por esse gate.
+  As amostras aprovadas vão pra uma fila (`pendingPositions`) e são gravadas
+  num INSERT em lote (`createMany` → `bulkCreate`) a cada ciclo de 1 s. O
+  `lastPosition` é marcado antes de qualquer await, pra amostras simultâneas
+  não furarem o throttle.
 - **WebSocket**: `emitStatus` empurra `robot:status` pro front quando o status
   muda (isso acontece SEM pacote novo - por timeout - então o front só fica
   sabendo por aqui; é o equivalente ao `RELOAD` do PyDotBot). Os nomes de evento
-  do socket ficam no enum `SocketEvents` (`robot:update`, `robot:status`, `robot:new`),
+  do socket ficam no enum `SocketEvents` (`robot:updates`, `robot:status`, `robot:new`),
   separado do `EventsCommands` interno de propósito.
 
 `SwarmModule` importa `RobotModule` + `PositionModule` (pra injetar
 `RobotService`/`PositionService`); sem ciclo, porque nenhum deles importa o
 `SwarmModule`.
+
+### Scenario e Obstacle (`src/Classes/Scenario/`) - FEITO
+
+CRUD em `/scenarios` no padrão Base* (Controller → Service → Repository, DTO com
+class-validator pt-br, `ScenarioSchema` pro `@ApiBody`, `JwtAuthGuard`). Obstacle
+**não tem rota nem módulo próprios**: sempre existe dentro de um Scenario.
+
+- Os obstáculos vão no body do Scenario (`obstacles: ObstacleDto[]`, opcional). O
+  `ObstacleDto` não tem `scenarioId`: o Repository preenche a FK, e o whitelist
+  recusa o campo se ele vier no body.
+- `ScenarioRepository` sobrescreve o CRUD do `BaseRepository`: `get`/`getAll`
+  sempre com `include: [ObstacleModel]`; `insert` cria tudo junto (`include`) numa
+  transação; no `update`, se `obstacles` vier, **substitui a lista inteira** (soft
+  delete das antigas + `bulkCreate`); se não vier, os obstáculos ficam como estão.
+  `delete` apaga (soft) os obstáculos junto, porque o paranoid não cascateia.
+- `BaseController<T, D = Partial<T>>`: o 2º genérico (tipo do body) existe por
+  causa do Scenario. Sem ele, `ObstacleDto[]` não é compatível com o
+  `ObstacleModel[]` do `Partial<ScenarioModel>` e a sobrescrita de
+  `create`/`update` não compila. Os outros controllers usam o default.
 
 ### Armadilha resolvida: `useDefineForClassFields`
 
@@ -602,14 +725,15 @@ dependência real, cada bloco precisa do anterior:
   seção "Rede Mari".
 - **Bloco E (SwarmService): FEITO** - `Map` + `handleFrame` (11/12), job de status por
   `lastSync` (13), escrita throttled no Postgres (14) e emissão de eventos (15). Ver
-  "Persistência de estado". (Falta só o gate de calibração LH2 pra gravar posição.)
+  "Persistência de estado". Gate de calibração LH2 pra gravar posição: FEITO na
+  API (depende da borda mandar o `lh2`).
 - **Bloco F (Orchestrator): nível 1 e nível 2 FEITOS** (menos recarga) - atribuição
   automática task↔robô Auto + regras reativas (robô `Lost` solta a task, `waypoint_idx`
   no fim conclui) via `OrchestratorListener`. A regra de **bateria baixa** hoje é
   placeholder (só solta a task); a **recarga** foi adiada (ver "Adiado"). Ver
   "Automação nível 2".
-- **Bloco G (WebSocket): FEITO** - `RobotWebsockets` empurra `robot:update` (a cada
-  frame) e `robot:status` (quando o status muda por timeout) ao front.
+- **Bloco G (WebSocket): FEITO** - `RobotWebsockets` empurra `robot:updates` (lote
+  a cada ~33 ms) e `robot:status` (quando o status muda por timeout) ao front.
 - **Bloco H (Rotas): FEITO** - 5 comandos + `GET /status` + atribuição **manual**
   (`PUT /orchestrator/robots/:address/assign`, usada pelo SemiAuto). A atribuição
   automática segue no Orchestrator.
@@ -618,30 +742,169 @@ dependência real, cada bloco precisa do anterior:
   é o caminho pra rodar API + frota simulada sem hardware); (b) testar o transporte
   **Mari** com o gateway FÍSICO (código pronto, ver Passo 4.3); (c) **frontend** (ver
   SIMULADOR_PLANO.md); (d) recarga (adiada, ver "Adiado"); (e) suporte a lighthouse
-  (calibração, homografia, gate de posição/atribuição - ver "Lighthouse (LH2)" abaixo).
+  (calibração via SwarmIT `0xA1` na borda, gates de posição/atribuição na API -
+  plano revisado e dividido borda × API em "Lighthouse (LH2)" abaixo).
 
-### Lighthouse (LH2) - o que falta pra funcionar - PENDENTE
+### Lighthouse (LH2) - o que precisa ser feito - PENDENTE (plano revisado em 2026-10-15)
 
-Levantado em 2026-10-04 contra o PyDotBot `main` (0.32.0). **Hoje o backend não
-sabe se existe lighthouse**: não há entidade/config de base station; só infere pelo
-advertisement. O que existe: decode do `calibrated` (bitmask bit0=LH1, bit1=LH2) e
-de `pos_x/pos_y`; descarte do sentinela `0xFFFFFFFF` no `persistPosition`; decoder
-do `LH2_PROCESSED_DATA` (só índices crus, nada vira posição). O que NÃO existe:
-`robots.calibrated` nunca é gravado (fica 0); ninguém lê o `calibrated` pra decidir
-nada; `LH2_CALIBRATION_HOMOGRAPHY` (0x0E) sem encoder; `lh2HomographyCount`/
-`lh2Flags` do status swarmit decodificados mas sem uso; `/waypoints` e Orchestrator
-mandam `LH2_WAYPOINTS` sem checar calibração/posição.
+Premissa do dono: **a base station existe** (SteamVR Base Station 2.0; uma basta
+para arena 2D). O plano antigo desta seção (levantado contra o PyDotBot 0.32.0)
+mandava a homografia pelo payload `0x0E` da aplicação. **Isso não vale para o
+firmware que está no robô.** Lido no fonte do par que usamos - DotBot-firmware
+**1.23.0** (`apps-sandbox/dotbot/main.c` + dotbot-libs do submódulo), swarmit
+**0.9.0** (`device/network_core/Source/main.c`, `testbed/controller.py`,
+`testbed/protocol.py`) e PyDotBot **0.30.0** (`dotbot/calibration/lighthouse2.py`):
 
-**Consequência hoje (sem base stations)**: robô Auto/SemiAuto recebe a task, vira
-`InProgress`, não anda (firmware sem pose LH2 não fecha a malha) e, como no 1.22.0 o
-`waypoint_idx` vem sempre 0, a task nunca conclui - fica presa até `Lost` ou troca de
-modo. Só `move-raw` (manual) funciona sem lighthouse.
+**Como a LH2 funciona nesse firmware**
+- Quem calcula a posição é o **lado seguro** (bootloader do swarmit). A aplicação
+  sandbox só chama `swarmit_localization_get_position()`. Ela **não trata o `0x0E`**
+  `LH2_CALIBRATION_HOMOGRAPHY` - mandar por `DOTBOT_APP` não faz nada.
+- A calibração vai pelo protocolo **SwarmIT** (`nextProto 0x10`), payload
+  **`SWARMIT_LH2_CALIBRATION = 0xA1`**, uma mensagem por estação:
+  `homography_count` (u32 LE) + `homography_index` (u32 LE) + 9 × **int32 LE**
+  (valor × 1000, row-major) = 44 B depois do byte de tipo. Não é float32 (float32
+  só a partir do firmware 1.24.0).
+- Só é aceita com o robô em **Bootloader** (READY). Em Running o net core ignora.
+- O índice 0 zera o buffer; quando chega o **último índice** o net core grava a
+  página de config em flash e **reinicia o robô** (volta para Bootloader). A
+  calibração persiste entre power-ons - é um envio por robô, não por boot.
+- O swarmit manda cada matriz 5× (`COMMAND_MAX_ATTEMPTS`) com 0,3 s entre elas,
+  porque o enlace não é confiável. Máximo 16 estações.
+- **Confirmação**: o bloco DEVICE_INFO do SwarmIT (`0x8F`), que a borda já
+  decodifica - `lh2HomographyCount` + `lh2Flags` (bit0 = `VALID`, bit1 =
+  `FROM_FLASH`).
+- **Arquivo de calibração**: gerado pelo `dotbot` 0.30.0 (ferramenta de
+  calibração, robô em 4 pontos de um quadrado, 500 mm por padrão). TOML
+  `schema_version = 1` em `~/.dotbot/calibrations/calibration-*.toml`, campo
+  `[calibration].data_hex` = 1 B de contagem + N × 36 B; e o legado
+  `~/.dotbot/calibration.out` com os mesmos bytes. Já está no formato do fio:
+  é só fatiar, sem matemática nem OpenCV em TS.
+- Atalho sem código nosso (útil pra validar o hardware antes): `dotbot swarm -n
+  <porta> -b 1000000 lh2-calibration <arquivo>` com a borda DESLIGADA (mesma
+  serial), ou `dotbot device flash-swarmit-sandbox ... -l <arquivo>` no
+  provisionamento por cabo.
+
+**O que o robô manda no `DOTBOT_ADVERTISEMENT` (1.23.0)**
+- `calibrated` vem **fixo 0xFF** (comentário no fonte: o lado seguro ainda não
+  expõe o estado por estação). Não serve pra decidir nada - a fonte da verdade
+  é o DEVICE_INFO do SwarmIT, que **só existe no modo `mari`**.
+- Sem fix ainda: `pos_x/pos_y` = **(0, 0)** (não `0xFFFFFFFF`); `direction`
+  inválida = **-1000** (`DB_DIRECTION_INVALID`), não -1. O firmware descarta
+  posição > 100000 mm e saltos > 500 mm entre fixes.
+- `mode`, `waypoint_idx`, `waypoint_x/y`, pwm e encoders **vêm preenchidos** na
+  1.23.0 (na 1.22.0 eram placeholders zerados). `waypoint_idx` chega a `count`
+  quando o lote termina, então a regra de conclusão do Orchestrator
+  (`waypoint_idx >= nº de pontos`) passa a funcionar.
+- `LH2_WAYPOINTS` no formato antigo (`threshold` u16, `count` u8, N × (x u32,
+  y u32)) - é o que nosso encoder já fala. Máximo **16 pontos**
+  (`DB_MAX_WAYPOINTS`): o excedente é cortado em silêncio, e uma task com mais
+  de 16 pontos nunca conclui.
+- O fotodiodo do DotBot v3 fica 53,5 mm à frente do eixo (a posição é do
+  fotodiodo); `direction` só é confiável depois que o robô anda.
+
+**Versão de firmware**: ficar na **1.23.0** (par do PyDotBot 0.30.0 / swarmit
+0.9.0, ver memória do toolchain). Conferir no `dotbot swarm ... status` que o
+robô está mesmo com a sandbox 1.23.0 - se estiver na 1.22.0, regravar por OTA
+antes (a 1.22.0 manda `waypoint_idx` zerado). Subir pra 1.24/1.25 muda o
+`LH2_WAYPOINTS`, a homografia (float32) e, na 1.25, invalida calibrações e exige
+swarmit 0.11.0 gravado por cabo - fica para depois, de propósito.
+
+#### Borda (`Edge/server/src`) - o que fazer
+
+1. `Enums/SwarmitPayloadType.enum.ts`: `SWARMIT_LH2_CALIBRATION = 0xA1`.
+2. `Protocols/Swarmit/Swarmit.Protocol.ts`: `buildLh2Calibration(count, index,
+   matrix36)` + spec comparando byte a byte com o `PayloadCalibrationData` do
+   swarmit 0.9.0. Helper `isLh2Calibrated(info, expectedCount)` = contagem
+   igual E bit `VALID`.
+3. Leitor de calibração (arquivo novo em `config/`, ex. `lh2.config.ts`): env
+   `LH2_CALIBRATION_FILE` (TOML schema 1 ou `.out`). Valida `1 + N×36`,
+   `1 ≤ N ≤ 16` e a contagem; sem env = LH2 desligada (comportamento de hoje).
+   Documentar no `.env.example`.
+4. `adapter/Mari/SwarmitFleet.ts`: ação **`calibrate`** no `plan()`. Robô em
+   Bootloader, com device-info, calibração carregada e `!isLh2Calibrated` →
+   entra em `actions.calibrate` e **não** recebe START nesse ciclo. Orçamento
+   de tentativas e intervalo próprios (como `startAttempts`/`lastStartAt`).
+   Como o robô reinicia depois da última matriz, o `infoGen` muda, o device-info
+   é pedido de novo e, já calibrado, o fluxo normal dá o START. Spec com
+   timestamps na mão, igual à política de start.
+5. `adapter/Mari/MariGateway.Adapter.ts`: o timer roda se `autoStart` **ou**
+   calibração carregada; envia as N matrizes com `sendSwarmit` (endereçado, um
+   robô por vez, nunca broadcast) e loga. Um método para **forçar** o reenvio
+   (zera o "já confirmado" do nó) quando a arena for recalibrada.
+6. Rota `POST /v1/lh2/calibration/push` (opcional `{ address }`) chamando esse
+   método, e `GET /v1/lh2/calibration` com o que está carregado + estado por
+   robô. Fora do modo `mari` responde que não se aplica.
+7. `Classes/Swarm/Swarm.Service.ts` - `positionOf`: (0,0) = sem fix (`null`);
+   `direction` -1000 ou -1 = `null`; manter o `0xFFFFFFFF` por compatibilidade.
+8. `Robot.State.ts`: campo **`lh2: { valid, deviceCount } | null`** no
+   `robot:state` e no `GET /v1/robots` - **exatamente esses nomes**, que são os
+   do `Lh2Data` da API (`deviceCount` = `lh2HomographyCount` do DEVICE_INFO;
+   `valid` = bit `VALID` do `lh2Flags`). Nome diferente chega `undefined` na API
+   sem erro de compilação. `null` = transporte sem SwarmIT
+   (simulador/MQTT) - **não pode quebrar a frota simulada**. Precisa de um jeito
+   opcional do adapter informar isso (ex. método opcional no
+   `GatewayAdapter.interface`), sem o `SwarmService` conhecer o Mari.
+9. `Classes/Commands/DTO/waypoints.dto.ts`: `ArrayMaxSize(16)` (+ schema do
+   Swagger).
+10. Atualizar `Edge/README.md` com o contrato novo (`lh2` no estado, rotas).
+
+#### Backend (`Backend/server/src`) - FEITO (2026-10-15)
+
+Regra que vale em todos os itens: **`lh2 === null` = "não sei"** (transporte sem
+SwarmIT: simulador/MQTT, ou borda que ainda não manda o campo - o `handleState`
+faz `edgeState.lh2 ?? null`). Nesse caso tudo segue como antes; só `lh2`
+presente e inválido bloqueia algo.
+
+1. `Classes/Edge/Edge.Types.ts`: `EdgeRobotState.lh2: Lh2Data | null`, com
+   `Lh2Data = { valid, deviceCount }`.
+2. `Classes/Swarm/Swarm.Service.ts`: o `RobotState` guarda `lh2` e `position`;
+   o `persistRobot` grava `robots.calibrated` **só quando muda**, no mesmo
+   throttle de status/bateria (`persisted`). **Divergência do plano**: grava
+   **1/0** (calibrado e válido / não), não a contagem de estações. `lh2` null não
+   mexe na coluna. Não usa o `calibrated` do advertisement (0xFF fixo).
+3. Gate de posição no `persistPosition`: LH2 com `lh2` presente e não `valid`
+   (ou `deviceCount` 0) é descartada antes do throttle; GPS e `lh2` null gravam
+   como antes.
+4. Gate de atribuição: `SwarmService.taskBlockReason(address)` devolve o motivo
+   (sem estado da borda / calibração inválida / sem posição) ou `null`; o
+   `OrchestratorService.robotRejection` usa ele no automático (filtra os livres)
+   e no manual (409 com o motivo). **Divergência do plano**: a decisão lê a
+   **memória**, não o banco - no simulador o `lh2` é null e a coluna fica 0, um
+   filtro `calibrated > 0` no `getFreeRobots` bloquearia a frota inteira. O
+   `OrchestratorModule` importa o `SwarmModule` (sem ciclo).
+5. Máximo de 16 waypoints: `MAX_WAYPOINTS` + `@ArrayMaxSize` no
+   `waypoints.dto.ts` (e `maxItems` no Swagger); no Orchestrator via
+   `taskRejection` (automático pula, manual 400). Ainda não há rota que crie
+   waypoints de task (só o seed) - quando existir, validar lá também.
+6. `calibrated` já chegava ao front: `robot:new` e `GET /robots` mandam o
+   `RobotModel` inteiro.
+
+Com a borda atual (sem `lh2`), a única mudança visível é que robô sem posição
+não recebe mais task. O resto liga quando a borda fizer os itens 7-9 + o campo
+`lh2` (item 8), e resolve as tasks presas em `InProgress`.
+
+**Fora deste pacote (conhecido)**: ao receber task nova o robô pode mandar um ou
+dois advertisements com o `waypoint_idx` da task anterior antes do primeiro
+passo de controle; se a task nova tiver o mesmo número de pontos ou menos, o
+Orchestrator pode concluí-la na hora. Raro; tratar depois (ex. ignorar
+`waypoint_idx` até ver `mode` Auto com `waypoint_idx` < total).
+
+**Validação no hardware (ordem)**: (1) calibrar com a ferramenta do `dotbot`
+0.30.0 e conferir o arquivo; (2) borda com `LH2_CALIBRATION_FILE` + robô em
+Bootloader → ver o envio, o reboot e o device-info com `1 basestation (valid,
+from flash)`; (3) START → advertisement com posição ≠ (0,0); (4) task de 1-2
+pontos em Auto → robô anda e a task conclui por `waypoint_idx`.
+
+#### Referência: matriz de versões e formatos das releases novas (1.24+)
+
+Mantido do levantamento de 2026-10-04 (PyDotBot `main` 0.32.0) - só vale se o
+firmware for atualizado.
 
 **Matriz de versões** (as três saem juntas; misturar quebra):
 
 | Firmware | `dotbot-libs` | PyDotBot | O que muda pra nós |
 | --- | --- | --- | --- |
-| 1.22.0 (no robô hoje) | ≤ 0.3.0 | ≤ 0.30.0 | formato antigo - é o que nosso encoder/decoder falam; `waypoint_idx`/`mode` zerados |
+| 1.22.0 / 1.23.0 (1.23.0 no robô) | ≤ 0.3.0 | ≤ 0.30.0 | formato antigo - é o que nosso encoder/decoder falam; `waypoint_idx`/`mode` zerados só na 1.22.0 |
 | **1.24.0** (2026-09-28) | 0.4.0 (pré-tag) | 0.31.0 | **formato novo do `LH2_WAYPOINTS`** (lotes com pose, `batch_id`, limite de velocidade, relatório de conclusão - PR DotBot-libs#35); advertisement estendido; homografia em float32 (#31); EKF odometria+LH2 |
 | **1.25.0** (2026-10-01) | 0.5.0 | 0.32.0 | modelo pinhole da LH2 - **quebra calibrações antigas** (recalibrar); calibração schema 3; exige **swarmit 0.11.0** gravado antes (apps vão OTA depois) |
 
@@ -652,42 +915,6 @@ Formatos novos (PyDotBot `protocol.py`, 0.32.0):
   `batch_id`(1) `max_speed_10mm`(1) `axle_x`(2) `axle_y`(2). Nosso decoder lê só o
   prefixo, então não quebra; o encoder de waypoints quebra.
 - `LH2_CALIBRATION_HOMOGRAPHY` (0x0E): `index`(1) + 9 `float32` row-major (36 B) = 37 B.
-
-**Como o PyDotBot faz** (referência):
-- Calibração é **offline**, ferramenta própria (`dotbot/calibration/`): firmware de
-  calibração lendo contagens LH2 pela serial (115200), robô posto em 4 pontos de um
-  quadrado (`--distance`, padrão 500 mm), `cv2.findHomography` por estação. Salva TOML
-  (schema 3) em `~/.dotbot/calibrations/{site}/` com, por estação, `index` +
-  `homography` 3×3 + `residual_mm`, e `valid_mm` (área válida). Avisa se tiver mais de
-  30 dias (`LH2_CALIBRATION_MAX_AGE_DAYS`). Até 16 estações.
-- Manda a homografia quando o robô se conecta e `calibrated` não cobre todas as
-  estações da calibração carregada: 1 payload 0x0E por estação.
-- Só grava posição se o robô está **totalmente calibrado** E é um fix válido
-  (`is_lh2_fix`, fora do sentinela). Trilha a cada 20 mm.
-- Avisa se o robô tem estação que a calibração não cobre (`_warn_unsolved_stations`).
-- Físico: base stations SteamVR 2.0, canais distintos; no DotBot v3 o fotodiodo fica
-  53,5 mm à frente do eixo (a posição é do fotodiodo); `direction` só é confiável
-  depois que o robô anda.
-
-**Plano (ordem sugerida)**:
-1. **Fixar a versão de firmware** (1.22.0 vs 1.24.0 vs 1.25.0) - decide o formato do
-   encoder de waypoints e da homografia. Hoje o 1.22.0 deixa a regra de conclusão morta.
-2. **Carregar a calibração** no backend: reaproveitar o TOML da ferramenta do PyDotBot
-   (não reimplementar a matemática/OpenCV em TS). Arquivo de config ou tabela
-   (`lh2_calibrations` + `lh2_stations`) - decisão pendente.
-3. **Encoder 0x0E**: o `PayloadCodec` só tem inteiros 1/2/4 B - precisa de float32
-   (`writeFloatLE`) ou montar à mão no wrapper (como waypoints). Validar byte a byte
-   contra o PyDotBot.
-4. **Push da homografia** no advertisement quando `calibrated` não cobre as estações
-   carregadas; controlar por address (estilo `knownRobots`) pra não reenviar a cada
-   frame; reenviar pra frota quando carregar calibração nova.
-5. **Persistir `robots.calibrated`** no `refreshAndPersist` (só quando muda).
-6. **Gate de posição**: só gravar LH2 com robô totalmente calibrado + fix válido. (O
-   simulador fake manda `calibrated=0x01`, então não quebra com 1 estação.)
-7. **Gate de atribuição**: `getFreeRobots` e assign manual só entregam task a robô
-   calibrado com posição válida; validar waypoints da task dentro do `valid_mm`.
-
-Itens 5-7 independem da lighthouse física e já resolvem as tasks presas.
 
 ### Adiado: comportamento de recarga (bateria baixa) - DECISÃO DE DESIGN PENDENTE
 
@@ -790,6 +1017,9 @@ de verdade, não só retornar erro)
     também aciona o `Orchestrator` (bloco F).
 
 ## Rede Mari (transporte real - EM ESCOPO)
+
+> Desde 2026-10-10 quem abre a serial é a **borda** (`Edge/server`, `GATEWAY_MODE=mari`
+> no `.env` dela), não a API - ver "Divisão API × borda".
 
 Decidido pelo dono do projeto: o sistema **tem** que funcionar com o robô e o
 gateway **reais** - a Mari está no escopo, não é "trabalho futuro". Pesquisa
@@ -942,6 +1172,9 @@ Validar o `send` (cadeia inteira até o HDLC) contra o marilib, como no HDLC/pro
 > network_id dinamicamente, e usar `NODE_JOINED`/`NODE_LEFT` pra presença de nós.
 
 ## Conexão com o RobotSwarmSimulator (transporte MQTT — EM ESCOPO)
+
+> Desde 2026-10-10 quem conecta no broker é a **borda** (`Edge/server`, `GATEWAY_MODE=mqtt`
+> no `.env` dela); a API só fala com a borda - ver "Divisão API × borda".
 
 Além do gateway FÍSICO (serial/HDLC, seção "Rede Mari"), existe um repo
 separado — **RobotSwarmSimulator** (TypeScript/Vite) — que **impersona gateway
@@ -1132,15 +1365,19 @@ cd RobotSwarmSimulator && docker compose up -d      # Mosquitto: 1883 (TCP) + 90
 npm install                                          # 1ª vez
 MQTT_URL=mqtt://localhost:1883 npm run gateway       # usa scenarios/exemplo.json (NETID 1200)
 
-# 4) Backend NestJS no modo MQTT
-cd Backend/server
+# 4) Borda no modo MQTT
+cd Edge/server
 # .env: GATEWAY_MODE=mqtt, MARI_NETWORK_ID=0x1200, MQTT_URL=mqtt://localhost:1883
+npm install && npm run start:dev
+
+# 5) API (fala só com a borda: EDGE_URL=http://localhost:3001)
+cd Backend/server
 npm install && npm run start:dev
 ```
 
-Validação: o log do backend deve mostrar `[MQTT] conectado ... assinando
-/mari/1200/to_cloud`; em segundos o `SwarmService` decodifica os advertisements
-da frota e o auto-cadastro cria os robôs. Conferir em `GET /robots/:address/status`
+Validação: o log da borda deve mostrar `[MQTT] conectado ... assinando
+/mari/1200/to_cloud` e o da API `[EDGE] conectado na borda`; em segundos a borda
+decodifica os advertisements da frota e o auto-cadastro da API cria os robôs. Conferir em `GET /robots/:address/status`
 (ex.: `BDF2B04BC00D2725`, do `exemplo.json`) e mandar um comando de volta com
 `PUT /robots/:address/move-raw` — o log do gateway simulado deve mostrar o
 `⇩ move-raw` chegando.
@@ -1157,7 +1394,7 @@ da frota e o auto-cadastro cria os robôs. Conferir em `GET /robots/:address/sta
 >    antes). É por isso que o Mosquitto expõe 1883 (TCP, gateway/backend) **e**
 >    9001 (WebSocket, browser).
 >
-> Nos dois casos o backend precisa estar em `GATEWAY_MODE=mqtt` e com o
+> Nos dois casos a borda precisa estar em `GATEWAY_MODE=mqtt` e com o
 > `MARI_NETWORK_ID` batendo com o `network.id` do cenário (0x1200 no exemplo).
 
 > **Swarmit (orquestração) fica de fora por ora**: o `onCloudMessage` filtra
@@ -1176,8 +1413,9 @@ da frota e o auto-cadastro cria os robôs. Conferir em `GET /robots/:address/sta
   recalculada o tempo todo a partir de `lastSync`, não escolhida.
 - Não confundir `uuid` (chave interna do Postgres) com `address` (chave
   física do protocolo) - frames de rádio são endereçados por `address`.
-- Não gravar nem comparar `address` sem passar por `Protocol.normalizeAddress`
-  (ou `Protocol.readAddress`, ao ler dos bytes). A forma canônica é hex em
+- Não gravar nem comparar `address` sem passar por `normalizeAddress`
+  (`src/Helpers/Address.ts` na API; `Protocol.normalizeAddress`/`Protocol.readAddress`
+  na borda, ao ler dos bytes). A forma canônica é hex em
   **MAIÚSCULAS** (igual swarmit/CLI). O `toString(16)` devolve minúsculas e o
   Postgres compara com caixa: antes disso, robô cadastrado em maiúsculas não
   casava com o que chegava da rede, o auto-cadastro criava uma duplicata em

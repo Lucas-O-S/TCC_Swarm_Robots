@@ -15,6 +15,11 @@ export abstract class BaseRepository<T extends Model> {
         return await this.model.create(dto as any);
     }
 
+    /** Várias linhas num INSERT só (bulkCreate) - pra quem grava em lote. */
+    async insertMany(dtos: Partial<T>[]): Promise<T[]> {
+        return await this.model.bulkCreate(dtos as any[]);
+    }
+
     async update(dto: Partial<T>, uuid: string): Promise<boolean> {
         const [affectedRows] = await this.model.update(dto as any, {
             where: { uuid } as any,
