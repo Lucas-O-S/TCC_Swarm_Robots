@@ -1,48 +1,98 @@
-import { useState } from 'react';
-import { Card } from '../../components/Card/Card';
-import { HexBackground } from './components/HexBackground';
-import { SwarmMap } from './components/SwarmMap';
-import { RobotList } from './components/RobotList';
-import { AlertList } from './components/AlertList';
-import type { Robot, Alert } from './types';
+import { Button } from '../../components/Button/Button';
+import { MapElementsProvider, useMapElementsState } from '../../hooks/useMapElements';
+import { useSwarmGrid } from './hooks/useSwarmGrid';
+import { SwarmGrid } from './components/SwarmGrid';
+import { ConnectionList } from './components/ConnectionList';
+import { ConnectionLog } from './components/ConnectionLog';
+import { useRobotConnections } from './hooks/useRobotConnections';
+import { toConnectionLog } from './robotConnections';
 import styles from './DashboardScreen.module.css';
 
-// Dados de exemplo (provisórios). Trocar pela fonte real quando existir.
-const robots: Robot[] = [
-  { id: 0, label: 'R01', col: 2,  row: 1, online: true,  status: 'Operacional',  tarefa: 'Coletando ferramentas' },
-  { id: 1, label: 'R02', col: 3,  row: 2, online: true,  status: 'Operacional',  tarefa: 'Mapeando área B' },
-  { id: 2, label: 'R03', col: 5,  row: 4, online: true,  status: 'Retornando',   tarefa: 'Recarga de bateria' },
-  { id: 3, label: 'R04', col: 10, row: 9, online: true,  status: 'Aguardando',   tarefa: 'Nenhuma' },
-  { id: 4, label: 'R05', col: 7,  row: 6, online: false, status: 'Desconectado', tarefa: 'Desconhecida' },
-  { id: 5, label: 'R06', col: 9,  row: 3, online: false, status: 'Desconectado', tarefa: 'Desconhecida' },
-];
-
-const alerts: Alert[] = [
-  { id: 0, timestamp: '[25/05 20:42]', message: 'R05 foi desconectado', level: 'critico' },
-  { id: 1, timestamp: '[25/05 20:43]', message: 'R06 foi desconectado', level: 'critico' },
-];
-
 export function DashboardScreen() {
-  // Estado compartilhado: robô destacado no mapa e na lista.
-  const [hoveredId, setHoveredId] = useState<number | null>(null);
+  const { robots, state, retry } = useRobotConnections();
+  const {
+    obstacles,
+    chargePoint,
+    placingCharge,
+    toggleChargePlacement,
+    handleCellClick,
+    addObstacle,
+    removeObstacle,
+    clearObstacles,
+    reloadScenario,
+  } = useSwarmGrid();
+
+  // Criado aqui (não dentro do <SwarmGrid>) porque a ConnectionList — uma
+  // lista normal no layout da tela, não um drawer flutuante — também
+  // precisa ler/escrever a mesma seleção (ver useMapSelection). Envolvendo
+  // os dois no mesmo Provider, ambos enxergam o mesmo estado.
+  const mapElements = useMapElementsState();
+
+  const onlineCount = robots.filter((r) => r.status !== 'offline').length;
 
   return (
-    <div className={styles.screen}>
-      <HexBackground />
+    <MapElementsProvider value={mapElements.contextValue}>
+      <div className={styles.screen}>
+        <div className={styles.headerRow}>
+          <h2 className={styles.title}>
+            Visualização do enxame — {onlineCount}/{robots.length} robôs online — tempo real
+          </h2>
+          <div className={styles.headerActions}>
+            <Button variant={placingCharge ? 'accent' : 'outline'} onClick={toggleChargePlacement}>
+              {placingCharge ? 'Clique no mapa...' : 'Definir ponto de recarregamento'}
+            </Button>
+            <Button variant="outline" onClick={reloadScenario}>
+              Recarregar cenário
+            </Button>
+          </div>
+        </div>
 
-      <div className={styles.container}>
-        <main>
-          <Card>
-            <h2 className={styles.mapaTitle}>Mapa do Enxame</h2>
-            <SwarmMap robots={robots} hoveredId={hoveredId} onHover={setHoveredId} />
-          </Card>
-        </main>
+        {state.status === 'loading' && <p className={styles.hint}>Carregando robôs...</p>}
+        {state.status === 'error' && (
+          <p className={styles.hint} role="alert">
+            {state.message}{' '}
+            <Button variant="outline" onClick={retry}>
+              Tentar de novo
+            </Button>
+          </p>
+        )}
+        {state.status === 'ready' && robots.length === 0 && (
+          <p className={styles.hint}>Nenhum robô cadastrado ainda.</p>
+        )}
 
-        <aside className={styles.painel}>
-          <RobotList robots={robots} hoveredId={hoveredId} onHover={setHoveredId} />
-          <AlertList alerts={alerts} />
-        </aside>
+        <div className={styles.body}>
+          <div className={styles.mapColumn}>
+            <SwarmGrid
+              robots={robots}
+              obstacles={obstacles}
+              chargePoint={chargePoint}
+              placingCharge={placingCharge}
+              onCellClick={handleCellClick}
+              onObstacleClick={removeObstacle}
+              elements={mapElements}
+            />
+
+            <div className={styles.mapActions}>
+              <Button variant="outline" onClick={addObstacle}>
+                + Adicionar obstáculo
+              </Button>
+              <Button variant="outline" onClick={clearObstacles}>
+                Limpar obstáculos
+              </Button>
+            </div>
+
+            <p className={styles.hint}>
+              Ponto de recarregamento ativo — robôs com tarefa quase concluída seguem até ele
+              automaticamente.
+            </p>
+          </div>
+
+          <aside className={styles.painel}>
+            <ConnectionList robots={robots} />
+            <ConnectionLog entries={toConnectionLog(robots)} />
+          </aside>
+        </div>
       </div>
-    </div>
+    </MapElementsProvider>
   );
 }
