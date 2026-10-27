@@ -1,0 +1,2 @@
+# dotbot config. Options + examples: https://pydotbot.readthedocs.io/en/latest/reference/configuration.html
+# (MQTT credentials are env-only: DOTBOT_MQTT_USER / DOTBOT_MQTT_PASS.)
