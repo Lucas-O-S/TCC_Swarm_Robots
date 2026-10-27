@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { hostname } from 'os';
 
 /**
  * Config da própria borda (o resto - serial, MQTT, simulador fake - fica nos
@@ -12,10 +13,13 @@ import 'dotenv/config';
  *
  * `backendUrl`: back para o qual a borda abre o uplink (socket.io-client, com
  * o mesmo EDGE_TOKEN). Vazio = uplink desligado.
+ *
+ * `edgeId`: nome desta borda no back (vai no auth do uplink). Default: hostname.
  */
 export const edgeConfig = {
     port: Number(process.env.EDGE_PORT ?? 3001),
     authActivated: process.env.EDGE_AUTH_ACTIVATED === 'true',
     token: process.env.EDGE_TOKEN ?? '',
     backendUrl: process.env.BACKEND_URL ?? '',
+    edgeId: process.env.EDGE_ID || hostname(),
 };

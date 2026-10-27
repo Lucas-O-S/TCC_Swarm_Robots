@@ -10,4 +10,9 @@ export enum EdgeSocketEvents {
     RobotStatus = "robot:status",
     /** Primeiro advertisement de um robô desde que a borda subiu. */
     RobotJoined = "robot:joined",
+    /** Quadro inteiro da frota, mandado pelo uplink a cada (re)conexão (RobotSnapshotEvent). */
+    RobotSnapshot = "robot:snapshot",
+    /** Comando vindo do back pelo uplink, com ack (UplinkCommand → UplinkCommandReply). */
+    RobotCommand = "robot:command",
+
 }
