@@ -41,7 +41,15 @@ if ! sudo docker compose version >/dev/null 2>&1; then
     -o "$PLUGINS/docker-compose"
   sudo chmod +x "$PLUGINS/docker-compose"
 fi
-if ! sudo docker buildx version >/dev/null 2>&1; then
+# O pacote docker do Amazon Linux pode trazer um buildx antigo; o compose
+# exige 0.17+ ("compose build requires buildx 0.17.0 or later").
+buildx_ok() {
+  local v
+  v=$(sudo docker buildx version 2>/dev/null | awk '{print $2}' | sed 's/^v//')
+  [ -n "$v" ] || return 1
+  [ "$(printf '%s\n' 0.17.0 "$v" | sort -V | head -1)" = 0.17.0 ]
+}
+if ! buildx_ok; then
   # /releases/latest redireciona para /releases/tag/vX.Y.Z: pega a versão dali.
   BUILDX_VERSION=$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/docker/buildx/releases/latest | sed 's#.*/tag/##')
   sudo curl -fsSL "https://github.com/docker/buildx/releases/download/$BUILDX_VERSION/buildx-$BUILDX_VERSION.linux-$GOARCH" \
@@ -50,14 +58,6 @@ if ! sudo docker buildx version >/dev/null 2>&1; then
 fi
 sudo docker compose version
 sudo docker buildx version
-
-step "Tailscale (rede privada até a borda no seu Mac)"
-if ! command -v tailscale >/dev/null; then
-  sudo curl -fsSL https://pkgs.tailscale.com/stable/amazon-linux/2023/tailscale.repo \
-    -o /etc/yum.repos.d/tailscale.repo
-  sudo dnf install -y tailscale >/dev/null
-fi
-sudo systemctl enable --now tailscaled
 
 step "Arquivo deploy/.env"
 if [ -f "$DEPLOY_DIR/.env" ]; then
@@ -85,7 +85,7 @@ fi
 cat <<MSG
 
 Pronto. Próximos passos (README):
-  1. sudo tailscale up --hostname tcc-aws --accept-dns=false   -> abra o link que aparecer e entre na mesma conta do Mac
-  2. nano $DEPLOY_DIR/.env          -> EDGE_URL com o IP 100.x do Mac; copie o EDGE_TOKEN pro Mac
-  3. cd $DEPLOY_DIR && sudo docker compose up -d --build
+  1. cd $DEPLOY_DIR && sudo docker compose up -d --build
+  2. No Edge/server/.env da borda: BACKEND_URL=https://api.$(grep '^DOMAIN=' "$DEPLOY_DIR/.env" | cut -d= -f2)/edge
+     e o mesmo EDGE_TOKEN deste servidor:  grep EDGE_TOKEN $DEPLOY_DIR/.env
 MSG

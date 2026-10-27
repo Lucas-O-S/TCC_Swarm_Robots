@@ -8,4 +8,8 @@ export enum EdgeSocketEvents {
     RobotStates = "robot:states",
     RobotStatus = "robot:status",
     RobotJoined = "robot:joined",
+    RobotSnapshot = "robot:snapshot",
+    /** Este vai no sentido contrário: API → borda, com ack (EdgeCommandAck). */
+    RobotCommand = "robot:command",
+
 }

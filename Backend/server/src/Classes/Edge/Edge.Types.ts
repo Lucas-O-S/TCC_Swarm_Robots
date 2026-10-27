@@ -45,6 +45,30 @@ export interface EdgeRobotStatusEvent {
     lastSync: string;
 }
 
+/** O que a API manda no `robot:command` (borda conectada no /edge). */
+export interface EdgeCommandRequest {
+    address: string;
+    command: string;
+    payload: any;
+}
+
+/**
+ * Ack do `robot:command`. Espelha UplinkCommandReply da borda
+ * (Edge/server/src/Classes/Uplink/Uplink.Types.ts): `status` segue o HTTP
+ * da rota de comando (400 = corpo recusado, 500 = erro da borda).
+ */
+export type EdgeCommandAck =
+    | { ok: true; data: unknown }
+    | { ok: false; status: number; message: string };
+
+/**
+ * Evento `robot:snapshot`: quadro inteiro da frota, mandado pela borda a cada
+ * (re)conexão no /edge. Espelha RobotSnapshotEvent da borda.
+ */
+export interface EdgeRobotSnapshotEvent {
+    robots: EdgeRobotSnapshot[];
+}
+
 /** Item de GET /v1/robots. */
 export interface EdgeRobotSnapshot {
     address: string;

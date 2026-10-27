@@ -1,17 +1,23 @@
 import { HttpException, HttpStatus, Injectable, OnModuleDestroy, OnModuleInit, ServiceUnavailableException } from "@nestjs/common";
 import { io, Socket } from "socket.io-client";
+import { Socket as EdgeSocket } from "socket.io";
 import { edgeConfig } from "src/config/edge.config";
 import { Command } from "src/Enums/Command.enum";
 import { EdgeSocketEvents } from "src/Enums/EdgeSocketEvents.enum";
-import { EdgeRobotSnapshot, EdgeRobotState, EdgeRobotStatesEvent, EdgeRobotStatusEvent } from "./Edge.Types";
+import { EdgeGateway } from "./Edge.Gateway";
+import { EdgeCommandAck, EdgeCommandRequest, EdgeRobotSnapshot, EdgeRobotSnapshotEvent, EdgeRobotState, EdgeRobotStatesEvent, EdgeRobotStatusEvent } from "./Edge.Types";
 
 /**
  * Único ponto da API que conversa com a borda. Substitui o antigo
  * GatewayAdapter: em vez de bytes, fala o contrato público da borda.
- *  - comandos: HTTP  POST {EDGE_URL}/v1/robots/:address/commands/:comando
+ *  - comandos: `robot:command` com ack pela borda conectada no /edge; sem
+ *    ela e com EDGE_URL definido, HTTP POST {EDGE_URL}/v1/robots/:address/commands/:comando
  *  - telemetria: socket.io  robot:states (lote) / robot:status
- * Ao (re)conectar, puxa GET /v1/robots para não perder robô que anunciou
- * enquanto a API estava fora.
+ * Dois jeitos de receber a telemetria, os dois alimentam os mesmos listeners:
+ *  - borda conecta na API (namespace /edge, EdgeGateway) e manda
+ *    robot:snapshot ao conectar;
+ *  - API conecta na borda (só com EDGE_URL definido) e puxa GET /v1/robots
+ *    a cada (re)conexão.
  */
 @Injectable()
 export class EdgeClient implements OnModuleInit, OnModuleDestroy {
@@ -25,7 +31,13 @@ export class EdgeClient implements OnModuleInit, OnModuleDestroy {
     // Evita repetir o aviso de "borda fora" a cada tentativa de reconexão.
     private warnedOffline = false;
 
+    constructor(private readonly edgeGateway: EdgeGateway) {}
+
     onModuleInit(): void {
+        this.edgeGateway.onEdgeConnected((socket) => this.attach(socket));
+
+        if (!edgeConfig.url) return;
+
         this.socket = io(edgeConfig.url, {
             auth: edgeConfig.token ? { token: edgeConfig.token } : undefined,
             transports: ["websocket"],
@@ -50,12 +62,35 @@ export class EdgeClient implements OnModuleInit, OnModuleDestroy {
             console.warn(`[EDGE] não conectou na borda em ${edgeConfig.url} (${error.message}) - tentando de novo em segundo plano`);
         });
 
-        // A borda manda em lote; cada item segue pros listeners como antes.
-        this.socket.on(EdgeSocketEvents.RobotStates, (event: EdgeRobotStatesEvent) => {
-            for (const state of event.states) this.publishState(state);
-        });
-
+        this.socket.on(EdgeSocketEvents.RobotStates, (event: EdgeRobotStatesEvent) => this.onStates(event));
         this.socket.on(EdgeSocketEvents.RobotStatus, (event: EdgeRobotStatusEvent) => this.publishStatus(event));
+    }
+
+    /** Borda que acabou de entrar no /edge: mesmos eventos + o snapshot inicial. */
+    private attach(socket: EdgeSocket): void {
+        socket.on(EdgeSocketEvents.RobotSnapshot, (event: EdgeRobotSnapshotEvent) => {
+            if (!Array.isArray(event?.robots)) return;
+            this.applySnapshot(event.robots);
+        });
+        socket.on(EdgeSocketEvents.RobotStates, (event: EdgeRobotStatesEvent) => this.onStates(event));
+        socket.on(EdgeSocketEvents.RobotStatus, (event: EdgeRobotStatusEvent) => this.publishStatus(event));
+    }
+
+    // A borda manda em lote; cada item segue pros listeners como antes.
+    private onStates(event: EdgeRobotStatesEvent): void {
+        if (!Array.isArray(event?.states)) return;
+        for (const state of event.states) this.publishState(state);
+    }
+
+    private async resync(): Promise<void> {
+        this.applySnapshot(await this.getRobots());
+    }
+
+    private applySnapshot(snapshots: EdgeRobotSnapshot[]): void {
+        for (const snapshot of snapshots) {
+            this.publishState(snapshot.state);
+            this.publishStatus({ address: snapshot.address, status: snapshot.status, lastSync: snapshot.state.updatedAt });
+        }
     }
 
     onModuleDestroy(): void {
@@ -73,22 +108,36 @@ export class EdgeClient implements OnModuleInit, OnModuleDestroy {
         this.statusListeners.push(callback);
     }
 
-    /** Manda um comando para o robô pela borda. Erro da borda vira HttpException aqui. */
+    /**
+     * Manda um comando para o robô pela borda. Erro da borda vira HttpException
+     * aqui: sem borda 503, 400/404 repassa, 5xx/token recusado/timeout 502.
+     * Sem borda no /edge e com EDGE_URL definido, vai por HTTP como antes.
+     */
     async sendCommand(address: string, command: Command, payload: any): Promise<unknown> {
-        return this.request("POST", `/v1/robots/${encodeURIComponent(address)}/commands/${command}`, payload);
+        const edge = this.edgeGateway.current;
+        if (!edge && edgeConfig.url) {
+            return this.request("POST", `/v1/robots/${encodeURIComponent(address)}/commands/${command}`, payload);
+        }
+        if (!edge) throw new ServiceUnavailableException("Nenhuma borda conectada");
+
+        const request: EdgeCommandRequest = { address, command, payload };
+        let ack: EdgeCommandAck;
+        try {
+            ack = await edge.timeout(edgeConfig.requestTimeoutMs).emitWithAck(EdgeSocketEvents.RobotCommand, request);
+        } catch {
+            throw new HttpException(`Borda não respondeu em ${edgeConfig.requestTimeoutMs} ms`, HttpStatus.BAD_GATEWAY);
+        }
+
+        if (ack?.ok === true) return ack.data;
+        if (ack?.ok === false && typeof ack.status === "number") {
+            throw new HttpException(`Borda: ${ack.message ?? "erro sem mensagem"}`, this.toApiStatus(ack.status));
+        }
+        throw new HttpException("Borda: resposta inválida", HttpStatus.BAD_GATEWAY);
     }
 
     /** Quadro atual da frota segundo a borda. */
     async getRobots(): Promise<EdgeRobotSnapshot[]> {
         return this.request<EdgeRobotSnapshot[]>("GET", "/v1/robots");
-    }
-
-    private async resync(): Promise<void> {
-        const snapshots = await this.getRobots();
-        for (const snapshot of snapshots) {
-            this.publishState(snapshot.state);
-            this.publishStatus({ address: snapshot.address, status: snapshot.status, lastSync: snapshot.state.updatedAt });
-        }
     }
 
     private publishState(state: EdgeRobotState): void {
@@ -125,14 +174,17 @@ export class EdgeClient implements OnModuleInit, OnModuleDestroy {
 
         if (!response.ok) {
             const detail = Array.isArray(json?.message) ? json.message.join("; ") : (json?.message ?? response.statusText);
-            // 400/404 da borda são erro do pedido: repassa igual. Token recusado
-            // ou falha interna da borda são problema entre API e borda: 502.
-            const status = response.status >= 500 || response.status === 401 || response.status === 403
-                ? HttpStatus.BAD_GATEWAY
-                : response.status;
-            throw new HttpException(`Borda: ${detail}`, status);
+            throw new HttpException(`Borda: ${detail}`, this.toApiStatus(response.status));
         }
 
         return json as T;
+    }
+
+    // 400/404 da borda são erro do pedido: repassa igual. Token recusado
+    // ou falha interna da borda são problema entre API e borda: 502.
+    private toApiStatus(edgeStatus: number): number {
+        return edgeStatus >= 500 || edgeStatus === 401 || edgeStatus === 403
+            ? HttpStatus.BAD_GATEWAY
+            : edgeStatus;
     }
 }
