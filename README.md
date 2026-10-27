@@ -37,7 +37,22 @@ Copie ou confira o arquivo `Backend/server/.env`. Os valores padrão já batem c
 | `DB_PASSWORD`| `123456`         |
 | `DB_NAME`    | `mari_database`  |
 
-### 3. Iniciar o servidor
+### 3. Iniciar a borda (Edge)
+
+A borda é quem fala com o hardware (serial do gateway Mari) ou com o
+RobotSwarmSimulator (MQTT). Configure `Edge/server/.env` a partir do
+`.env.example` (`GATEWAY_MODE`, `MARI_*`, `MQTT_*`):
+
+```bash
+cd Edge/server
+npm install
+npm run start:dev
+```
+
+Ela sobe na porta `3001` (Swagger em [http://localhost:3001/api](http://localhost:3001/api)).
+Contrato e detalhes em [`Edge/README.md`](Edge/README.md).
+
+### 4. Iniciar a API
 
 ```bash
 cd Backend/server
@@ -45,11 +60,14 @@ npm install
 npm run start:dev
 ```
 
+A API encontra a borda por `EDGE_URL` (default `http://localhost:3001`) e sobe
+mesmo com ela fora, reconectando sozinha.
+
 Use `npm run start` para rodar sem hot-reload, ou `npm run start:prod` após `npm run build`.
 
 > **Atenção:** use `npm run start`, não `npx run start`. O segundo executa um pacote diferente e vai falhar.
 
-### 4. Acessar a API
+### 5. Acessar a API
 
 - API: [http://localhost:3000](http://localhost:3000)
 - Swagger: [http://localhost:3000/api](http://localhost:3000/api)
@@ -59,8 +77,10 @@ Use `npm run start` para rodar sem hot-reload, ou `npm run start:prod` após `np
 ```
 Backend/
   docker-compose.yml      # PostgreSQL
-  server/                 # NestJS (API)
+  server/                 # NestJS (API do front: negócio, banco, socket.io pro front)
     database/sql/init.sql # Schema inicial
+Edge/
+  server/                 # NestJS (borda: serial/Mari, MQTT do simulador, REST /v1 + socket.io)
 Frontend/                 # (em breve)
 ```
 

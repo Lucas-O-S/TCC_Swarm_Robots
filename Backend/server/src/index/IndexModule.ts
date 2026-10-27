@@ -5,6 +5,7 @@ import { TaskModule } from "src/Classes/Tasks/Task.module";
 import { PositionModule } from "src/Classes/Positions/Position.module";
 import { SwarmModule } from "src/Classes/Swarm/Swarm.Module";
 import { OrchestratorModule } from "src/Classes/Orchestrator/Orchestrator.Module";
+import { ScenarioModule } from "src/Classes/Scenario/Scenario.Module";
 import { EventEmitterModule } from "@nestjs/event-emitter/dist/event-emitter.module";
 
 /**
@@ -20,5 +21,6 @@ export const AllModules = [
     PositionModule,
     SwarmModule,
     OrchestratorModule,
+    ScenarioModule,
     EventEmitterModule.forRoot()
 ];

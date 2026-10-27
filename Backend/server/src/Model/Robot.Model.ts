@@ -35,7 +35,11 @@ export class RobotModel extends BaseModel<RobotModel> {
     @Column({ type: DataType.SMALLINT, allowNull: false })
     mode: RobotControlMode;
 
-    /** Bitmask de calibração LH2: bit0 = lighthouse 1, bit1 = lighthouse 2. */
+    /**
+     * Calibração LH2: 1 = calibrado e válido, 0 = não. Vem do DEVICE_INFO do
+     * SwarmIT (campo `lh2` da borda), não do advertisement (lá é 0xFF fixo).
+     * Sem SwarmIT (simulador/MQTT) não é atualizado.
+     */
     @Default(0)
     @Column({ type: DataType.SMALLINT, allowNull: false })
     calibrated: number;

@@ -107,7 +107,7 @@ CREATE TABLE position (
     FOREIGN KEY (robot_id) REFERENCES robots(uuid)
 );
 
-CREATE TABLE cenario (
+CREATE TABLE scenario (
     
     uuid UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
@@ -131,12 +131,12 @@ CREATE TABLE obstacle (
     start_point_x INT NOT NULL,
     start_point_y INT NOT NULL, 
     
-    cenario_id UUID NOT NULL,
+    scenario_id UUID NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL,
 
-    FOREIGN KEY (cenario_id) REFERENCES cenario(uuid)
+    FOREIGN KEY (scenario_id) REFERENCES scenario(uuid)
 );
 
 
