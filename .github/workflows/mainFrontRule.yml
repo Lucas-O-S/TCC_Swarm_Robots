@@ -32,3 +32,10 @@ jobs:
           echo "Branch de origem: $HEAD_REF"
           echo "Branch de destino: $BASE_REF"
           echo "Fazendo deploy..."
+
+  # Lint e build do front do PR. Para o merge ficar travado quando falhar,
+  # marque este check como obrigatório na regra da branch main-Front
+  # (deploy/README.md, "Verificação no PR").
+  verificar:
+    name: Verificar frontend
+    uses: ./.github/workflows/frontVerify.yml
