@@ -1,5 +1,6 @@
 import { OnGatewayInit, WebSocketGateway, WebSocketServer } from "@nestjs/websockets";
 import { Server } from "socket.io";
+import { UplinkService } from "src/Classes/Uplink/Uplink.Service";
 import { EdgeSocketEvents } from "src/Enums/EdgeSocketEvents.enum";
 import { bearerToken, isEdgeTokenValid } from "src/Classes/Auth/EdgeToken.Guard";
 import { RobotJoinedEvent, RobotState, RobotStatesEvent, RobotStatusEvent } from "src/Classes/Swarm/Robot.State";
@@ -27,13 +28,17 @@ export class EdgeWebsockets implements OnGatewayInit {
     @WebSocketServer()
     private server!: Server;
 
+    constructor(private readonly uplink: UplinkService) {}
+
     afterInit(server: Server): void {
         server.use((socket, next) => {
             const token = socket.handshake.auth?.token ?? bearerToken(socket.handshake.headers?.authorization);
+            
             if (isEdgeTokenValid(token)) {
                 next();
                 return;
             }
+            
             console.warn(`[EDGE] conexão socket.io recusada (token inválido): ${socket.id}`);
             next(new Error("Token da borda ausente ou inválido"));
         });
@@ -53,12 +58,18 @@ export class EdgeWebsockets implements OnGatewayInit {
     // assim o cliente continua vendo os eventos na ordem em que aconteceram.
     emitStatus(event: RobotStatusEvent): void {
         this.flushStates();
-        this.server.emit(EdgeSocketEvents.RobotStatus, event);
+        this.broadcast(EdgeSocketEvents.RobotStatus, event);
     }
 
     emitJoined(event: RobotJoinedEvent): void {
         this.flushStates();
-        this.server.emit(EdgeSocketEvents.RobotJoined, event);
+        this.broadcast(EdgeSocketEvents.RobotJoined, event);
+    }
+
+    // Mesmo evento para os clientes conectados aqui e para o back pelo uplink.
+    private broadcast(event: EdgeSocketEvents, payload: unknown): void {
+        this.server.emit(event, payload);
+        this.uplink.emit(event, payload);
     }
 
     private flushStates(): void {
@@ -67,6 +78,6 @@ export class EdgeWebsockets implements OnGatewayInit {
         if (this.pendingStates.length === 0) return;
         const event: RobotStatesEvent = { states: this.pendingStates };
         this.pendingStates = [];
-        this.server.emit(EdgeSocketEvents.RobotStates, event);
+        this.broadcast(EdgeSocketEvents.RobotStates, event);
     }
 }

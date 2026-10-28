@@ -1,6 +1,7 @@
 import { SwarmModule } from "src/Classes/Swarm/Swarm.Module";
 import { CommandModule } from "src/Classes/Commands/Command.Module";
 import { Lh2Module } from "src/Classes/Lh2/Lh2.Module";
+import { UplinkBridgeModule } from "src/Classes/Bridge/Bridge.Module";
 
 /**
  * Lista central de módulos da borda (mesmo padrão do IndexModule da API) -
@@ -10,4 +11,5 @@ export const AllModules = [
     SwarmModule,
     CommandModule,
     Lh2Module,
+    UplinkBridgeModule
 ];
