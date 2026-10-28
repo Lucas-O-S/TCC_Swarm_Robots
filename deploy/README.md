@@ -3,7 +3,7 @@
 Tutorial completo para qualquer pessoa montar o servidor, ligar a borda (robô real) e configurar o GitHub com as pipelines de verificação e deploy.
 
 ```
- Navegador ──HTTPS──►  EC2 na AWS (1 máquina, 3 containers)           Mac com o gateway no USB
+ Navegador ──HTTPS──►  EC2 na AWS (1 máquina, 3 containers)           Computador da borda (Windows, Linux ou Mac)
                        ├─ web      Caddy: front + certificado HTTPS   ├─ Edge/server (borda)
                        ├─ backend  NestJS ◄──── wss …/edge ───────── │   └─ USB ─ gateway ─ rádio ─ robô
                        └─ db       Postgres (sem porta pública)
@@ -15,7 +15,7 @@ Tutorial completo para qualquer pessoa montar o servidor, ligar a borda (robô r
 - **Endereço grátis com HTTPS**: o [sslip.io](https://sslip.io) transforma o IP em nome (`54-12-34-56.sslip.io` → `54.12.34.56`) e o Caddy tira o certificado sozinho.
   - Front: `https://54-12-34-56.sslip.io`
   - API: `https://api.54-12-34-56.sslip.io` (Swagger em `/api`)
-- **A borda fica no Mac** (precisa do USB do gateway) e é **ela que conecta no back** (`wss://api.<domínio>/edge`, com o `EDGE_TOKEN`), como um navegador abrindo um site. Funciona em qualquer rede com internet, sem abrir porta no Mac e sem VPN. Telemetria e comandos passam por essa conexão.
+- **A borda roda em qualquer computador** (Windows, Linux ou Mac) com internet e uma porta USB para o gateway, e é **ela que conecta no back** (`wss://api.<domínio>/edge`, com o `EDGE_TOKEN`), como um navegador abrindo um site. Funciona em qualquer rede com internet, sem abrir porta nesse computador e sem VPN. Telemetria e comandos passam por essa conexão.
 - **Deploy automático e separado**: merge na `main-Back` sobe só o back; merge na `main-Front` sobe só o front. A `main` não faz deploy.
 
 ## Roteiro
@@ -23,7 +23,7 @@ Tutorial completo para qualquer pessoa montar o servidor, ligar a borda (robô r
 | Parte | Passos | Onde |
 |---|---|---|
 | A. Servidor | 1 a 9: criar a EC2, IP fixo, baixar o código, preparar, conferir o `.env`, subir, primeiro usuário | Console da AWS + terminal da EC2 |
-| B. Borda | 10: ligar a borda no back | Mac |
+| B. Borda | 10: preparar o computador da borda e ligar no back | Computador da borda (Windows, Linux ou Mac) |
 | C. GitHub | 11 a 15: runner na EC2, segurança do Actions, regras das branches, variáveis, primeiro deploy | GitHub + terminal da EC2 |
 | D. Referência | como a pipeline funciona, dia a dia, banco, problemas comuns, segurança, outro ambiente | — |
 
@@ -51,8 +51,8 @@ Tutorial completo para qualquer pessoa montar o servidor, ligar a borda (robô r
 
 ## Antes de começar
 
-1. **Acessos**: AWS Academy com o Learner Lab; no GitHub, ser **admin** do repositório (precisa ver a aba **Settings**); um Mac com a borda e o gateway.
-2. **Branches prontas**: a `main-Back` e a `main-Front` precisam ter os arquivos da tabela acima. O front tem que passar no `npm run build` (em `Frontend/`, no seu Mac): é o mesmo comando do servidor e da pipeline, e um `error TS...` aí derruba o deploy do front.
+1. **Acessos**: AWS Academy com o Learner Lab; no GitHub, ser **admin** do repositório (precisa ver a aba **Settings**); um computador para a borda (Windows, Linux ou macOS) com internet, uma porta USB livre e o gateway (nRF5340 DK) já gravado.
+2. **Branches prontas**: a `main-Back` e a `main-Front` precisam ter os arquivos da tabela acima. O front tem que passar no `npm run build` (em `Frontend/`, no seu computador): é o mesmo comando do servidor e da pipeline, e um `error TS...` aí derruba o deploy do front.
 3. **Repositório privado?** Crie um token no GitHub (Settings da sua conta → Developer settings → Personal access tokens → *Fine-grained*, só este repo, *Contents: Read-only*). Ele é a "senha" no `git clone`. Repositório público não precisa.
 
 ---
@@ -113,7 +113,7 @@ Sem isso o IP muda toda vez que o lab reinicia, e o endereço do site muda junto
 
 **Instâncias** → marque `tcc-server` → **Conectar** → aba **EC2 Instance Connect** → **Conectar**.
 
-Abre um terminal no navegador. Todos os comandos da Parte A são colados nele (colar: `Cmd+V` no Mac).
+Abre um terminal no navegador. Todos os comandos da Parte A são colados nele (colar: `Ctrl+V` ou `Ctrl+Shift+V` no Windows/Linux, `Cmd+V` no Mac).
 
 > Não conectou? Mesma tela, aba **Session Manager** → **Conectar**, e rode `sudo su - ec2-user` antes de tudo.
 
@@ -167,7 +167,7 @@ nano ~/tcc/back/deploy/.env
 | `EDGE_URL` | Modo antigo (o back conecta na borda) | **vazio**, exatamente `EDGE_URL=` sem espaços depois |
 | `VITE_MARI_NETWORK_ID` | Gravado no build do front | `0x1200` |
 
-- **No servidor só vale este arquivo.** O `Backend/server/.env` é do dev no Mac: o Docker nem leva ele para dentro da imagem.
+- **No servidor só vale este arquivo.** O `Backend/server/.env` é do dev local: o Docker nem leva ele para dentro da imagem.
 - **`DB_PASSWORD` fica fixa depois da primeira subida**: o Postgres grava a senha quando cria o banco. Para trocar depois, veja "Banco".
 - Nunca faça commit do `.env` (já está no `.gitignore` desta pasta) nem cole os valores em chat ou issue.
 
@@ -200,35 +200,80 @@ Com `AUTH_ACTIVATED=true` o front pede login, e o primeiro usuário é criado pe
 
 # Parte B: borda
 
-## Passo 10: ligar a borda no back
+## Passo 10: preparar o computador da borda e ligar no back
 
-A borda é quem conecta no back, então a configuração fica toda no **Mac**. Use uma versão da borda com o uplink (o `Edge/server/.env.example` tem `BACKEND_URL`).
+A borda é quem conecta no back, então tudo deste passo acontece no **computador da borda**: qualquer máquina com Windows, Linux ou macOS, com internet e o gateway no USB. Ela só faz conexões de saída (como um navegador), então não precisa abrir porta no firewall nem no roteador.
+
+### 10.1 Instalar (uma vez)
+
+1. Instale o **Node.js 22** (com npm) e o **git**:
+   - Windows: instaladores de <https://nodejs.org> (versão 22 LTS) e <https://git-scm.com>.
+   - macOS: instaladores dos mesmos sites (ou `brew install node@22 git`).
+   - Linux: Node 22 pelo gerenciador de pacotes da distro ou pelo `nvm`; `git` pelo gerenciador de pacotes.
+2. Baixe o código, numa branch da borda que tenha o uplink (o `Edge/server/.env.example` traz `BACKEND_URL`), e instale as dependências:
+   ```bash
+   git clone -b <branch-da-borda> https://github.com/Lucas-O-S/TCC_Swarm_Robots.git
+   cd TCC_Swarm_Robots/Edge/server
+   npm install
+   ```
+3. Crie o `.env` a partir do modelo: `cp .env.example .env` (no Prompt de Comando do Windows: `copy .env.example .env`).
+
+### 10.2 Achar a porta do gateway
+
+Ligue o nRF5340 DK pelo conector **J2** (o USB do J-Link, perto do botão de power). Ele aparece como duas ou três portas seriais; a do gateway é a **primeira (VCOM0)**.
+
+| Sistema | Como achar | Exemplo de `MARI_PORT` |
+|---|---|---|
+| Windows | **Gerenciador de Dispositivos → Portas (COM e LPT)** → "JLink CDC UART Port". Não aparece? Instale o driver J-Link da SEGGER (vem no *nRF Command Line Tools*) | `COM5` |
+| Linux | `ls /dev/ttyACM*` | `/dev/ttyACM0` |
+| macOS | `ls /dev/tty.usbmodem*` | `/dev/tty.usbmodem0010500667001` |
+
+No Linux, dê permissão de acesso à serial uma vez: `sudo usermod -aG dialout $USER` e saia/entre de novo na sessão.
+
+### 10.3 Configurar o `.env` da borda
 
 1. Na EC2, veja o domínio e o token:
    ```bash
    grep -E '^(DOMAIN|EDGE_TOKEN)=' ~/tcc/back/deploy/.env
    ```
-2. No **`Edge/server/.env` do Mac** (o resto, como `GATEWAY_MODE=mari` e `MARI_PORT`, continua como você já usa):
+2. No **`Edge/server/.env`** do computador da borda:
    ```
+   GATEWAY_MODE=mari
+   MARI_PORT=<porta do 10.2>
+   MARI_NETWORK_ID=<id da rede gravado no gateway>
+   MARI_AUTO_START=true
    BACKEND_URL=https://api.<seu DOMAIN>/edge
    EDGE_TOKEN=<o EDGE_TOKEN da EC2>
-   EDGE_ID=mac-lab
+   EDGE_ID=lab-borda
    EDGE_AUTH_ACTIVATED=true
    ```
    - O `BACKEND_URL` **tem que terminar em `/edge`**. Sem isso a borda cai no socket do front e é ignorada.
-   - `EDGE_ID` é o nome da borda no log do back (vazio = nome do Mac).
-   - `EDGE_AUTH_ACTIVATED=true` protege a API local da borda (porta 3001) na rede do Mac; o uplink não depende dele.
-3. Com o gateway no USB, suba a borda como sempre (`npm run start:hw` em `Edge/server`; rode `npm install` antes se a borda ganhou dependência nova). Ela reconecta sozinha se a internet ou o back caírem.
-4. **O Mac não pode dormir** enquanto o robô estiver em uso. Deixe um terminal aberto com:
-   ```bash
-   caffeinate -dims
-   ```
-   (`Ctrl+C` para soltar.)
-5. Confira as duas pontas:
-   - terminal da borda: `[UPLINK] conectado no back em https://api.<seu DOMAIN>/edge`
-   - EC2: `cd ~/tcc/back/deploy && sudo docker compose logs backend | grep EDGE` → `[EDGE] borda conectada: edgeId=mac-lab, ip=...`
+   - `MARI_NETWORK_ID` tem que ser o mesmo gravado no firmware do gateway.
+   - `MARI_AUTO_START=true` faz a borda dar o *start* nos robôs que ligam no bootloader, sem script extra.
+   - `EDGE_ID` é o nome da borda no log do back (vazio = nome do computador).
+   - `EDGE_AUTH_ACTIVATED=true` protege a API local da borda (porta 3001) na rede desse computador; o uplink não depende dele.
 
-> O back aceita **uma borda por vez**. Enquanto a borda estiver ligada na nuvem, não deixe um back local (do Mac) conectado nela também pelo `EDGE_URL`: os dois mandariam no robô.
+### 10.4 Subir a borda e não deixar o computador dormir
+
+1. Com o gateway no USB, dentro de `Edge/server`:
+   ```bash
+   npm run start
+   ```
+   Ela reconecta sozinha se a internet ou o back caírem. (Atualizou a borda? Rode `npm install` antes.)
+2. **O computador não pode dormir** enquanto o robô estiver em uso:
+
+   | Sistema | Como |
+   |---|---|
+   | Windows | **Configurações → Sistema → Energia** → suspensão **Nunca** (na tomada). Ou, no PowerShell como administrador: `powercfg /change standby-timeout-ac 0` |
+   | macOS | Deixe um terminal aberto com `caffeinate -dims` (`Ctrl+C` para soltar) |
+   | Linux | Deixe um terminal aberto com `systemd-inhibit --what=sleep:idle --why=borda sleep infinity` (`Ctrl+C` para soltar) |
+
+### 10.5 Conferir
+
+- Terminal da borda: `[UPLINK] conectado no back em https://api.<seu DOMAIN>/edge`
+- EC2: `cd ~/tcc/back/deploy && sudo docker compose logs backend | grep EDGE` → `[EDGE] borda conectada: edgeId=lab-borda, ip=...`
+
+> O back aceita **uma borda por vez**. Enquanto a borda estiver ligada na nuvem, não deixe um back local (de dev) conectado nela também pelo `EDGE_URL`: os dois mandariam no robô.
 
 ---
 
@@ -336,7 +381,7 @@ main-Back / main-Front / main-Edge ─PR─► main   (só confere a origem; a m
 1. **Start Lab** → bolinha verde → **AWS**.
 2. **EC2 → Instâncias → `tcc-server` → Estado da instância → Iniciar instância**.
 3. Espere 1 a 2 minutos. Docker, containers e runner sobem sozinhos; o site volta no mesmo endereço.
-4. No Mac: borda rodando e `caffeinate -dims`. Se a borda já estava ligada, ela reconecta sozinha quando o back voltar.
+4. No computador da borda: gateway no USB, borda rodando (`npm run start`) e o computador sem dormir (passo 10.4). Se a borda já estava ligada, ela reconecta sozinha quando o back voltar.
 
 **Desligar**: o lab desliga sozinho no fim da sessão. Para economizar crédito antes disso: **Estado da instância → Interromper instância**. Nunca *Encerrar*.
 
@@ -395,7 +440,7 @@ cd ~/tcc/back/deploy && sudo docker compose up -d --build
 | O endereço mudou | IP elástico não associado | Passo 3; corrigir `DOMAIN` no `.env` e `sudo docker compose up -d --build` |
 | `compose build requires buildx 0.17.0 or later` | Buildx antigo do Amazon Linux | Rodar de novo o `setup-ec2.sh` da versão atual |
 | `required variable EDGE_TOKEN is missing a value` (ou `DOMAIN`, `DB_PASSWORD`...) | Variável vazia no `.env` | Preencher no `deploy/.env` (passo 7) |
-| Build do `web` falha com `error TS...` | Erro de tipo no front (`npm run build` roda `tsc -b` antes do Vite) | Corrigir no código, conferir com `npm run build` no Mac e subir pelo fluxo |
+| Build do `web` falha com `error TS...` | Erro de tipo no front (`npm run build` roda `tsc -b` antes do Vite) | Corrigir no código, conferir com `npm run build` no seu computador e subir pelo fluxo |
 | Build morre com `Killed` / código 137 | Falta de memória | `free -h` deve mostrar swap de 2G; se mostrar, troque para `t3.medium` (instância parada → Ações → Configurações da instância → Alterar tipo de instância) |
 | Back não conecta no banco depois de mudar `DB_PASSWORD` | O Postgres guardou a senha antiga | Ver "Banco" (`ALTER USER`) |
 | Instance Connect não conecta | Porta 22 fechada | Regra SSH 22 de entrada, ou use o Session Manager |
@@ -405,11 +450,15 @@ cd ~/tcc/back/deploy && sudo docker compose up -d --build
 
 | Sintoma | Causa provável | O que fazer |
 |---|---|---|
-| Comandos ao robô respondem **503** ("Nenhuma borda conectada") | A borda não está conectada no back | Mac acordado e com internet? Borda rodando? `BACKEND_URL` termina em `/edge`? Ver o log `EDGE` do back e o `[UPLINK]` da borda |
-| Borda: `back recusou a conexão: token inválido` / back: `borda recusada: token inválido` | `EDGE_TOKEN` diferente entre EC2 e Mac | Mesmo valor nos dois `.env`; a borda tenta de novo sozinha a cada 30 s (ou reinicie) |
+| Comandos ao robô respondem **503** ("Nenhuma borda conectada") | A borda não está conectada no back | Computador da borda acordado e com internet? Borda rodando? `BACKEND_URL` termina em `/edge`? Ver o log `EDGE` do back e o `[UPLINK]` da borda |
+| Borda: `back recusou a conexão: token inválido` / back: `borda recusada: token inválido` | `EDGE_TOKEN` diferente entre a EC2 e a borda | Mesmo valor nos dois `.env`; a borda tenta de novo sozinha a cada 30 s (ou reinicie) |
 | Back: `borda recusada: ... já está conectada` | Outra borda (outro `EDGE_ID`) já está ligada nesse back | Desligar a outra; o back aceita uma borda por vez |
 | Borda: `não conectou no back` | Back ou `web` fora do ar, ou `BACKEND_URL` errado | `sudo docker compose ps` na EC2; conferir o `BACKEND_URL` |
 | Comandos respondem **502** | A borda não respondeu a tempo ou deu erro interno | Ver o terminal da borda; conferir o gateway no USB |
+| Borda não abre a serial (`No such file`, `File not found`, `cannot open`) | `MARI_PORT` errada ou gateway desconectado | Passo 10.2; no Windows a porta é `COMx`, no Linux `/dev/ttyACMx` |
+| Linux: `Permission denied` na serial | Usuário sem acesso à serial | `sudo usermod -aG dialout $USER` e entrar de novo na sessão |
+| Windows: o DK não aparece em "Portas (COM e LPT)" | Falta o driver J-Link | Instalar o *nRF Command Line Tools* (traz o driver da SEGGER) e religar o cabo |
+| Borda conectada, mas nenhum robô aparece | Porta que não é a VCOM0, `MARI_NETWORK_ID` diferente do gateway, ou robô desligado | Trocar para a outra porta do DK; conferir o id da rede; ligar o robô |
 
 **GitHub / runner**
 
@@ -428,9 +477,9 @@ cd ~/tcc/back/deploy && sudo docker compose up -d --build
 
 ## Segurança (o mínimo)
 
-- `deploy/.env` tem senhas: **nunca** faça commit nem cole em chat. Vazou o `EDGE_TOKEN`? Gere outro (`openssl rand -hex 24`) e troque nos dois `.env` (EC2 e borda).
+- `deploy/.env` tem senhas: **nunca** faça commit nem cole em chat. Vazou o `EDGE_TOKEN`? Gere outro (`openssl rand -hex 24`, na EC2) e troque nos dois `.env` (EC2 e borda).
 - O Postgres não tem porta aberta para a internet; só o `backend` enxerga.
-- A borda não recebe conexões de fora: é ela que conecta no back, por HTTPS, com o `EDGE_TOKEN`. O back aceita uma borda por vez e registra no log o `edgeId` e o IP de cada conexão. Quem tiver o token consegue se passar pela borda: trate como senha.
+- O computador da borda não recebe conexões de fora: é a borda que conecta no back, por HTTPS, com o `EDGE_TOKEN`. O back aceita uma borda por vez e registra no log o `edgeId` e o IP de cada conexão. Quem tiver o token consegue se passar pela borda: trate como senha.
 - Mantenha `AUTH_ACTIVATED=true`. Atenção: `/auth/register` é público, então quem tiver o endereço consegue criar conta (fechar isso exige mudar o back).
 - Token do runner: só registra máquina e vence em ~1 h, mas não compartilhe. Runner desconhecido na lista? Remova.
 - Repositório público: mantenha a aprovação de PRs de fora (passo 12).
@@ -443,6 +492,6 @@ Para um segundo ambiente, repita as Partes A e B em uma **EC2 nova**, mudando:
 - **Nome** `tcc-hml` e **IP elástico novo** (o domínio sai diferente sozinho).
 - **Clones** nas branches do ambiente (ex.: `hml-Back` e `hml-Front`).
 - **`.env` próprio**, com `EDGE_TOKEN` diferente do de produção: assim uma borda de um ambiente nunca entra no outro.
-- **Borda**: o back aceita uma borda por vez e só existe um gateway. Para homologação, rode uma segunda borda numa cópia da pasta `Edge`, só com robô simulado: `GATEWAY_MODE=simulator`, `SIMULATOR_FAKE_ADVERTISEMENT=true`, `EDGE_PORT=3002` e `BACKEND_URL=https://api.<domínio-hml>/edge`.
+- **Borda**: o back aceita uma borda por vez e só existe um gateway. Para homologação, rode uma segunda borda (em qualquer computador, ou numa cópia da pasta `Edge` no mesmo), só com robô simulado: `GATEWAY_MODE=simulator`, `SIMULATOR_FAKE_ADVERTISEMENT=true`, `EDGE_PORT=3002` e `BACKEND_URL=https://api.<domínio-hml>/edge`.
 - **Runner**: registre com **outra etiqueta** (ex.: `--labels hml`), **nunca `prod`**, senão os deploys de produção podem cair nessa máquina.
 - **Pipeline**: os workflows de deploy de hoje atendem só produção (`main-Back`/`main-Front` + etiqueta `prod`). Até eles serem adaptados para receber branch e etiqueta, atualize o outro ambiente na mão ("Atualizar na mão").
