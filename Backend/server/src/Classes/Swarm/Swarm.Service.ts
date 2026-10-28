@@ -268,6 +268,12 @@ export class SwarmService implements OnModuleInit, OnModuleDestroy {
         this.persisted.delete(address);
     }
 
+    /** Última bateria do robô em Volts (null = sem estado ou payload sem bateria). */
+    public batteryVolts(address: string): number | null {
+        const state = this.states.get(normalizeAddress(address));
+        return state ? this.batteryVoltsOf(state) : null;
+    }
+
     /** Motivo para não entregar task ao robô, ou null se pode. */
     public taskBlockReason(address: string): string | null {
 

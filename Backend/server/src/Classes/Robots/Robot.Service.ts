@@ -58,21 +58,33 @@ export class RobotService extends BaseService<RobotModel> {
         return { address: robot.address, command, payload };
     }
 
+    /** SemiAuto não existe no robô: pra ele é Auto (segue waypoints). */
+    private static wireModeOf(mode: RobotControlMode): RobotControlMode {
+        return mode === RobotControlMode.Manual ? RobotControlMode.Manual : RobotControlMode.Auto;
+    }
+
     /**
      * O modo é regra do backend (quem pode comandar o robô), então a fonte da
-     * verdade é robots.mode. No firmware DotBot 1.22.0 o CONTROL_MODE só para
-     * os motores e aborta os waypoints (o valor é ignorado), e o `mode` do
-     * advertisement vai zerado - não dá pra ler o modo de volta do robô.
-     * Como o robô para, a task em andamento é solta via evento (Orchestrator).
+     * verdade é robots.mode. O control-mode da borda para o robô e aborta os
+     * waypoints (ela manda LH2_WAYPOINTS vazio + CONTROL_MODE: no firmware
+     * 1.23.0 o CONTROL_MODE sozinho não tira o robô do Auto). Como o robô
+     * para, a task em andamento é solta via evento (Orchestrator).
      */
     async setControlMode(address: string, mode: RobotControlMode) {
         const robot = await this.requireByAddress(address);
-        // SemiAuto não existe no robô: pra ele é Auto (segue waypoints).
-        const wireMode = mode === RobotControlMode.Manual ? RobotControlMode.Manual : RobotControlMode.Auto;
-        await this.dispatch(robot.address, Command.ControlMode, { mode: wireMode });
+        await this.dispatch(robot.address, Command.ControlMode, { mode: RobotService.wireModeOf(mode) });
         await this.update(robot.uuid, { mode });
         this.events.emit(EventsCommands.modeChanged, { address: robot.address, mode });
         return { address: robot.address, command: Command.ControlMode, payload: { mode } };
+    }
+
+    /**
+     * Para o robô e aborta a rota SEM trocar o modo - para quando a task é
+     * solta por outro motivo (bateria baixa, robô perdido). Vai como
+     * control-mode com o modo atual, que na borda é a parada de verdade.
+     */
+    async stop(robot: RobotModel): Promise<void> {
+        await this.dispatch(robot.address, Command.ControlMode, { mode: RobotService.wireModeOf(robot.mode) });
     }
 
     async getFreeRobots(): Promise<RobotModel[] | null> {
