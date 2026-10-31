@@ -3,7 +3,6 @@ import { MapCanvas } from '../../../components/MapCanvas/MapCanvas';
 import type { CellSelectRect } from '../../../components/MapCanvas/MapCanvas';
 import type { BaseTool } from '../../../components/MapViewport/MapViewport';
 import { Obstacle } from '../../../components/Obstacle/Obstacle';
-import { CELL_MM } from '../../../Consts/SimulationConsts';
 import type { MapElementsController } from '../../../hooks/useMapElements';
 import type { ElementBounds } from '../../../hooks/useSelectableElements';
 import type { ScenarioModel } from '../../../model/Scenario.Model';
@@ -16,7 +15,7 @@ import type { RouteDraft } from '../../Simulation/hooks/useRouteDraft';
 interface VisualizerMapProps {
   /** Cenário pronto, no formato do Construtor: células, Y pra baixo. */
   cenario: ScenarioModel;
-  /** Robôs da API, em mm com Y pra cima (convenção LH2). */
+  /** Robôs da API, em mm no referencial do firmware (Y pra baixo, o mesmo do grid). */
   robots: SimMapRobotModel[];
   trails: ReadonlyMap<string, readonly Vec2Model[]>;
   focusAddress: string | null;
@@ -97,7 +96,7 @@ export function VisualizerMap({
           ))}
 
           <SimRobotsLayer
-            scale={makeScale(cellWidth, cellHeight, cenario.sizeY * CELL_MM)}
+            scale={makeScale(cellWidth, cellHeight)}
             robots={robots}
             trails={trails}
             editable={false}

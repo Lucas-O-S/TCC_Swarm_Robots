@@ -76,7 +76,7 @@ function EditRobotForm({ robot, onRename, onPatch, onStart, onRemoveWaypoint, on
       <DrawerField
         label={
           <span>
-            Rumo: <strong>{Math.round(robot.start.theta_deg)}°</strong> (0° = leste, 90° = norte)
+            Rumo: <strong>{Math.round(robot.start.theta_deg)}°</strong> (0° = pra baixo, 90° = esquerda, 180° = pra cima, -90° = direita — como o robô)
           </span>
         }
       >

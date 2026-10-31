@@ -21,7 +21,7 @@ export interface VisRobotModel {
   telemetry: RobotTelemetryModel | null;
   /** Quando a telemetria chegou neste navegador (ms, Date.now): base do "há X s", sem depender do relógio do servidor. */
   receivedAt: number | null;
-  /** Rumo em rad (anti-horário a partir de +X), o último conhecido. */
+  /** Rumo em rad (0 = +Y, horário — convenção do firmware), o último conhecido. */
   theta: number;
   rgb: RgbColorModel | null;
   route: VisRouteModel | null;

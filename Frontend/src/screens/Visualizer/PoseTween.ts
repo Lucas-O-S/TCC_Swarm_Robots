@@ -1,7 +1,7 @@
 import { clamp } from '../Simulation/Service/SimPhysics';
 import { normalizeAngle } from '../Simulation/Service/SimRobot';
 
-/** Pose desenhada no mapa: mm (Y pra cima) e rumo em rad. */
+/** Pose desenhada no mapa: mm e rumo em rad (convenção do firmware, ver SimRobot.ts). */
 export interface TweenPose {
   x: number;
   y: number;

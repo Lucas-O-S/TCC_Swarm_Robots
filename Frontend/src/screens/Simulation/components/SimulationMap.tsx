@@ -49,8 +49,8 @@ interface SimulationMapProps {
 
 // Mapa 2D (topo) da simulação sobre o <MapCanvas> do app — mesmo grid,
 // zoom/arraste, ferramentas e seleção do Construtor de Cenários e do de
-// Tarefas. O mundo é em mm com Y pra cima (convenção do simulador); a
-// conversão pra px fica em useMapGeometry.ts. Obstáculos e robôs "derivam"
+// Tarefas. O mundo é em mm com Y pra baixo (convenção do firmware, a mesma
+// do grid); a conversão pra px fica em useMapGeometry.ts. Obstáculos e robôs "derivam"
 // da entidade de seleção compartilhada (ver src/hooks/useMapElements.tsx):
 // no modo Editar dá pra mover/apagar; no Simular só selecionar (a posição
 // vem da física). Robôs, rotas e rascunho vêm do SimRobotsLayer (o mesmo do
@@ -89,7 +89,7 @@ export function SimulationMap({
     return (
       <>
         {obstacles.map((o) => {
-          const topLeft = toPx(scale, { x: o.x, y: o.y + o.h });
+          const topLeft = toPx(scale, { x: o.x, y: o.y });
           return (
             <Obstacle
               key={o.id}
@@ -104,7 +104,7 @@ export function SimulationMap({
               movable={editable}
               onMove={(next) => {
                 const p = fromPx(scale, next);
-                onMoveObstacle(o.id, { x: p.x, y: p.y - o.h });
+                onMoveObstacle(o.id, { x: p.x, y: p.y });
               }}
               removable={editable}
               onRemove={() => onRemoveObstacle(o.id)}
@@ -175,7 +175,7 @@ export function SimulationMap({
         tools={tools}
         panel={panel}
       >
-        {(cellWidth, cellHeight) => renderContent(makeScale(cellWidth, cellHeight, arena.height))}
+        {(cellWidth, cellHeight) => renderContent(makeScale(cellWidth, cellHeight))}
       </MapCanvas>
     </div>
   );

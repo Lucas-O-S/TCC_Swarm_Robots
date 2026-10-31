@@ -1,6 +1,6 @@
 /**
  * Mundo da simulação em memória (ver `screens/Simulation/SimWorld.ts`) —
- * mm com Y pra cima, origem no canto inferior-esquerdo.
+ * mm com Y pra baixo, origem no canto superior-esquerdo (convenção do firmware, ver SimRobot.ts).
  */
 
 export interface Vec2Model {
@@ -15,7 +15,7 @@ export interface SimArenaModel {
   grid: number;
 }
 
-/** Barreira retangular alinhada aos eixos (AABB), em mm — x,y = canto inferior-esquerdo. */
+/** Barreira retangular alinhada aos eixos (AABB), em mm — x,y = canto superior-esquerdo. */
 export interface SimObstacleModel {
   id: string;
   x: number;

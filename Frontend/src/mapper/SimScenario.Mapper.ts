@@ -5,13 +5,14 @@ import type { RobotApplication } from '../enums/RobotApplication.enum';
 import { ADDRESS_RE, CELL_MM, DEFAULT_NETWORK, DEFAULT_SIM_CONFIG, DEFAULT_WAYPOINT_THRESHOLD_MM, DEG_TO_RAD, RAD_TO_DEG } from '../Consts/SimulationConsts';
 import { SimRobot } from '../screens/Simulation/Service/SimRobot';
 import { SimWorld } from '../screens/Simulation/Service/SimWorld';
+import { cellRectToWorld } from '../screens/Simulation/hooks/useMapGeometry';
 
 // Conversões do cenário da Simulação (mesmo papel dos outros *.Mapper.ts:
 // traduzir de um formato pro outro, sem regra de tela):
 //   - toWorld/fromWorld: cenário JSON (mm/graus, schema do RobotSwarmSimulator)
 //     ⇄ SimWorld em memória (mm/radianos) — porte do src/core/scenario.ts de lá;
-//   - fromMap: mapa do app (MapModel em células, Y pra baixo — ScenarioBuilder)
-//     → cenário (mm, Y pra cima).
+//   - fromMap: mapa do app (MapModel em células — ScenarioBuilder) → cenário
+//     (mm). Os dois têm Y pra baixo (convenção do firmware): só muda a escala.
 
 function fail(msg: string): never {
   throw new Error(`Cenário inválido: ${msg}`);
@@ -110,7 +111,7 @@ function fromWorld(world: SimWorld): SimScenarioModel {
   };
 }
 
-/** Mapa do app (células, Y pra baixo — ver ScenarioBuilder) → cenário do simulador (mm, Y pra cima). */
+/** Mapa do app (células — ver ScenarioBuilder) → cenário do simulador (mm). */
 function fromMap(map: MapModel, robots: ScenarioRobotModel[] = []): SimScenarioModel {
   const { scenario } = map;
   const width = scenario.sizeX * CELL_MM;
@@ -120,13 +121,10 @@ function fromMap(map: MapModel, robots: ScenarioRobotModel[] = []): SimScenarioM
     version: 1,
     network: { ...DEFAULT_NETWORK },
     arena: { width_mm: width, height_mm: height, grid_mm: CELL_MM },
-    obstacles: scenario.obstacles.map((o) => ({
-      id: o.name || o.id,
-      x_mm: o.startPointX * CELL_MM,
-      y_mm: height - (o.startPointY + o.sizeY) * CELL_MM,
-      w_mm: o.sizeX * CELL_MM,
-      h_mm: o.sizeY * CELL_MM,
-    })),
+    obstacles: scenario.obstacles.map((o) => {
+      const r = cellRectToWorld(o);
+      return { id: o.name || o.id, x_mm: r.x, y_mm: r.y, w_mm: r.w, h_mm: r.h };
+    }),
     robots: robots.map((r) => ({ ...r, start: { ...r.start }, waypoints: r.waypoints?.map((w) => ({ ...w })) })),
     sim: { ...DEFAULT_SIM_CONFIG },
   };

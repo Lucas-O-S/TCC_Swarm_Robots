@@ -104,9 +104,17 @@ Onde fica cada peça:
   (menos de 5 s sem telemetria), Inactive (5–60 s) ou Lost (mais de 60 s).
   Pra ligar na API, trocar pelo `MqttFleetLink` em `hooks/useSimulation.ts`; o
   contrato é o mesmo. O botão "Conectar à API" fica desabilitado.
-- **Unidades:** mundo em mm com Y pra cima e origem no canto inferior
-  esquerdo; conversão pra px só em `useMapGeometry.ts`. 1 célula = 200 mm
-  (`CELL_MM`, derivado de `BLOCK_SIDE_M`). A célula é sempre quadrada.
+- **Unidades e referencial:** UM referencial só, o do DotBot-firmware 1.23.0
+  e da LH2, em todo o projeto (robô real, borda, backend, todas as telas do
+  front e o RobotSwarmSimulator), sem conversão: mm, X pra direita, Y pra
+  BAIXO, origem no canto superior-esquerdo da arena (o mesmo do grid do
+  `<MapCanvas>`: mm vira px só pela escala, em `useMapGeometry.ts`). Rumo
+  (`theta` em rad, `direction`/`theta_deg` em graus): 0 = olhando pra +Y,
+  positivo = horário, -90° = pra direita. `headingOf`/`headingVector` em
+  `SimRobot.ts` fazem a conta; roda esquerda mais rápida = horário (EKF e
+  `control_loop.c` do firmware). AABB com x,y = canto superior-esquerdo.
+  1 célula = 200 mm (`CELL_MM`, derivado de `BLOCK_SIDE_M`). A célula é
+  sempre quadrada.
 - **Dois enums de modo.**
   - `DotBotControlMode` (modo no fio do firmware): Manual = 0, Auto = 1.
   - `RobotControlMode` (modo de orquestração do backend): Auto = 0,
@@ -262,10 +270,15 @@ Onde fica cada peça:
   Construtor, sem robôs.
 - **Blocos como na tela de gerar mapa** (escolha do dono): cenário em células,
   célula esticando pra preencher a altura (`fitWidth` + `maxHeight`) e
-  obstáculos por célula. A telemetria (mm, Y pra cima) vira px pela escala de
-  cada eixo, e a seta do robô é corrigida pro esticamento (`screenTheta` no
+  obstáculos por célula. A telemetria vira px pela escala de cada eixo, e a
+  seta do robô é corrigida pro esticamento (`screenTheta` no
   `useMapGeometry`) pra apontar pra onde ele anda na tela. No celular o mapa
   passa da largura, igual ao Construtor e às Tarefas.
+- **Referencial:** o mesmo do firmware (ver "Unidades e referencial" na
+  Simulação): a telemetria vai crua pro mapa e a rota avulsa vai crua pro
+  robô. O `direction` do robô real é medido entre duas leituras da LH2 (pra
+  onde ele andou, não pra onde está virado). A origem da LH2 é o canto
+  superior-esquerdo do cenário.
 - **Robôs:** só os da API (`GET /robots` + `robot:new`), com rótulos R1, R2…
   na ordem em que aparecem. Pose, rumo (`direction`; -1 = sem leitura),
   bateria (mV) e modo do fio vêm do advertisement; posição `0xFFFFFFFF` = sem

@@ -1,12 +1,14 @@
 import { DotBotControlMode } from '../../../enums/DotBotControlMode.enum';
 import { clamp } from './SimPhysics';
-import { normalizeAngle } from './SimRobot';
+import { headingOf, normalizeAngle } from './SimRobot';
 import type { SimRobot } from './SimRobot';
 
 // Controlador de rota do modo AUTO — porte do RobotSwarmSimulator
 // (src/core/waypoints.ts): gira em direção ao waypoint atual e avança;
 // dentro do threshold, incrementa waypoint_idx. No fim da lista, sem loop o
-// robô PARA de forma estável; com loop, waypoint_idx volta a 0.
+// robô PARA de forma estável; com loop, waypoint_idx volta a 0. Erro de rumo
+// positivo = alvo no sentido horário → roda esquerda mais rápida (como o
+// control_loop.c do firmware).
 
 const ANGLE_TOLERANCE_RAD = 0.15; // ~8.6° — acima disso, gira no lugar
 const TURN_PWM_MAX = 60;
@@ -32,16 +34,16 @@ export function applyWaypointController(robot: SimRobot): void {
     const dist = Math.hypot(dx, dy);
 
     if (dist > robot.waypoint_threshold) {
-      const desired = Math.atan2(dy, dx);
+      const desired = headingOf(dx, dy);
       const err = normalizeAngle(desired - robot.theta);
       if (Math.abs(err) > ANGLE_TOLERANCE_RAD) {
         const turn = clamp(K_TURN * err, -TURN_PWM_MAX, TURN_PWM_MAX);
-        robot.pwm_left = Math.round(-turn);
-        robot.pwm_right = Math.round(turn);
+        robot.pwm_left = Math.round(turn);
+        robot.pwm_right = Math.round(-turn);
       } else {
         const corr = clamp(K_TURN * err, -20, 20);
-        robot.pwm_left = Math.round(clamp(FORWARD_PWM - corr, -127, 127));
-        robot.pwm_right = Math.round(clamp(FORWARD_PWM + corr, -127, 127));
+        robot.pwm_left = Math.round(clamp(FORWARD_PWM + corr, -127, 127));
+        robot.pwm_right = Math.round(clamp(FORWARD_PWM - corr, -127, 127));
       }
       return;
     }
