@@ -230,10 +230,13 @@ Onde fica cada peça:
 - `screens/Visualizer/` — `Visualizer.tsx` (tela), `hooks/useVisualizer.ts`
   (ponte API ↔ React), `VisFleet.ts` (a frota como a API mostra, fora do
   React: registro, telemetria, rastro, tarefas e log),
-  `PoseTween.ts` (suaviza a pose no mapa: a cada amostra o robô desliza da
-  pose desenhada até a nova durante o intervalo médio entre amostras; o
-  `useVisualizer` mantém o laço de rAF só enquanto algum robô desliza. A lista
-  e o rastro usam a amostra crua) e `components/VisualizerMap.tsx` (mapa).
+  `PoseTween.ts` (suaviza a pose no mapa: a cada pose nova o robô desliza da
+  pose desenhada até ela durante o intervalo médio entre poses; amostra
+  repetida não conta, pula direto só em salto > 1 m — nunca por tempo sem
+  amostra, que com o rádio perdendo pacotes é normal — e amostra sem posição
+  deixa o robô na última pose; o `useVisualizer` mantém o laço de rAF só
+  enquanto algum robô desliza. A lista e o rastro usam a amostra crua) e
+  `components/VisualizerMap.tsx` (mapa).
 - `components/` — `VisualizerControls` (header), `VisRobotList` e
   `VisRobotDrawer`, montados com as peças compartilhadas listadas em "Peças
   compartilhadas" da Simulação (`RobotList`, `RobotCard`, `TaskPanel`,
