@@ -25,6 +25,8 @@ const INTERVAL_SMOOTHING = 0.2;
 /** Faixa da duração do deslize (ms). Intervalo maior que o teto (rádio perdeu pacotes, robô ficou parado) entra na média já cortado nele. */
 const MIN_DURATION_MS = 30;
 const MAX_DURATION_MS = 600;
+
+const SLIDE_MAX_MS = 120;
 /**
  * Salto maior que isso (mm) entre duas poses = robô recolocado à mão ou a
  * localização se perdeu e voltou longe: aparece direto, sem deslizar. Por
@@ -99,7 +101,7 @@ export class PoseTween {
       from,
       to: target,
       start: now,
-      duration: clamp(interval, MIN_DURATION_MS, MAX_DURATION_MS),
+      duration: clamp(interval, MIN_DURATION_MS, SLIDE_MAX_MS),
       lastAt: now,
       interval,
       shown: from,
