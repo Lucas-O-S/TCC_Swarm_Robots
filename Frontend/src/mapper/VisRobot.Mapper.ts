@@ -47,7 +47,9 @@ export const VisRobotMapper = {
   thetaFromDirection,
 
   /**
-   * Robô → mapa, ou null sem posição (não dá pra desenhar). Fora da arena,
+   * Robô → mapa, ou null se nunca teve posição (não dá pra desenhar). Amostra
+   * sem posição (LH2 sem leitura) não tira o robô do mapa: ele fica na última
+   * pose suavizada. Fora da arena,
    * o marcador fica na borda (a lista avisa). O robô conta como seguindo rota
    * (AUTO no mapa) quando a tela conhece uma — o robot:update não traz o
    * modo do fio nem o alvo atual.
@@ -61,8 +63,8 @@ export const VisRobotMapper = {
     shown: { x: number; y: number; theta: number } | null = null,
   ): SimMapRobotModel | null {
     const raw = position(v.telemetry);
-    if (!raw) return null;
-    const pos = shown ?? { ...raw, theta: v.theta };
+    const pos = shown ?? (raw ? { ...raw, theta: v.theta } : null);
+    if (!pos) return null;
 
     const waypoints = knownRoute(v, taskPoints);
     const onRoute = waypoints.length > 0;
