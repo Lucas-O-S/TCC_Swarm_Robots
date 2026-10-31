@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { extname, join } from "path";
 import { LH2_MATRIX_LEN, LH2_MAX_STATIONS } from "src/Constants/Lh2.Constants";
 
@@ -20,7 +20,7 @@ export interface Lh2CalibrationMeta {
 //
 // A posição na lista é o índice da estação (canal - 1): o firmware guarda e
 // usa a homografia por índice (homography_matrix[lh_index] no dotbot-libs).
-// Calibrar só o canal N exige N slots, com os anteriores zerados - slot
+// Calibrar até o canal N exige N slots, com os não calibrados zerados - slot
 // zerado = estação sem calibração, como no PyDotBot (LH2Homography começa
 // zerada) e no net core (zera o buffer no índice 0).
 export class Lh2Calibration {
@@ -51,13 +51,38 @@ export class Lh2Calibration {
         return Lh2Calibration.fromPayload(Buffer.concat([Buffer.from([matrices.length]), ...matrices]), source);
     }
 
-    // Uma estação só, no slot do índice dela; os anteriores vão zerados.
-    static forStation(station: number, matrix: Buffer, source: string): Lh2Calibration {
-        if (!Number.isInteger(station) || station < 0 || station >= LH2_MAX_STATIONS)
-            throw new Error(`estação ${station} fora de 0..${LH2_MAX_STATIONS - 1}`);
+    // Cada matriz no slot do índice da estação (chave = canal - 1), do 0 até o
+    // maior; os índices sem matriz vão zerados.
+    static forStations(matrices: Map<number, Buffer>, source: string): Lh2Calibration {
+        const stations = [...matrices.keys()];
 
-        const empty = Array.from({ length: station }, () => Buffer.alloc(LH2_MATRIX_LEN));
-        return Lh2Calibration.fromMatrices([...empty, matrix], source);
+        if (stations.length === 0)
+            throw new Error("nenhuma estação para calibrar");
+
+        for (const station of stations)
+            if (!Number.isInteger(station) || station < 0 || station >= LH2_MAX_STATIONS)
+                throw new Error(`estação ${station} fora de 0..${LH2_MAX_STATIONS - 1}`);
+
+        const slots = Array.from(
+            { length: Math.max(...stations) + 1 },
+            (_, index) => matrices.get(index) ?? Buffer.alloc(LH2_MATRIX_LEN),
+        );
+        return Lh2Calibration.fromMatrices(slots, source);
+    }
+
+    // TOML de calibração mais recente (pela data de modificação) direto em
+    // dir - o que a borda carrega no boot sem LH2_CALIBRATION_FILE. Só olha os
+    // calibration*.toml, o nome que a borda e o PyDotBot 0.30.0 gravam.
+    static latestToml(dir: string): string | null {
+        if (!existsSync(dir)) return null;
+
+        const files = readdirSync(dir, { withFileTypes: true })
+            .filter((entry) => entry.isFile() && /^calibration.*\.toml$/.test(entry.name))
+            .map((entry) => join(dir, entry.name));
+
+        if (files.length === 0) return null;
+
+        return files.reduce((latest, file) => (statSync(file).mtimeMs > statSync(latest).mtimeMs ? file : latest));
     }
 
     // Mesmo texto do save_calibration do PyDotBot 0.30.0 (schema 1), para o

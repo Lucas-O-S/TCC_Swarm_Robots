@@ -45,6 +45,11 @@ export const LH2_CAPTURE_TIMEOUT_MS = 5000;
 
 export const LH2_CAPTURE_RETRIES = 3;
 
+// Respostas que cada canto junta antes de fechar. O bootloader (swarmit 0.9.0,
+// main.c) responde assim que a primeira base fica pronta e manda só as que
+// estiverem prontas naquele instante: uma resposta pode vir sem alguma base.
+export const LH2_CAPTURE_MIN_RESPONSES = 2;
+
 // Tolerância da conferência da homografia: os 4 cantos projetados têm que cair
 // nos de referência (np.allclose(..., atol=1e-3) no PyDotBot).
 export const LH2_HOMOGRAPHY_TOLERANCE = 1e-3;

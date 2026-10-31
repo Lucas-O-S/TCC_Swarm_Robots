@@ -47,7 +47,8 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
 
     private fleetTimer: NodeJS.Timeout | null = null;
 
-    // Calibração LH2 carregada do LH2_CALIBRATION_FILE (null = não calibra).
+    // Calibração LH2 carregada (LH2_CALIBRATION_FILE ou, sem ele, o TOML mais
+    // recente do LH2_CALIBRATION_DIR). null = não calibra.
     private calibration: Lh2Calibration | null = null;
 
     // setTimeouts das matrizes ainda por sair, para não escrever na serial
@@ -61,8 +62,8 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
         // Antes da serial: arquivo configurado e inválido derruba a borda no
         // boot com o motivo no log. Só logar deixaria os robôs sem calibração
         // sem ninguém perceber.
-        if (lh2Config.calibrationFile) {
-            this.calibration = Lh2Calibration.fromFile(lh2Config.calibrationFile);
+        this.calibration = MariGatewayAdapter.loadCalibration();
+        if (this.calibration) {
             console.log(`[LH2] calibração carregada: ${MariGatewayAdapter.channels(this.calibration)} de ${this.calibration.source}`);
         }
 
@@ -172,7 +173,8 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
         return this.fleet.list();
     }
 
-    // Calibração carregada do arquivo (null = LH2_CALIBRATION_FILE vazio).
+    // Calibração carregada (null = nenhuma: LH2_CALIBRATION_FILE vazio e nenhum
+    // TOML no LH2_CALIBRATION_DIR).
     lh2Calibration(): Lh2Calibration | null {
         return this.calibration;
     }
@@ -183,7 +185,7 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
     // (em Running o net core ignora). Devolve os endereços marcados.
     forceLh2Calibration(address?: string): string[] {
         if (!this.calibration) {
-            throw new Error("nenhuma calibração carregada (LH2_CALIBRATION_FILE vazio)");
+            throw new Error("nenhuma calibração carregada (LH2_CALIBRATION_FILE vazio e nenhum TOML no LH2_CALIBRATION_DIR)");
         }
 
         return this.fleet.forceCalibrate(address);
@@ -192,9 +194,9 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
     // --- captura LH2 (o `lh2-calibration collect`, dentro da borda) ---------
 
     // Reserva o robô: a borda dá STOP se ele estiver rodando e não calibra nem
-    // dá START nele até solve/cancel. Uma captura por vez. station null = a
-    // sessão usa a estação que o robô enxergar na primeira leitura.
-    beginLh2Capture(address: string, distanceMm: number, tag: string | null, station: number | null = null): Lh2CaptureSession {
+    // dá START nele até solve/cancel. Uma captura por vez; calibra todas as
+    // bases que o robô enxergar.
+    beginLh2Capture(address: string, distanceMm: number, tag: string | null): Lh2CaptureSession {
         if (this.capture)
             throw new Error(`já existe captura em andamento para ${this.capture.address} - resolva ou cancele antes`);
 
@@ -204,10 +206,9 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
 
         this.capture = new Lh2CaptureSession(node.address, distanceMm, tag, () => {
             this.sendSwarmit(node.address, SwarmitProtocol.buildLh2Capture());
-        }, LH2_CAPTURE_DEFAULTS, station);
+        }, LH2_CAPTURE_DEFAULTS);
 
-        const canal = station === null ? "canal: o primeiro que o robô enxergar" : `canal ${station + 1}`;
-        console.log(`[LH2] captura iniciada em ${node.address} (quadrado de ${distanceMm} mm, ${canal})`);
+        console.log(`[LH2] captura iniciada em ${node.address} (quadrado de ${distanceMm} mm, todas as bases que ele enxergar)`);
         return this.capture;
     }
 
@@ -216,7 +217,7 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
     }
 
     // O robô precisa estar em Bootloader: em Running o lado seguro não atende.
-    captureLh2Corner(corner: Lh2Corner): Promise<Lh2Sample> {
+    captureLh2Corner(corner: Lh2Corner): Promise<Lh2Sample[]> {
         const session = this.capture;
         if (!session) return Promise.reject(new Error("nenhuma captura em andamento"));
 
@@ -226,23 +227,32 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
             return Promise.reject(new Error(`${session.address} não está em Bootloader (${nome}) - espere o STOP pegar`));
         }
 
-        return session.capture(corner).then((sample) => {
-            console.log(`[LH2] ${session.address} ${corner} (canal ${sample.lhIndex + 1}): count1=${sample.count1} count2=${sample.count2}`);
-            return sample;
+        return session.capture(corner).then((samples) => {
+            const canais = samples.map((s) => `canal ${s.lhIndex + 1} (count1=${s.count1} count2=${s.count2})`).join(", ");
+            console.log(`[LH2] ${session.address} ${corner}: ${canais}`);
+            return samples;
         });
     }
 
-    // Calcula a homografia, grava o TOML (mesmo formato do PyDotBot), adota
-    // como calibração carregada e marca a frota toda para receber - arena
-    // recalibrada vale para todos os robôs. Solta o robô reservado.
-    solveLh2Capture(): { calibration: Lh2Calibration; marked: string[] } {
+    // Calcula uma homografia por base, grava tudo num TOML (mesmo formato do
+    // PyDotBot), adota como calibração carregada e marca a frota toda para
+    // receber - arena recalibrada vale para todos os robôs. Solta o robô
+    // reservado. keptOnRestart = false quando o LH2_CALIBRATION_FILE aponta
+    // para outro arquivo, que volta a valer no próximo boot.
+    solveLh2Capture(): { calibration: Lh2Calibration; marked: string[]; keptOnRestart: boolean } {
         const session = this.capture;
         if (!session) throw new Error("nenhuma captura em andamento");
 
-        const corners = session.corners();
-        const matrix = Lh2Homography.toWire(Lh2Homography.fromCorners(corners, session.distanceMm));
-        // corners() só devolve com os 4 cantos, então a estação já foi escolhida.
-        const draft = Lh2Calibration.forStation(session.calibratedStation!, matrix, "captura");
+        const matrices = new Map<number, Buffer>();
+        for (const [station, corners] of session.cornersByStation()) {
+            try {
+                matrices.set(station, Lh2Homography.toWire(Lh2Homography.fromCorners(corners, session.distanceMm)));
+            } catch (error) {
+                throw new Error(`base do canal ${station + 1}: ${(error as Error).message}`);
+            }
+        }
+
+        const draft = Lh2Calibration.forStations(matrices, "captura");
         const path = draft.saveToml(lh2Config.calibrationDir, { distanceMm: session.distanceMm, tag: session.tag ?? undefined });
         const calibration = Lh2Calibration.fromPayload(draft.payload, path);
 
@@ -253,11 +263,14 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
         this.fleet.release(session.address);
         this.capture = null;
 
+        const keptOnRestart = !lh2Config.calibrationFile;
         console.log(
-            `[LH2] calibração salva em ${path} e carregada - ` +
-            `para continuar valendo depois de reiniciar a borda, ponha esse caminho no LH2_CALIBRATION_FILE`
+            `[LH2] calibração (${MariGatewayAdapter.channels(calibration)}) salva em ${path} e carregada - ` +
+            (keptOnRestart
+                ? "continua valendo depois de reiniciar (é o TOML mais recente do LH2_CALIBRATION_DIR)"
+                : `ao reiniciar volta a valer o LH2_CALIBRATION_FILE (${lh2Config.calibrationFile}); esvazie-o para manter esta`)
         );
-        return { calibration, marked };
+        return { calibration, marked, keptOnRestart };
     }
 
     cancelLh2Capture(): boolean {
@@ -310,9 +323,19 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
 
         if (packet[0] === SwarmitPayloadType.SWARMIT_EVENT_LOG) {
             const log = SwarmitProtocol.parseEventLog(packet);
-            if (!log) return;
+            if (!log) {
+                console.log(`[LH2] ${address} EVENT_LOG cortado (${packet.length} B) - descartado`);
+                return;
+            }
             const samples = SwarmitProtocol.parseLh2Samples(log.data);
-            if (samples.length > 0) this.capture?.onSamples(address, samples);
+            if (samples.length > 0) {
+                const canais = samples.map((s) => `canal ${s.lhIndex + 1} (count1=${s.count1} count2=${s.count2})`).join(", ");
+                console.log(`[LH2] ${address} enxerga: ${canais}`);
+                this.capture?.onSamples(address, samples);
+            } else {
+                // Sem a tag de captura: log de texto do robô (ou captura vazia).
+                console.log(`[LH2] ${address} EVENT_LOG sem amostras (${log.data.length} B): ${log.data.toString("latin1")}`);
+            }
             return;
         }
 
@@ -410,6 +433,23 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
     private toInternalFrame(mari: MariFrame): Buffer {
         const header = Protocol.buildHeader(mari.header.destination, FRAME_VERSION, FRAME_TYPE_DATA, mari.header.source);
         return Buffer.concat([header, mari.payload]);
+    }
+
+    // LH2_CALIBRATION_FILE manda; vazio, vale o TOML mais recente do
+    // LH2_CALIBRATION_DIR (o último solve). O arquivo indicado e inválido
+    // derruba a borda; o achado sozinho só vira aviso - ninguém pediu por ele.
+    private static loadCalibration(): Lh2Calibration | null {
+        if (lh2Config.calibrationFile) return Lh2Calibration.fromFile(lh2Config.calibrationFile);
+
+        const latest = Lh2Calibration.latestToml(lh2Config.calibrationDir);
+        if (!latest) return null;
+
+        try {
+            return Lh2Calibration.fromFile(latest);
+        } catch (error) {
+            console.warn(`[LH2] ${latest} ignorado (${(error as Error).message}) - a borda sobe sem calibração`);
+            return null;
+        }
     }
 
     // "canal 7" / "canais 1, 3" - os slots zerados não contam.

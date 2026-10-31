@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "fs";
+import { mkdtempSync, rmSync, utimesSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { Lh2Calibration } from "../Protocols/Swarmit/Lh2Calibration";
@@ -59,13 +59,37 @@ describe("Lh2Calibration.fromPayload", () => {
         expect(() => Lh2Calibration.fromPayload(payload(Buffer.alloc(36), Buffer.alloc(36)))).toThrow("todas as matrizes zeradas");
     });
 
-    it("forStation põe a matriz no slot do índice e zera os anteriores", () => {
-        const cal = Lh2Calibration.forStation(6, matrix(1), "captura");
+    it("forStations põe cada matriz no slot do índice e zera os outros", () => {
+        const cal = Lh2Calibration.forStations(new Map([[6, matrix(1)], [2, matrix(2)]]), "captura");
         expect(cal.count).toBe(7);
-        expect(cal.stations).toEqual([6]);
+        expect(cal.stations).toEqual([2, 6]);
+        expect(cal.matrices[2].equals(matrix(2))).toBe(true);
         expect(cal.matrices[6].equals(matrix(1))).toBe(true);
         expect(cal.payload.length).toBe(1 + 7 * 36);
-        expect(() => Lh2Calibration.forStation(16, matrix(1), "captura")).toThrow("fora de 0..15");
+        expect(() => Lh2Calibration.forStations(new Map([[16, matrix(1)]]), "captura")).toThrow("fora de 0..15");
+        expect(() => Lh2Calibration.forStations(new Map(), "captura")).toThrow("nenhuma estação");
+    });
+
+    it("latestToml olha só os calibration*.toml da pasta", () => {
+        const dir = mkdtempSync(join(tmpdir(), "lh2-latest-"));
+        try {
+            expect(Lh2Calibration.latestToml(dir)).toBeNull();
+            expect(Lh2Calibration.latestToml(join(dir, "nao-existe"))).toBeNull();
+
+            const old = join(dir, "calibration-a.toml");
+            writeFileSync(old, "");
+            utimesSync(old, 1000, 1000);
+            const other = join(dir, "outra-coisa.toml");
+            writeFileSync(other, "");
+            utimesSync(other, 3000, 3000);
+            const latest = join(dir, "calibration-b.toml");
+            writeFileSync(latest, "");
+            utimesSync(latest, 2000, 2000);
+
+            expect(Lh2Calibration.latestToml(dir)).toBe(latest);
+        } finally {
+            rmSync(dir, { recursive: true, force: true });
+        }
     });
 });
 

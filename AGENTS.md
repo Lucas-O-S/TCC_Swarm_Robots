@@ -848,17 +848,27 @@ no PyDotBot 0.30.0 (`dotbot/calibration/ota.py`, `cli/swarm_lh2.py`,
 - Resposta: **`SWARMIT_EVENT_LOG = 0x89`** = timestamp u32 + count u8 + dados;
   dados = tag **`0xCA`** + amostras de 9 B (`lh_index` u8, `count1` u32 LE,
   `count2` u32 LE). Log de texto comum não começa com a tag.
-- Calibra **uma estação, em qualquer canal** (o PyDotBot 0.30.0 fixa o índice
-  0): a do `channel` pedido no início da sessão ou, sem ele, a de menor índice
-  na primeira leitura - é a que o firmware prefere quando vê várias (o laço do
-  `localization_get_position` começa do 0). Fica fixa até o fim da sessão.
+- Calibra **todas as bases que o robô enxergar, numa passada só** (2026-10-31;
+  o PyDotBot 0.30.0 fixa o índice 0), em qualquer canal, sem `channel` no
+  início. O bootloader (swarmit 0.9.0, `main.c`) responde ao 0xA2 assim que a
+  primeira base fica pronta e manda só as prontas naquele instante
+  (`localization_get_raw_counts`), então cada canto junta respostas: fecha com
+  `LH2_CAPTURE_MIN_RESPONSES` (2) e com todas as bases já vistas na sessão,
+  pedindo de novo na hora enquanto faltar alguma (até min + retries pedidos);
+  esgotado, fecha com o que tem. O `solve` recusa (400) se alguma base vista
+  não apareceu nos 4 cantos, porque o `localization_get_position` usa a base
+  de menor índice com leitura nova **sem olhar se ela tem calibração**: matriz
+  zerada dá 0/0 = NaN, passa o filtro de faixa e a posição sai (0,0) ou é
+  descartada pelo salto de 500 mm. Para tirar uma base da sessão: desligá-la e
+  recapturar os cantos em que ela apareceu.
   O firmware indexa a homografia pelo índice da estação
-  (`homography_matrix[lh_index]`, dotbot-libs do swarmit 0.9.0), então canal N
-  = N slots com os anteriores zerados (`Lh2Calibration.forStation`); o net core
-  aceita slot zerado e o `lh2HomographyCount` reportado é o nº de slots. Slot
-  zerado = estação sem calibração; só tudo zerado é recusado. Ressalva: se o
-  robô só enxergar uma estação sem matriz, a conta dá 0/0 e a posição sai
-  (0,0) (= sem fix) ou é descartada pelo salto de 500 mm.
+  (`homography_matrix[lh_index]`, dotbot-libs do swarmit 0.9.0), então os
+  slots vão do 0 ao maior canal calibrado, com os outros zerados
+  (`Lh2Calibration.forStations`); o net core aceita slot zerado e o
+  `lh2HomographyCount` reportado é o nº de slots. Slot zerado = estação sem
+  calibração; só tudo zerado é recusado. As bases não são fundidas: o firmware
+  usa uma por leitura (a de menor canal), então base a mais dá cobertura, não
+  precisão.
 - Conta: contagens → ponto de câmera (`LH_PERIODS`), homografia dos 4 cantos
   para (0,4/0,6 × 5 × lado) mm, int32 × 1000 truncado. Sem OpenCV: com 4 pontos
   é um sistema 8 × 8. O spec compara com vetores gerados pelo próprio PyDotBot
@@ -867,8 +877,12 @@ no PyDotBot 0.30.0 (`dotbot/calibration/ota.py`, `cli/swarm_lh2.py`,
 - Onde está: `Protocols/Swarmit/Lh2Homography.ts`, `adapter/Mari/Lh2CaptureSession.ts`,
   `SwarmitFleet.hold/release` (robô reservado leva STOP e não recebe
   calibração/START), rotas `/v1/lh2/calibration/session*` (contrato no
-  `Edge/README.md`). O `solve` grava o TOML schema 1 em `LH2_CALIBRATION_DIR`
-  (default `~/.dotbot/calibrations`), carrega e força o envio para a frota.
+  `Edge/README.md`). O `solve` grava um TOML schema 1 só, com todas as bases, em
+  `LH2_CALIBRATION_DIR` (default `~/.dotbot/calibrations`), carrega e força o
+  envio para a frota. Sem `LH2_CALIBRATION_FILE`, a borda carrega no boot o
+  `calibration*.toml` mais recente (mtime) dessa pasta - o último solve vale
+  depois de reiniciar sem mexer no `.env`; arquivo indicado e inválido derruba
+  o boot, o achado sozinho e inválido só vira aviso.
 - O PyDotBot continua necessário só para gravar firmware (cabo e OTA) e o gateway.
 
 #### Backend (`Backend/server/src`) - o que fazer
@@ -903,7 +917,7 @@ Orchestrator pode concluí-la na hora. Raro; tratar depois (ex. ignorar
 
 **Validação no hardware (ordem)**: (1) calibrar pela borda (rotas
 `/v1/lh2/calibration/session*`) ou com a ferramenta do `dotbot` 0.30.0 e
-conferir o arquivo; (2) borda com `LH2_CALIBRATION_FILE` + robô em
+conferir o arquivo; (2) borda com a calibração carregada + robô em
 Bootloader → ver o envio, o reboot e o device-info com `1 basestation (valid,
 from flash)`; (3) START → advertisement com posição ≠ (0,0); (4) task de 1-2
 pontos em Auto → robô anda e a task conclui por `waypoint_idx`.

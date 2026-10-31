@@ -82,7 +82,8 @@ export const SWARMIT_FLEET_DEFAULTS: SwarmitFleetOptions = {
 export interface SwarmitFleetPolicy {
     // MARI_AUTO_START: dar START em robô parado no bootloader com imagem.
     autoStart: boolean;
-    // Estações da calibração carregada (LH2_CALIBRATION_FILE). null = a borda
+    // Slots da calibração carregada (LH2_CALIBRATION_FILE ou o TOML mais
+    // recente do LH2_CALIBRATION_DIR). null = a borda
     // não calibra ninguém, só repassa o lh2 que o robô reportar.
     lh2StationCount: number | null;
 }

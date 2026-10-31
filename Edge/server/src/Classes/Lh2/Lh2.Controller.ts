@@ -42,22 +42,26 @@ export class Lh2Controller {
         return this.lh2.push(dto.address);
     }
 
-    /** Reserva o robô para a captura (STOP se estiver rodando) e abre a sessão. */
+    /**
+     * Reserva o robô para a captura (STOP se estiver rodando) e abre a sessão.
+     * Calibra todas as bases que o robô enxergar.
+     */
     @Post('session')
     @ApiBody(Lh2CaptureStartSchema)
     startCapture(@Body() dto: Lh2CaptureStartDto) {
         return this.lh2.startCapture(dto);
     }
 
-    /** Cantos já capturados, o que falta e o canto em espera. */
+    /** Cantos já capturados, o que falta, o canto em espera e as bases vistas. */
     @Get('session')
     getCapture() {
         return this.lh2.getCapture();
     }
 
     /**
-     * Captura o canto onde o robô está agora. Espera a resposta do robô (até
-     * ~20 s com os reenvios); 504 se ele não responder.
+     * Captura o canto onde o robô está agora, com a leitura de cada base que o
+     * enxergar. Espera o robô (até ~20 s com os reenvios); 504 se ele não
+     * responder.
      */
     @Post('session/capture')
     @HttpCode(200)
@@ -66,7 +70,11 @@ export class Lh2Controller {
         return this.lh2.captureCorner(dto.corner);
     }
 
-    /** Calcula, grava o TOML, carrega e manda para a frota. Encerra a sessão. */
+    /**
+     * Calcula uma homografia por base, grava um TOML só, carrega e manda para a
+     * frota. Encerra a sessão. 400 se faltar canto ou se alguma base vista não
+     * tiver aparecido nos 4.
+     */
     @Post('session/solve')
     @HttpCode(200)
     solveCapture() {

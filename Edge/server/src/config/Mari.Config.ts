@@ -11,6 +11,7 @@ export const mariConfig = {
     // Dar START sozinho nos robôs que aparecerem em Bootloader com imagem
     // gravada. Desligado por padrão: com isso em false a borda não comanda a
     // malha - só pede o device-info (leitura: imagem e calibração LH2) e, se
-    // LH2_CALIBRATION_FILE estiver preenchido, manda a calibração.
+    // houver calibração carregada (LH2_CALIBRATION_FILE ou o TOML mais recente
+    // do LH2_CALIBRATION_DIR), manda a calibração.
     autoStart : (process.env.MARI_AUTO_START ?? "false") === "true",
 }

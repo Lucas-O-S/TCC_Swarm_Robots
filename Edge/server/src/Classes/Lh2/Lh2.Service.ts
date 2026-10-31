@@ -46,7 +46,7 @@ export class Lh2Service {
         const mari = this.requireMari();
 
         if (!mari.lh2Calibration()) {
-            throw new ConflictException("Nenhuma calibração carregada (LH2_CALIBRATION_FILE vazio)");
+            throw new ConflictException("Nenhuma calibração carregada (LH2_CALIBRATION_FILE vazio e nenhum TOML no LH2_CALIBRATION_DIR)");
         }
 
         const marked = mari.forceLh2Calibration(address);
@@ -69,8 +69,7 @@ export class Lh2Service {
         if (!mari.swarmitFleet().some((node) => node.address === Protocol.normalizeAddress(dto.address)))
             throw new NotFoundException(`A malha SwarmIT nunca reportou o robô '${Protocol.normalizeAddress(dto.address)}'`);
 
-        const station = dto.channel === undefined ? null : dto.channel - 1;
-        return mari.beginLh2Capture(dto.address, dto.distanceMm ?? LH2_CALIBRATION_DISTANCE_DEFAULT, dto.tag ?? null, station).view();
+        return mari.beginLh2Capture(dto.address, dto.distanceMm ?? LH2_CALIBRATION_DISTANCE_DEFAULT, dto.tag ?? null).view();
     }
 
     getCapture(): Lh2CaptureView {
@@ -82,8 +81,8 @@ export class Lh2Service {
         const session = this.requireSession();
 
         try {
-            const sample = await mari.captureLh2Corner(corner);
-            return { corner, sample, session: session.view() };
+            const samples = await mari.captureLh2Corner(corner);
+            return { corner, samples, session: session.view() };
         } catch (error) {
             if (error instanceof Lh2CaptureTimeoutError) throw new GatewayTimeoutException(error.message);
             if (error instanceof Lh2CaptureBusyError) throw new ConflictException(error.message);
@@ -96,15 +95,17 @@ export class Lh2Service {
         const mari = this.requireMari();
         const session = this.requireSession();
 
-        if (!session.isComplete())
-            throw new BadRequestException(`Faltam os cantos: ${session.view().missing.join(", ")}`);
+        // Canto faltando ou base que não apareceu nos 4 cantos.
+        const problem = session.problem();
+        if (problem) throw new BadRequestException(problem);
 
         try {
-            const { calibration, marked } = mari.solveLh2Capture();
+            const { calibration, marked, keptOnRestart } = mari.solveLh2Capture();
             return {
                 file: calibration.source,
                 stationCount: calibration.count,
                 channels: Lh2Service.channels(calibration.stations),
+                keptOnRestart,
                 marked,
                 notInBootloader: this.notInBootloader(mari, marked),
             };

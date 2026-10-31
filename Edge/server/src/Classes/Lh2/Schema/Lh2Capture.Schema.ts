@@ -10,7 +10,6 @@ export const Lh2CaptureStartSchema = {
             address: { type: 'string', example: 'BDF2B04BC00D2725' },
             distanceMm: { type: 'integer', example: 500 },
             tag: { type: 'string', example: 'arena-taak' },
-            channel: { type: 'integer', minimum: 1, maximum: 16, example: 7 },
         },
     },
 };

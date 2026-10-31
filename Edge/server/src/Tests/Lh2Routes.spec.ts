@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, GatewayTimeoutException, NotFoundException } from "@nestjs/common";
-import { existsSync, mkdtempSync, rmSync } from "fs";
+import { existsSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { lh2Config } from "../config/lh2.config";
@@ -16,7 +16,7 @@ import { SwarmitFleet } from "../adapter/Mari/SwarmitFleet";
 import { Lh2Calibration } from "../Protocols/Swarmit/Lh2Calibration";
 import { SwarmitDeviceInfo, SwarmitStatus } from "../Protocols/Swarmit/Swarmit.Protocol";
 import { Lh2Flags, SwarmitDeviceStatus, SwarmitDeviceType } from "../Enums/SwarmitDeviceStatus.enum";
-import { LH2_MAX_WAYPOINTS } from "../Constants/Lh2.Constants";
+import { LH2_CAPTURE_MIN_RESPONSES, LH2_CAPTURE_RETRIES, LH2_MAX_WAYPOINTS } from "../Constants/Lh2.Constants";
 
 const A = "BDF2B04BC00D2725";
 const B = "0000000000000002";
@@ -140,27 +140,37 @@ describe("/v1/lh2/calibration/session - captura pela borda", () => {
         [Lh2Corner.BottomRight]: [47000, 79000],
     };
 
-    // O EVENT_LOG que o robô manda em resposta ao 0xA2.
-    const reply = (adapter: MariGatewayAdapter, [c1, c2]: [number, number], lhIndex = 0) => {
-        const data = Buffer.alloc(10);
+    // O EVENT_LOG que o robô manda em resposta ao 0xA2: uma leitura por base.
+    const reply = (adapter: MariGatewayAdapter, [c1, c2]: [number, number], lhIndexes = [0]) => {
+        const data = Buffer.alloc(1 + 9 * lhIndexes.length);
         data.writeUInt8(0xCA, 0);
-        data.writeUInt8(lhIndex, 1);
-        data.writeUInt32LE(c1, 2);
-        data.writeUInt32LE(c2, 6);
+        lhIndexes.forEach((lhIndex, i) => {
+            data.writeUInt8(lhIndex, 1 + i * 9);
+            data.writeUInt32LE(c1, 2 + i * 9);
+            data.writeUInt32LE(c2, 6 + i * 9);
+        });
         const head = Buffer.from([0x89, 0, 0, 0, 0, data.length]);
         (adapter as any).onSwarmitPacket({ header: { source: A }, payload: Buffer.concat([head, data]) });
     };
 
+    // Responde até o canto fechar (o que sobra cai sem canto pendente e é ignorado).
+    const answer = (adapter: MariGatewayAdapter, counts: [number, number], lhIndexes = [0]) => {
+        for (let i = 0; i < LH2_CAPTURE_MIN_RESPONSES + LH2_CAPTURE_RETRIES; i++) reply(adapter, counts, lhIndexes);
+    };
+
     let dir: string;
     const originalDir = lh2Config.calibrationDir;
+    const originalFile = lh2Config.calibrationFile;
 
     beforeEach(() => {
         dir = mkdtempSync(join(tmpdir(), "lh2-capture-"));
         lh2Config.calibrationDir = dir;
+        lh2Config.calibrationFile = null;
     });
 
     afterEach(() => {
         lh2Config.calibrationDir = originalDir;
+        lh2Config.calibrationFile = originalFile;
         rmSync(dir, { recursive: true, force: true });
         jest.useRealTimers();
     });
@@ -173,16 +183,17 @@ describe("/v1/lh2/calibration/session - captura pela borda", () => {
 
         for (const corner of Object.values(Lh2Corner)) {
             const pending = service.captureCorner(corner);
-            reply(adapter, COUNTS[corner]);
-            await expect(pending).resolves.toMatchObject({ corner, sample: { lhIndex: 0, count1: COUNTS[corner][0] } });
+            answer(adapter, COUNTS[corner]);
+            await expect(pending).resolves.toMatchObject({ corner, samples: [{ lhIndex: 0, count1: COUNTS[corner][0] }] });
         }
 
-        // Cada canto saiu como um 0xA2 endereçado ao robô.
-        expect(sent.mock.calls.filter(([, p]) => p[0] === 0xA2).map(([to]) => to)).toEqual([A, A, A, A]);
+        // Cada canto saiu como LH2_CAPTURE_MIN_RESPONSES 0xA2 endereçados ao robô.
+        expect(sent.mock.calls.filter(([, p]) => p[0] === 0xA2).map(([to]) => to))
+            .toEqual(Array(4 * LH2_CAPTURE_MIN_RESPONSES).fill(A));
 
         const result = service.solveCapture();
 
-        expect(result).toMatchObject({ stationCount: 1, channels: [1], notInBootloader: [B] });
+        expect(result).toMatchObject({ stationCount: 1, channels: [1], keptOnRestart: true, notInBootloader: [B] });
         expect(result.marked).toEqual(expect.arrayContaining([A, B]));
         expect(result.file.startsWith(dir)).toBe(true);
         expect(result.file).toMatch(/calibration-arena-taak-.*\.toml$/);
@@ -204,10 +215,10 @@ describe("/v1/lh2/calibration/session - captura pela borda", () => {
 
         for (const corner of Object.values(Lh2Corner)) {
             const pending = service.captureCorner(corner);
-            reply(adapter, COUNTS[corner], 6);
-            await expect(pending).resolves.toMatchObject({ sample: { lhIndex: 6 } });
+            answer(adapter, COUNTS[corner], [6]);
+            await expect(pending).resolves.toMatchObject({ samples: [{ lhIndex: 6 }] });
         }
-        expect(service.getCapture()).toMatchObject({ station: 6, channel: 7 });
+        expect(service.getCapture()).toMatchObject({ bases: [{ channel: 7, missing: [] }] });
 
         const result = service.solveCapture();
         expect(result).toMatchObject({ stationCount: 7, channels: [7] });
@@ -219,16 +230,44 @@ describe("/v1/lh2/calibration/session - captura pela borda", () => {
         expect(service.getCalibration()).toMatchObject({ stationCount: 7, channels: [7] });
     });
 
-    it("channel no início fixa a estação: leitura de outro canal não fecha o canto", async () => {
+    it("duas bases: uma passada calibra as duas num arquivo só", async () => {
         const { adapter, service } = mariSetup(false);
-        expect(service.startCapture({ address: A, channel: 13 })).toMatchObject({ station: 12, channel: 13 });
+        service.startCapture({ address: A });
 
-        const pending = service.captureCorner(Lh2Corner.TopLeft);
-        reply(adapter, COUNTS[Lh2Corner.TopLeft], 6);
-        expect(service.getCapture()).toMatchObject({ pending: Lh2Corner.TopLeft, otherStations: [6] });
+        for (const corner of Object.values(Lh2Corner)) {
+            const pending = service.captureCorner(corner);
+            answer(adapter, COUNTS[corner], [0, 2]);
+            await expect(pending).resolves.toMatchObject({ samples: [{ lhIndex: 0 }, { lhIndex: 2 }] });
+        }
+        expect(service.getCapture().bases).toEqual([{ channel: 1, missing: [] }, { channel: 3, missing: [] }]);
 
-        reply(adapter, COUNTS[Lh2Corner.TopLeft], 12);
-        await expect(pending).resolves.toMatchObject({ sample: { lhIndex: 12 } });
+        const result = service.solveCapture();
+        expect(result).toMatchObject({ stationCount: 3, channels: [1, 3] });
+
+        // Uma matriz por base, no slot do índice; o do canal 2 zerado.
+        const saved = Lh2Calibration.fromFile(result.file);
+        expect(saved.stations).toEqual([0, 2]);
+        expect(saved.matrices[1].every((b) => b === 0)).toBe(true);
+        expect(saved.matrices[0].equals(saved.matrices[2])).toBe(false);
+        expect(service.getCalibration()).toMatchObject({ stationCount: 3, channels: [1, 3] });
+    });
+
+    it("base que não apareceu nos 4 cantos: solve é 400 e a sessão continua", async () => {
+        const { adapter, service } = mariSetup(false);
+        service.startCapture({ address: A });
+
+        for (const corner of Object.values(Lh2Corner)) {
+            const pending = service.captureCorner(corner);
+            answer(adapter, COUNTS[corner], corner === Lh2Corner.TopLeft ? [0, 1] : [0]);
+            await pending;
+        }
+
+        expect(service.getCapture().bases).toEqual([
+            { channel: 1, missing: [] },
+            { channel: 2, missing: [Lh2Corner.TopRight, Lh2Corner.BottomLeft, Lh2Corner.BottomRight] },
+        ]);
+        expect(() => service.solveCapture()).toThrow(/base do canal 2 não apareceu em top-right, bottom-left, bottom-right/);
+        expect(service.getCapture().address).toBe(A);
     });
 
     it("captura sem resposta vira 504", async () => {
@@ -274,5 +313,64 @@ describe("/v1/lh2/calibration/session - captura pela borda", () => {
         expect(validateSync(plainToInstance(Lh2CaptureStartDto, {}))).toHaveLength(1);
         expect(validateSync(plainToInstance(Lh2CaptureCornerDto, { corner: "top-left" }))).toHaveLength(0);
         expect(validateSync(plainToInstance(Lh2CaptureCornerDto, { corner: "meio" }))).toHaveLength(1);
+    });
+});
+
+describe("boot - calibração sem LH2_CALIBRATION_FILE", () => {
+
+    const load = (): Lh2Calibration | null => (MariGatewayAdapter as any).loadCalibration();
+
+    const write = (dir: string, name: string, payload: Buffer, mtimeS: number) => {
+        const path = join(dir, name);
+        writeFileSync(path, Lh2Calibration.fromPayload(payload, name).toToml({ distanceMm: 500 }));
+        utimesSync(path, mtimeS, mtimeS);
+        return path;
+    };
+
+    let dir: string;
+    const originalDir = lh2Config.calibrationDir;
+    const originalFile = lh2Config.calibrationFile;
+
+    beforeEach(() => {
+        dir = mkdtempSync(join(tmpdir(), "lh2-boot-"));
+        lh2Config.calibrationDir = dir;
+        lh2Config.calibrationFile = null;
+    });
+
+    afterEach(() => {
+        lh2Config.calibrationDir = originalDir;
+        lh2Config.calibrationFile = originalFile;
+        rmSync(dir, { recursive: true, force: true });
+        jest.restoreAllMocks();
+    });
+
+    it("pasta vazia ou inexistente: sobe sem calibração", () => {
+        expect(load()).toBeNull();
+        lh2Config.calibrationDir = join(dir, "nao-existe");
+        expect(load()).toBeNull();
+    });
+
+    it("carrega o TOML mais recente da pasta (o último solve)", () => {
+        write(dir, "calibration-2026-10-01T00-00-00Z.toml", Buffer.concat([Buffer.from([1]), matrix]), 1000);
+        const latest = write(dir, "calibration-arena-2026-09-01T00-00-00Z.toml", Buffer.concat([Buffer.from([2]), matrix, matrix]), 2000);
+
+        expect(load()).toMatchObject({ source: latest, count: 2 });
+    });
+
+    it("o mais recente inválido vira aviso, não derruba o boot", () => {
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+        write(dir, "calibration-ok.toml", Buffer.concat([Buffer.from([1]), matrix]), 1000);
+        writeFileSync(join(dir, "calibration-novo.toml"), "schema_version = 3\n");
+
+        expect(load()).toBeNull();
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining("calibration-novo.toml ignorado"));
+    });
+
+    it("LH2_CALIBRATION_FILE manda, mesmo mais antigo", () => {
+        const fixed = write(dir, "calibration-fixo.toml", Buffer.concat([Buffer.from([1]), matrix]), 1000);
+        write(dir, "calibration-novo.toml", Buffer.concat([Buffer.from([2]), matrix, matrix]), 2000);
+        lh2Config.calibrationFile = fixed;
+
+        expect(load()).toMatchObject({ source: fixed, count: 1 });
     });
 });

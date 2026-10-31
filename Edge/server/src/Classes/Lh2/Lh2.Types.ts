@@ -21,7 +21,8 @@ export interface Lh2RobotView {
 export interface Lh2CalibrationView {
     // false = transporte sem SwarmIT (simulador/MQTT): não há o que calibrar.
     supported: boolean;
-    // Arquivo carregado (null = LH2_CALIBRATION_FILE vazio).
+    // Arquivo carregado: o LH2_CALIBRATION_FILE ou, sem ele, o TOML mais
+    // recente do LH2_CALIBRATION_DIR. null = nenhum.
     file: string | null;
     // Slots do arquivo (= lh2HomographyCount do robô calibrado com ele).
     stationCount: number | null;
@@ -41,7 +42,8 @@ export interface Lh2PushResult {
 /** Resposta do POST /v1/lh2/calibration/session/capture. */
 export interface Lh2CornerResult {
     corner: Lh2Corner;
-    sample: Lh2Sample;
+    // Uma leitura por base vista no canto, em ordem de canal.
+    samples: Lh2Sample[];
     session: Lh2CaptureView;
 }
 
@@ -50,7 +52,12 @@ export interface Lh2SolveResult {
     // TOML gravado (formato do PyDotBot 0.30.0) e já carregado pela borda.
     file: string;
     stationCount: number;
+    // Bases calibradas (uma homografia por canal, no mesmo arquivo).
     channels: number[];
+    // true = é a que a borda carrega no próximo boot (o TOML mais recente do
+    // LH2_CALIBRATION_DIR). false = o LH2_CALIBRATION_FILE aponta para outro
+    // arquivo, que volta a valer ao reiniciar.
+    keptOnRestart: boolean;
     // Robôs que vão receber a calibração nova (a frota toda).
     marked: string[];
     // Só recebem quando estiverem em Bootloader.
