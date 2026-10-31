@@ -43,7 +43,11 @@ export class CommandController {
         return this.commands.send(address, Command.RgbLed, dto);
     }
 
-    /** Modo de controle do robô (0 Manual / 1 Auto). Para os motores e aborta waypoints. */
+    /**
+     * Modo de controle do robô (0 Manual / 1 Auto). Para os motores e aborta
+     * waypoints: a borda manda LH2_WAYPOINTS vazio + CONTROL_MODE (ver
+     * CommandService).
+     */
     @Post(Command.ControlMode)
     @HttpCode(202)
     @ApiBody(ControlModeSchema)
