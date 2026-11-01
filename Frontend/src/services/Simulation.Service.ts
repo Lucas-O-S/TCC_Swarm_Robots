@@ -28,15 +28,15 @@ const EXEMPLO: SimScenarioModel = {
       address: 'BDF2B04BC00D2725',
       application: 0,
       mode: 1,
-      start: { x_mm: 300, y_mm: 300, theta_deg: 0 },
+      start: { x_mm: 300, y_mm: 1700, theta_deg: -90 },
       battery: 100,
       waypoints: [
-        { x_mm: 1500, y_mm: 300 },
         { x_mm: 1500, y_mm: 1700 },
+        { x_mm: 1500, y_mm: 300 },
       ],
       waypoint_threshold_mm: 50,
     },
-    { address: 'A1B2C3D4E5F60708', application: 0, mode: 0, start: { x_mm: 300, y_mm: 1000, theta_deg: 0 }, battery: 100 },
+    { address: 'A1B2C3D4E5F60708', application: 0, mode: 0, start: { x_mm: 300, y_mm: 1000, theta_deg: -90 }, battery: 100 },
   ],
   sim: { ...DEFAULT_SIM_CONFIG },
 };
@@ -47,21 +47,21 @@ const ENXAME: SimScenarioModel = {
   arena: { width_mm: 4000, height_mm: 4000, grid_mm: 200 },
   obstacles: [
     { id: 'muro-central', x_mm: 1800, y_mm: 1200, w_mm: 400, h_mm: 1600 },
-    { id: 'caixa-ne', x_mm: 2800, y_mm: 3000, w_mm: 400, h_mm: 300 },
-    { id: 'caixa-so', x_mm: 700, y_mm: 2500, w_mm: 600, h_mm: 250 },
+    { id: 'caixa-ne', x_mm: 2800, y_mm: 700, w_mm: 400, h_mm: 300 },
+    { id: 'caixa-so', x_mm: 700, y_mm: 1250, w_mm: 600, h_mm: 250 },
   ],
   robots: [
     {
       address: '0A11CE0000000001',
       application: 0,
       mode: 1,
-      start: { x_mm: 600, y_mm: 600, theta_deg: 0 },
+      start: { x_mm: 600, y_mm: 3400, theta_deg: -90 },
       battery: 100,
       waypoints: [
-        { x_mm: 3400, y_mm: 600 },
         { x_mm: 3400, y_mm: 3400 },
-        { x_mm: 600, y_mm: 3400 },
+        { x_mm: 3400, y_mm: 600 },
         { x_mm: 600, y_mm: 600 },
+        { x_mm: 600, y_mm: 3400 },
       ],
       waypoint_threshold_mm: 60,
       loop: true,
@@ -70,13 +70,13 @@ const ENXAME: SimScenarioModel = {
       address: '0A11CE0000000002',
       application: 0,
       mode: 1,
-      start: { x_mm: 1500, y_mm: 1000, theta_deg: 0 },
+      start: { x_mm: 1500, y_mm: 3000, theta_deg: -90 },
       battery: 100,
       waypoints: [
-        { x_mm: 2500, y_mm: 1000 },
         { x_mm: 2500, y_mm: 3000 },
-        { x_mm: 1500, y_mm: 3000 },
+        { x_mm: 2500, y_mm: 1000 },
         { x_mm: 1500, y_mm: 1000 },
+        { x_mm: 1500, y_mm: 3000 },
       ],
       waypoint_threshold_mm: 50,
       loop: true,
@@ -85,11 +85,11 @@ const ENXAME: SimScenarioModel = {
       address: '0A11CE0000000003',
       application: 0,
       mode: 1,
-      start: { x_mm: 3600, y_mm: 2400, theta_deg: 270 },
+      start: { x_mm: 3600, y_mm: 1600, theta_deg: 0 },
       battery: 90,
       waypoints: [
-        { x_mm: 3600, y_mm: 1200 },
-        { x_mm: 2800, y_mm: 600 },
+        { x_mm: 3600, y_mm: 2800 },
+        { x_mm: 2800, y_mm: 3400 },
       ],
       waypoint_threshold_mm: 50,
     },
@@ -97,19 +97,19 @@ const ENXAME: SimScenarioModel = {
       address: '0A11CE0000000004',
       application: 0,
       mode: 1,
-      start: { x_mm: 400, y_mm: 1600, theta_deg: 90 },
+      start: { x_mm: 400, y_mm: 2400, theta_deg: 180 },
       battery: 80,
-      waypoints: [{ x_mm: 400, y_mm: 3000 }],
+      waypoints: [{ x_mm: 400, y_mm: 1000 }],
       waypoint_threshold_mm: 50,
     },
-    { address: '0A11CE0000000005', application: 0, mode: 0, start: { x_mm: 3000, y_mm: 500, theta_deg: 90 }, battery: 100 },
-    { address: '0A11CE0000000006', application: 0, mode: 0, start: { x_mm: 2000, y_mm: 3600, theta_deg: 0 }, battery: 40 },
+    { address: '0A11CE0000000005', application: 0, mode: 0, start: { x_mm: 3000, y_mm: 3500, theta_deg: 180 }, battery: 100 },
+    { address: '0A11CE0000000006', application: 0, mode: 0, start: { x_mm: 2000, y_mm: 400, theta_deg: -90 }, battery: 40 },
   ],
   sim: { ...DEFAULT_SIM_CONFIG },
 };
 
 // Robôs do mapa mock (12×10 blocos = 2400×2000 mm; obstáculos em
-// x 600–1000/y 1200–1600 e x 1200–1800/y 600–800): um contorna a arena em
+// x 600–1000/y 400–800 e x 1200–1800/y 1200–1400): um contorna a arena em
 // loop (a 300 mm das bordas, fora da legenda/controles do mapa), outro dá voltas entre os obstáculos e um fica em MANUAL pro joystick.
 // As rotas não se cruzam de frente (dois robôs na mesma linha em sentidos
 // opostos travam um no outro — a colisão entre robôs só separa, não desvia).
@@ -118,13 +118,13 @@ const MOCK_ROBOTS: ScenarioRobotModel[] = [
     address: 'C0FFEE0000000001',
     application: 0,
     mode: DotBotControlMode.Auto,
-    start: { x_mm: 300, y_mm: 300, theta_deg: 0 },
+    start: { x_mm: 300, y_mm: 1700, theta_deg: -90 },
     battery: 100,
     waypoints: [
-      { x_mm: 2100, y_mm: 300 },
       { x_mm: 2100, y_mm: 1700 },
-      { x_mm: 300, y_mm: 1700 },
+      { x_mm: 2100, y_mm: 300 },
       { x_mm: 300, y_mm: 300 },
+      { x_mm: 300, y_mm: 1700 },
     ],
     waypoint_threshold_mm: 50,
     loop: true,
@@ -133,12 +133,12 @@ const MOCK_ROBOTS: ScenarioRobotModel[] = [
     address: 'C0FFEE0000000002',
     application: 0,
     mode: DotBotControlMode.Auto,
-    start: { x_mm: 1100, y_mm: 1000, theta_deg: 0 },
+    start: { x_mm: 1100, y_mm: 1000, theta_deg: -90 },
     battery: 85,
     waypoints: [
       { x_mm: 1950, y_mm: 1000 },
-      { x_mm: 1950, y_mm: 450 },
-      { x_mm: 1100, y_mm: 450 },
+      { x_mm: 1950, y_mm: 1550 },
+      { x_mm: 1100, y_mm: 1550 },
       { x_mm: 1100, y_mm: 1000 },
     ],
     waypoint_threshold_mm: 50,
@@ -148,7 +148,7 @@ const MOCK_ROBOTS: ScenarioRobotModel[] = [
     address: 'C0FFEE0000000003',
     application: 0,
     mode: DotBotControlMode.Manual,
-    start: { x_mm: 400, y_mm: 1000, theta_deg: 90 },
+    start: { x_mm: 400, y_mm: 1000, theta_deg: 180 },
     battery: 60,
   },
 ];
@@ -186,12 +186,12 @@ const PRESETS: (ScenarioPreset & { build: () => SimScenarioModel })[] = [
 // linha reta: todo ponto livre e nenhum trecho cortando barreira (o
 // controlador AUTO não desvia de nada).
 const MOCK_TASKS: { name: string; priority: number; points: [number, number][] }[] = [
-  { name: 'Entrega doca → estoque', priority: 0, points: [[0.12, 0.12], [0.88, 0.12], [0.88, 0.5]] },
-  { name: 'Inspeção canto nordeste', priority: 1, points: [[0.75, 0.75], [0.88, 0.88], [0.7, 0.88]] },
-  { name: 'Coleta canto sudoeste', priority: 1, points: [[0.3, 0.3], [0.12, 0.3], [0.12, 0.12]] },
-  { name: 'Patrulha do perímetro', priority: 2, points: [[0.12, 0.12], [0.88, 0.12], [0.88, 0.88], [0.12, 0.88], [0.12, 0.12]] },
-  { name: 'Travessia norte', priority: 3, points: [[0.12, 0.88], [0.88, 0.88]] },
-  { name: 'Ronda central', priority: 4, points: [[0.35, 0.5], [0.5, 0.35], [0.65, 0.5], [0.5, 0.65]] },
+  { name: 'Entrega doca → estoque', priority: 0, points: [[0.12, 0.88], [0.88, 0.88], [0.88, 0.5]] },
+  { name: 'Inspeção canto nordeste', priority: 1, points: [[0.75, 0.25], [0.88, 0.12], [0.7, 0.12]] },
+  { name: 'Coleta canto sudoeste', priority: 1, points: [[0.3, 0.7], [0.12, 0.7], [0.12, 0.88]] },
+  { name: 'Patrulha do perímetro', priority: 2, points: [[0.12, 0.88], [0.88, 0.88], [0.88, 0.12], [0.12, 0.12], [0.12, 0.88]] },
+  { name: 'Travessia norte', priority: 3, points: [[0.12, 0.12], [0.88, 0.12]] },
+  { name: 'Ronda central', priority: 4, points: [[0.35, 0.5], [0.5, 0.65], [0.65, 0.5], [0.5, 0.35]] },
 ];
 
 const MOCK_CLEARANCE_MM = ROBOT_RADIUS_MM + 20;

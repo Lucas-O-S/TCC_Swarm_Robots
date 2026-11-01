@@ -4,8 +4,9 @@
  * vice-versa. É o estado INICIAL que o modo Editar mexe e que o modo Simular
  * carrega do zero (ver `Scenario.Mapper.ts` → `SimWorld`).
  *
- * Unidades: milímetros, com Y crescendo PRA CIMA a partir do canto
- * inferior-esquerdo (convenção do simulador e do mundo LH2); ângulos em graus.
+ * Unidades: milímetros, com Y crescendo PRA BAIXO a partir do canto
+ * superior-esquerdo (convenção do DotBot-firmware e da LH2, ver SimRobot.ts);
+ * ângulos em graus, `theta_deg` = 0 olhando pra +Y, positivo = horário.
  * O campo `mode` usa a numeração do FIO (`DotBotControlMode`: Manual = 0,
  * Auto = 1), não o `RobotControlMode` do backend.
  */

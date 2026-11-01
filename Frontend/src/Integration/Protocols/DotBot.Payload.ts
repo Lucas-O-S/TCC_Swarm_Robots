@@ -37,7 +37,7 @@ function packet(type: number, body: Uint8Array): Uint8Array {
 
 export interface DotBotAdvertisement {
   calibrated: number; // u8 (bitmask LH1=0x01, LH2=0x02)
-  direction: number; // i16, graus [0, 360)
+  direction: number; // i16, graus -180..180: 0 = +Y (pra baixo), horário (convenção do firmware)
   pos_x: number; // u32, mm
   pos_y: number; // u32, mm
   battery: number; // u16, mV

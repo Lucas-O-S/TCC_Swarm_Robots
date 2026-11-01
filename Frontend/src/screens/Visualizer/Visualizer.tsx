@@ -105,7 +105,7 @@ export function Visualizer() {
 
   function handleCreate(rect: CellSelectRect) {
     if (tool !== 'waypoint' || !canDraftForRobot || !focusAddress) return;
-    const p = clampPoint(cellPointToWorld(rect, arena.height));
+    const p = clampPoint(cellPointToWorld(rect));
     setNotice(collidesAny(p, ROBOT_RADIUS_MM, obstacles) ? { kind: 'error', text: POINT_IN_OBSTACLE_NOTICE } : null);
     routeDraft.add(focusAddress, p);
   }
