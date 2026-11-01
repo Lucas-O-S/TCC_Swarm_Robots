@@ -5,6 +5,7 @@ import { describeCommand } from '../../../Integration/FleetLink';
 import type { FleetCommand, FleetLink, FleetUplink, SwarmitCommand } from '../../../Integration/FleetLink';
 import { batteryToMillivolts } from '../../../Integration/Protocols/DotBot.Payload';
 import type { DotBotAdvertisement } from '../../../Integration/Protocols/DotBot.Payload';
+import { normalizeAngle } from './SimRobot';
 import type { SimRobot } from './SimRobot';
 import type { SimWorld } from './SimWorld';
 import { NetChannel, netParamsFromSim } from './SimNetModel';
@@ -35,10 +36,9 @@ import { SwarmitDevice } from './SwarmitDevice';
 //     (o robô sempre boota no bootloader e o backend não o enxerga até um
 //     START; ver a memória "rede Mari — estado real" do projeto).
 
-/** theta (rad, núcleo) → direction (graus inteiros em [0, 360)). */
+/** theta (rad, núcleo) → direction em graus inteiros de -180 a 180, como o firmware manda (mesma convenção, ver SimRobot.ts). */
 export function directionFromTheta(thetaRad: number): number {
-  const deg = Math.round(thetaRad * RAD_TO_DEG);
-  return ((deg % 360) + 360) % 360;
+  return Math.round(normalizeAngle(thetaRad) * RAD_TO_DEG);
 }
 
 const clampU32 = (v: number) => Math.min(0xffffffff, Math.max(0, Math.round(v)));

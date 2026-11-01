@@ -8,6 +8,12 @@ import type { Vec2Model } from '../../../model/SimWorld.Model';
 // Cinemática SIMPLES de tração diferencial (constantes em
 // Consts/SimulationConsts.ts): fidelidade funcional (o que o backend
 // observa), não física realista. Unidades: mm e radianos.
+//
+// Referencial = o do DotBot-firmware 1.23.0 (dotbot-libs `control_loop.c`) e
+// da LH2, o mesmo em todo o projeto (robô real, borda, backend, front e
+// RobotSwarmSimulator), sem conversão: X pra direita, Y pra BAIXO, origem no
+// canto superior-esquerdo da arena; theta = 0 olhando pra +Y, positivo =
+// horário (-π/2 = pra direita) — o `direction` do advertisement em radianos.
 
 /** Normaliza um ângulo para (-PI, PI]. */
 export function normalizeAngle(a: number): number {
@@ -15,6 +21,16 @@ export function normalizeAngle(a: number): number {
   if (r > Math.PI) r -= 2 * Math.PI;
   if (r <= -Math.PI) r += 2 * Math.PI;
   return r;
+}
+
+/** Rumo de um deslocamento (dx, dy) — o `compute_angle` do firmware. */
+export function headingOf(dx: number, dy: number): number {
+  return -Math.atan2(dx, dy);
+}
+
+/** Vetor unitário de um rumo (o inverso do `headingOf`). */
+export function headingVector(theta: number): Vec2Model {
+  return { x: -Math.sin(theta), y: Math.cos(theta) };
 }
 
 function clampPwm(v: number): number {
@@ -129,10 +145,12 @@ export class SimRobot {
     const vl = (this.pwm_left / PWM_MAX) * MAX_WHEEL_SPEED_MM_S;
     const vr = (this.pwm_right / PWM_MAX) * MAX_WHEEL_SPEED_MM_S;
     const v = (vl + vr) / 2;
-    const w = (vr - vl) / WHEEL_BASE_MM;
+    // Roda esquerda mais rápida → gira no sentido horário → theta cresce (como o EKF do firmware).
+    const w = (vl - vr) / WHEEL_BASE_MM;
+    const dir = headingVector(this.theta);
 
-    this.pos_x += v * Math.cos(this.theta) * dt;
-    this.pos_y += v * Math.sin(this.theta) * dt;
+    this.pos_x += v * dir.x * dt;
+    this.pos_y += v * dir.y * dt;
     this.theta = normalizeAngle(this.theta + w * dt);
 
     this.encoder_left += vl * dt;

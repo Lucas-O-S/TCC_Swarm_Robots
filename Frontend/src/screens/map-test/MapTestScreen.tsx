@@ -56,7 +56,7 @@ interface MockRobot {
   status: RobotStatus;
   col: number;
   row: number;
-  /** Graus, 0° = pra cima — mesma convenção do `theta` do simulador. */
+  /** Graus, 0° = pra cima, horário — a convenção do <Robot direction> (ver thetaToDirection). */
   direction: number;
   /** Rota planejada (TaskModel.waypoints) — x/y aqui são célula do grid, não mm. */
   path?: TaskWaypointModel[];
