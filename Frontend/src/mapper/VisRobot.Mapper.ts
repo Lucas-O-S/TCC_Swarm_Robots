@@ -25,7 +25,7 @@ function position(t: RobotTelemetryModel | null): Vec2Model | null {
   return { x: p.x, y: p.y };
 }
 
-/** direction (graus, anti-horário a partir de +X, a convenção do simulador) → theta em rad; null = sem leitura. */
+/** direction do firmware (graus) → theta em rad, na mesma convenção (0 = +Y, horário — ver SimRobot.ts); null = sem leitura. */
 function thetaFromDirection(direction: number | null): number | null {
   return direction === null ? null : direction * DEG_TO_RAD;
 }
@@ -41,7 +41,8 @@ function isOutside(p: Vec2Model, arena: ArenaSize): boolean {
 
 // Traduz o robô do Visualizador (registro da API + telemetria) pros
 // formatos de tela: o do mapa (o mesmo SimMapRobotModel da Simulação, pra
-// reaproveitar o SimulationMap) e a linha da lista do menu.
+// reaproveitar o SimulationMap) e a linha da lista do menu. A telemetria já
+// vem no referencial do mapa (o do firmware): nada a converter.
 export const VisRobotMapper = {
   position,
   thetaFromDirection,

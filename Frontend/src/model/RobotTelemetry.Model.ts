@@ -1,11 +1,15 @@
 import type { PositionSource } from '../enums/PositionSource.enum';
 
-/** Posição do robô já sem sentinela. LH2: x/y em mm; GPS: x = latitude, y = longitude, em graus. */
+/**
+ * Posição do robô já sem sentinela. LH2: x/y em mm (Y pra baixo, origem no
+ * canto sup.-esq. — convenção do firmware, ver SimRobot.ts); GPS: x =
+ * latitude, y = longitude, em graus.
+ */
 export interface RobotPositionModel {
   source: PositionSource;
   x: number;
   y: number;
-  /** Graus, anti-horário a partir de +X; null = sem leitura. */
+  /** Graus na convenção do firmware: 0 = +Y do robô, positivo = horário (-90 = pra direita); null = sem leitura. */
   direction: number | null;
 }
 

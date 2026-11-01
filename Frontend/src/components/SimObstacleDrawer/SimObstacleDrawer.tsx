@@ -74,7 +74,7 @@ function ObstacleForm({
           <input type="number" min={20} step={50} value={obstacle.h_mm} onChange={field('h_mm', 20)} />
         </DrawerField>
       </DrawerRow>
-      <DrawerHint>x/y = canto inferior-esquerdo (Y cresce pra cima, como no simulador).</DrawerHint>
+      <DrawerHint>x/y = canto superior-esquerdo (Y cresce pra baixo, como no robô).</DrawerHint>
 
       <Button variant="outline" onClick={onRemove}>
         Remover barreira

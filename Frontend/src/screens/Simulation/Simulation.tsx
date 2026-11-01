@@ -181,7 +181,7 @@ export function Simulation() {
   }
 
   function pointFromCell(rect: CellSelectRect): Vec2Model {
-    return clampPoint(cellPointToWorld(rect, arena.height));
+    return clampPoint(cellPointToWorld(rect));
   }
 
   function robotFits(p: Vec2Model): boolean {
@@ -192,7 +192,7 @@ export function Simulation() {
 
   function handleCreate(rect: CellSelectRect) {
     if (tool === 'obstacle' && draft) {
-      const raw = cellRectToWorld(rect, arena.height);
+      const raw = cellRectToWorld(rect);
       const x = Math.max(0, snap(raw.x, OBSTACLE_SNAP_MM));
       const y = Math.max(0, snap(raw.y, OBSTACLE_SNAP_MM));
       const w = Math.min(arena.width - x, snap(raw.x + raw.w, OBSTACLE_SNAP_MM) - x);

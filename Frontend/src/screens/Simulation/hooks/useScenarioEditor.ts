@@ -46,7 +46,7 @@ export function makeRobot(s: SimScenarioModel, pos: Vec2Model): ScenarioRobotMod
     address: generateAddress(s.robots.map((r) => r.address)),
     application: RobotApplication.DotBot,
     mode: DotBotControlMode.Manual,
-    start: { x_mm: pos.x, y_mm: pos.y, theta_deg: 90 }, // "olhando pro norte"
+    start: { x_mm: pos.x, y_mm: pos.y, theta_deg: 180 }, // "olhando pra cima"
     battery: 100,
   };
 }
