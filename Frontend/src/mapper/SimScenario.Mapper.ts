@@ -130,6 +130,36 @@ function fromMap(map: MapModel, robots: ScenarioRobotModel[] = []): SimScenarioM
   };
 }
 
+/**
+ * Cenário do simulador (mm) → mapa do app (células): o inverso do `fromMap`.
+ * Divide sem arredondar (diferente do ScenarioMapper do backend): barreira em
+ * x = 900 mm vira 4,5 células, desenha no mesmo lugar e volta exata pelo
+ * `cellRectToWorld`. Só a arena arredonda pra cima, pro grid ter células
+ * inteiras. Robôs ficam de fora (nas telas eles vêm da API).
+ */
+function toMap(s: SimScenarioModel, name: string, description = ''): MapModel {
+  return {
+    scenario: {
+      uuid: null,
+      name,
+      description,
+      sizeX: Math.ceil(s.arena.width_mm / CELL_MM),
+      sizeY: Math.ceil(s.arena.height_mm / CELL_MM),
+      obstacles: s.obstacles.map((o) => ({
+        id: crypto.randomUUID(),
+        name: o.id,
+        description: '',
+        sizeX: o.w_mm / CELL_MM,
+        sizeY: o.h_mm / CELL_MM,
+        startPointX: o.x_mm / CELL_MM,
+        startPointY: o.y_mm / CELL_MM,
+        scenarioId: '',
+      })),
+    },
+    robots: [],
+  };
+}
+
 /** Cópia profunda (o cenário é JSON puro). */
 function clone(s: SimScenarioModel): SimScenarioModel {
   return JSON.parse(JSON.stringify(s)) as SimScenarioModel;
@@ -139,5 +169,6 @@ export const SimScenarioMapper = {
   toWorld,
   fromWorld,
   fromMap,
+  toMap,
   clone,
 };

@@ -31,8 +31,8 @@ export const ScenarioService = {
 
 
   /**
-   * Mapa fixo (sem persistência) usado pelo Visualizador, pela Simulação e pelo
-   * TaskBuilder para testar fluxos sem depender do banco. Vem do antigo
+   * Mapa fixo (sem persistência) usado pela Simulação e pelo TaskBuilder para
+   * testar fluxos sem depender do banco. Vem do antigo
    * `CenarioService.createMockMap` (dev-front), já no modelo novo
    * (`scenario`, `obstacles`, `uuid: null`).
    */

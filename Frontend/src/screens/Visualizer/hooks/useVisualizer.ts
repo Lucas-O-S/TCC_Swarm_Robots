@@ -8,7 +8,8 @@ import { SocketApiLink } from '../../../Integration/SocketApiLink';
 import type { ScenarioModel } from '../../../model/Scenario.Model';
 import type { RgbColorModel } from '../../../model/SimRobot.Model';
 import type { Vec2Model } from '../../../model/SimWorld.Model';
-import { ScenarioService } from '../../../services/Scenario.Service';
+import { SimScenarioMapper } from '../../../mapper/SimScenario.Mapper';
+import { SIMULATOR_DEFAULT_PRESET, SimulationService } from '../../../services/Simulation.Service';
 import { failure } from '../../../services/ServiceResult';
 import type { ServiceResult } from '../../../services/ServiceResult';
 import { VisFleet } from '../VisFleet';
@@ -135,8 +136,15 @@ export function useVisualizer() {
 
   // ---- cenário -------------------------------------------------------------------
 
-  /** Único cenário pronto por enquanto: o mapa mock do Construtor (a API ainda não tem rota de cenários). */
-  const loadMockScenario = useCallback(() => setCenario(ScenarioService.createMockMap().scenario), []);
+  /**
+   * Único cenário pronto por enquanto (a API ainda não tem rota de cenários):
+   * o padrão do RobotSwarmSimulator (exemplo.json), pra arena e barreira
+   * baterem com a telemetria que o simulador manda.
+   */
+  const loadMockScenario = useCallback(() => {
+    const exemplo = SimulationService.createPreset(SIMULATOR_DEFAULT_PRESET);
+    if (exemplo) setCenario(SimScenarioMapper.toMap(exemplo, 'exemplo (RobotSwarmSimulator)').scenario);
+  }, []);
 
   // ---- comandos (drawer) — cada um devolve o erro da API ou null ---------------------
 

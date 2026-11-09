@@ -266,8 +266,10 @@ Onde fica cada peça:
   os eventos estão no contrato, conferidos no backend. Vai precisar do
   `socket.io-client`, que ainda não está instalado.
 - **Cenário:** só pronto. "Salvos" fica desabilitado (a API não tem rota de
-  cenário, só os models `Cenario`/`Obstacle`); a única opção é o mapa mock do
-  Construtor, sem robôs.
+  cenário, só os models `Cenario`/`Obstacle`); a única opção é o cenário
+  padrão do RobotSwarmSimulator (preset `exemplo` do `SimulationService`,
+  convertido por `SimScenarioMapper.toMap` sem arredondar), sem robôs — assim
+  arena e barreira batem com a telemetria do simulador.
 - **Blocos como na tela de gerar mapa** (escolha do dono): cenário em células,
   célula esticando pra preencher a altura (`fitWidth` + `maxHeight`) e
   obstáculos por célula. A telemetria vira px pela escala de cada eixo, e a

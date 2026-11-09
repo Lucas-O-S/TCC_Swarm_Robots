@@ -41,7 +41,7 @@ type Tool = BaseTool | 'waypoint';
 // peças (MapMenuLayout, HeaderBar, camada de robôs do mapa, lista de robôs,
 // painel de tarefas, log e as seções do drawer do robô), mas sem
 // customização nenhuma e sem simular nada: roda ligada na rede, só com
-// cenário pronto (por enquanto o mapa mock) e só com os robôs que vierem da
+// cenário pronto (por enquanto o padrão do simulador) e só com os robôs que vierem da
 // API, que dá pra acompanhar e comandar do mesmo jeito que na Simulação
 // (modo, joystick, rota avulsa, tarefa no Semi-auto, LED). Os blocos do
 // mapa seguem a tela de gerar mapa (ver VisualizerMap).
@@ -240,7 +240,7 @@ export function Visualizer() {
         savedTitle="Cenários salvos"
         savedEmptyText="Nenhum cenário disponível — a API ainda não tem rota de cenários."
         savedButtonLabel="Selecionar cenário"
-        mockText="O mapa fixo do Construtor de Cenários (12×10 blocos, 2 obstáculos), sem robôs — eles aparecem conforme a API manda."
+        mockText="O cenário padrão do RobotSwarmSimulator (exemplo.json: 10×10 blocos = 2000×2000 mm, 1 barreira), sem robôs — eles aparecem conforme a API manda."
         onSelectMock={pickMockScenario}
       />
 

@@ -159,9 +159,12 @@ export interface ScenarioPreset {
   description: string;
 }
 
+/** Preset igual ao cenário padrão do RobotSwarmSimulator (`npm run gateway` sem argumento = scenarios/exemplo.json). */
+export const SIMULATOR_DEFAULT_PRESET = 'exemplo';
+
 const PRESETS: (ScenarioPreset & { build: () => SimScenarioModel })[] = [
   {
-    key: 'exemplo',
+    key: SIMULATOR_DEFAULT_PRESET,
     name: 'exemplo',
     description: '2 robôs (1 em AUTO com rota, 1 em MANUAL) e uma barreira — o exemplo.json do RobotSwarmSimulator.',
     build: () => SimScenarioMapper.clone(EXEMPLO),
