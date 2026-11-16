@@ -12,6 +12,7 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
+    "start:carga": "DOTENV_CONFIG_PATH=test/.env.test nest start",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -19,6 +20,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand --forceExit --silent",
     "test:e2e:cov": "jest --config ./test/jest-e2e.json --runInBand --forceExit --silent --coverage",
+    "test:carga": "k6 run test/carga/carga.js",
     "frota": "node ../../scripts/frota/frota.mjs",
     "frota:list": "node ../../scripts/frota/frota.mjs list",
     "frota:stop": "node ../../scripts/frota/frota.mjs stop"

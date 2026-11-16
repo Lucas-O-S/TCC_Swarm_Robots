@@ -36,3 +36,22 @@ npm run test:e2e        # testes de API (68 casos)
 npm run test:e2e:cov    # testes de API com cobertura (coverage/e2e)
 npm run test:cov        # testes unitários com cobertura (coverage)
 ```
+
+## Teste de carga (k6)
+
+O script `test/carga/carga.js` sobe até 20 usuários simultâneos que repetem
+três rotas que não dependem da borda: login, listagem de tasks e status do
+robô. O resumo mostra média, p95 e máximo de cada rota e a taxa de erro, e os
+números completos ficam em `test/carga/resultado.json`.
+
+Instalar o k6 (uma vez): `brew install k6`.
+
+Em dois terminais, dentro de `Backend/server`:
+
+```bash
+npm run start:carga     # terminal 1: backend usando o banco de teste (test/.env.test)
+npm run test:carga      # terminal 2: roda o teste (cerca de 1 minuto)
+```
+
+O backend precisa estar no ar antes de rodar o `test:carga`. Para apontar para
+outro endereço: `k6 run -e BASE_URL=http://host:porta test/carga/carga.js`.
