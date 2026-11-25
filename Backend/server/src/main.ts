@@ -2,9 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import 'dotenv/config';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { ValidationPipe } from '@nestjs/common';
-import { ApiResponseInterceptor } from './Classes/Interceptors/ApiResponse.Interceptor';
-import { ApiResponseExceptionFilter } from './Classes/Filters/ApiResponse.Filter';
+import { configureApp } from './app.setup';
 
 async function bootstrap() {
 
@@ -24,16 +22,8 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
-  app.useGlobalPipes(new ValidationPipe({
-    transform: true,
-    whitelist: true,
-    forbidNonWhitelisted: true,
-  }));
-
-  // Envelope padrão de resposta ({status, message, data?, dataUnit?, error?})
-  // aplicado globalmente - ver src/Classes/Interceptors e src/Classes/Filters.
-  app.useGlobalInterceptors(new ApiResponseInterceptor());
-  app.useGlobalFilters(new ApiResponseExceptionFilter());
+  // Validação e envelope padrão de resposta - ver src/app.setup.ts.
+  configureApp(app);
 
   await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
   console.log(`Server is running on port ${process.env.PORT ?? 3000}`);
