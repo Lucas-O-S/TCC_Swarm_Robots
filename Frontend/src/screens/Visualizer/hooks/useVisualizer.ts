@@ -12,6 +12,7 @@ import { ScenarioService } from '../../../services/Scenario.Service';
 import { failure } from '../../../services/ServiceResult';
 import type { ServiceResult } from '../../../services/ServiceResult';
 import { VisFleet } from '../VisFleet';
+import { VisNetStats } from '../VisNetStats';
 
 // Ponte entre a API (pelo ApiLink) e o estado React da tela do
 // Visualizador — o equivalente do useSimulation, sem motor: aqui nada é
@@ -20,6 +21,11 @@ import { VisFleet } from '../VisFleet';
 // (Active/Inactive/Lost) é o que o backend calcula (robot:status). Os
 // comandos do drawer viram chamadas do ApiLink e devolvem a mensagem de erro
 // da API (ou null), pra tela mostrar.
+//
+// Os números do cartão Rede (latência, perda de pacote, quedas) saem do
+// VisNetStats, alimentado aqui: cada anúncio do socket, cada comando (tempo de
+// ida e volta) e cada mudança de status. O GET de estado não entra: não é
+// anúncio novo chegando.
 //
 // O link é o SocketApiLink (REST + socket.io do backend). Trocar pela
 // DisconnectedApiLink na linha marcada no efeito abaixo abre a tela sem API —
@@ -55,6 +61,7 @@ export function useVisualizer() {
   }, []);
 
   const [fleet] = useState(() => new VisFleet(scheduleRender));
+  const [net] = useState(() => new VisNetStats());
 
   useEffect(() => {
     fleetRef.current = fleet;
@@ -65,6 +72,7 @@ export function useVisualizer() {
     const api: ApiLink = new SocketApiLink();
     linkRef.current = api;
     fleet.reset();
+    net.clear();
     let reloadTimer: ReturnType<typeof setTimeout> | null = null;
 
     // Lista de robôs e tarefas + o último estado quente de cada robô (pra
@@ -75,6 +83,7 @@ export function useVisualizer() {
       if (robots.ok) {
         fleet.replaceRobots(robots.data);
         for (const r of robots.data) {
+          net.seedStatus(r.address, r.status);
           void api.getTelemetry(r.address).then((res) => {
             if (linkRef.current !== api || !res.ok || !res.data) return;
             fleet.applyTelemetry(r.address, res.data, Math.min(Date.now(), res.data.updatedAt.getTime()));
@@ -91,6 +100,7 @@ export function useVisualizer() {
     api.onState((state) => {
       setLink(state);
       fleet.log(state.message);
+      net.breakSequences(); // o que passou com o socket fora não é perda do rádio
       if (state.status === 'connected') void reload();
     });
 
@@ -99,6 +109,7 @@ export function useVisualizer() {
       console.log(`[Visualizador] ${event.kind}`, event);
       switch (event.kind) {
         case SocketEvents.RobotUpdate:
+          net.telemetry(event.address, event.telemetry.updatedAt.getTime(), Date.now());
           if (!fleet.applyTelemetry(event.address, event.telemetry, Date.now()) && !reloadTimer) {
             reloadTimer = setTimeout(() => {
               reloadTimer = null;
@@ -108,9 +119,11 @@ export function useVisualizer() {
           break;
         case SocketEvents.RobotStatus:
           fleet.applyStatus(event.address, event.status);
+          net.status(event.address, event.status, Date.now());
           break;
         case SocketEvents.RobotNew:
           fleet.addRobot(event.robot);
+          net.seedStatus(event.robot.address, event.robot.status);
           break;
       }
     });
@@ -123,7 +136,7 @@ export function useVisualizer() {
       reloadRef.current = () => Promise.resolve();
       api.stop();
     };
-  }, [fleet]);
+  }, [fleet, net]);
 
   // Relógio da tela (pro "telemetria há X s" do drawer).
   useEffect(() => {
@@ -143,7 +156,9 @@ export function useVisualizer() {
   const command = useCallback(
     async (label: string, address: string, run: (api: ApiLink) => Promise<ServiceResult<unknown>>): Promise<string | null> => {
       const api = linkRef.current;
+      const startedAt = performance.now();
       const res: ServiceResult<unknown> = api ? await run(api) : failure('network', API_NOT_CONNECTED);
+      if (api) net.command(address, performance.now() - startedAt, res.ok, Date.now()); // ida e volta, pro cartão Rede
       if (res.ok) {
         fleet.log(`⇩ ${label} → ${address}`);
         return null;
@@ -151,7 +166,7 @@ export function useVisualizer() {
       fleet.log(`✕ ${label} → ${address}: ${res.message}`);
       return res.message;
     },
-    [fleet],
+    [fleet, net],
   );
 
   const moveRaw = useCallback(
@@ -221,6 +236,7 @@ export function useVisualizer() {
     tasks: fleet.tasks,
     trails: fleet.trails,
     logEntries: fleet.entries,
+    net,
     moveRaw,
     setRgb,
     setMode,

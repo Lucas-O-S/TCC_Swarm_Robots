@@ -195,6 +195,11 @@ Onde fica cada peça:
     `useMapGeometry` (`screenTheta`, `clampPointToArena`, `cellPointToWorld`),
     `useSimSelection` (`useStickyFocus`);
   - `SimRobot.Mapper.statusSummary` e `TaskMapper.routePoints`.
+- `RobotChip` (rótulo R1, R2… na cor do robô): `RobotCard` e cartão Rede do
+  Visualizador. `SimRobotMapper.statusTone` (bolinha do status): drawer do
+  robô e cartão Rede do Visualizador.
+- `StatTile`/`StatTiles` (número de destaque) e `MiniLineChart` (gráfico de
+  linha pequeno, uma série, com tooltip): hoje só no cartão Rede.
 
 ### Drawers unificados
 
@@ -296,6 +301,41 @@ Onde fica cada peça:
   - raio de chegada (`PUT /robots/:uuid`) e LED (`PUT /robots/:address/rgb-led`).
 - **Rota desenhada:** a da tarefa (quando a API mandar os pontos) ou a última
   avulsa mandada desta tela; sem nenhuma, só o alvo atual do advertisement.
+
+### Cartão Rede (latência, perda de pacote, perda de robôs)
+
+Pedido do dono (2026-11-27): painel pra analisar latência, perda de pacote
+e perda de robôs. Ele escolheu: cartão "Rede" no menu + seção "Rede" no
+drawer do robô; taxa esperada num campo (padrão 2 Hz); latência da
+telemetria e dos comandos, com gráfico.
+
+- `screens/Visualizer/VisNetStats.ts` (fora do React, como o `VisFleet`): o
+  `useVisualizer` registra cada anúncio do socket (`robot:updates`), cada
+  comando (ida e volta) e cada `robot:status`; o GET de estado NÃO entra.
+  `hooks/useNetStats.ts` guarda janela (1/5 min) e taxa esperada e tira a
+  fotografia (`snapshot`) no relógio de 1 s da tela; cartão e drawer usam a
+  mesma. Textos em `mapper/NetStats.Mapper.ts`, linha por robô em
+  `VisRobotMapper.toNetRow`, tela em `components/NetStatsPanel`.
+- **Latência** = chegada no navegador − `updatedAt` que a BORDA carimba ao
+  receber o frame (o backend repassa esse horário). A perna do rádio não dá
+  pra medir: o DOTBOT_ADVERTISEMENT não tem horário. Borda e navegador
+  precisam estar na mesma máquina (relógio único); latência negativa acende
+  um aviso.
+- **Perda de pacote** é estimada: o anúncio não tem número de sequência.
+  Buraco entre dois anúncios seguidos do mesmo robô (horário da borda) /
+  intervalo esperado, arredondado, − 1. Buraco ≥ 5 s (`INACTIVE_AFTER_S`) é
+  queda, não perda. Socket caído quebra a sequência (não conta como perda).
+  Taxa esperada errada estraga a conta: com a medida > 1,25× a esperada
+  aparece um aviso (simulador: `advertise_hz` do cenário, 10 Hz no exemplo).
+  O gráfico de perda é média móvel de 10 s (a 2 Hz, pedaço a pedaço vira
+  serrote). "Variação" = quanto o intervalo foge da grade da taxa esperada.
+- **Perda de robôs**: quedas = saídas de Active vistas ao vivo no
+  `robot:status` (o status do GET só é ponto de partida); lista dos robôs
+  fora agora com o tempo sem anúncio.
+- **Comandos**: ida e volta da chamada REST (tela → API → borda → resposta),
+  medida no `command()` do `useVisualizer`; o robô não confirma.
+- Cor da linha do gráfico: `#c96a00` (o `--color-orange` dá 1,95:1 contra o
+  fundo do cartão; marca de dado precisa de 3:1).
 
 ### Pendências
 

@@ -1,6 +1,7 @@
 import type { MouseEvent, ReactNode } from 'react';
 import { Badge } from '../Badge/Badge';
 import type { BadgeTone } from '../Badge/Badge';
+import { RobotChip } from '../RobotChip/RobotChip';
 import { RobotStatus } from '../../enums/RobotStatus.enum';
 import { SimRobotMapper } from '../../mapper/SimRobot.Mapper';
 import styles from './RobotCard.module.css';
@@ -54,9 +55,7 @@ export function RobotCard({
   return (
     <button type="button" className={`${styles.card} ${selected ? styles.selected : ''}`} onClick={onClick}>
       <div className={styles.header}>
-        <span className={styles.chip} style={{ background: color }}>
-          {label}
-        </span>
+        <RobotChip label={label} color={color} />
         <span className={styles.address} title={addressTitle ?? address}>
           {SimRobotMapper.shortAddress(address)}
         </span>
