@@ -9,6 +9,7 @@ import { WaypointIcon } from '../../components/MapToolButton/icons';
 import type { BaseTool } from '../../components/MapViewport/MapViewport';
 import { Menu } from '../../components/Menu/Menu';
 import { MenuColumns } from '../../components/MenuColumns/MenuColumns';
+import { NetStatsPanel } from '../../components/NetStatsPanel/NetStatsPanel';
 import { SelectReadyMapModal } from '../../components/SelectReadyMapModal/SelectReadyMapModal';
 import { TaskPanel } from '../../components/TaskPanel/TaskPanel';
 import { VisRobotDrawer } from '../../components/VisRobotDrawer/VisRobotDrawer';
@@ -32,6 +33,7 @@ import { cellPointToWorld, clampPointToArena } from '../Simulation/hooks/useMapG
 import { POINT_IN_OBSTACLE_NOTICE, routeToolTitle, useRouteDraft } from '../Simulation/hooks/useRouteDraft';
 import { useStickyFocus } from '../Simulation/hooks/useSimSelection';
 import mapStyles from '../Simulation/components/SimulationMap.module.css';
+import { useNetStats } from './hooks/useNetStats';
 import { useVisualizer } from './hooks/useVisualizer';
 import { VisualizerMap } from './components/VisualizerMap';
 
@@ -50,6 +52,7 @@ type Tool = BaseTool | 'waypoint';
 // DisconnectedApiLink, então a tela abre só com o mapa e sem robôs.
 export function Visualizer() {
   const vis = useVisualizer();
+  const netStats = useNetStats(vis.net, vis.now);
   const mapElements = useMapElementsState();
   const selection = mapElements.contextValue;
   const routeDraft = useRouteDraft();
@@ -80,6 +83,7 @@ export function Visualizer() {
     return robot ? [robot] : [];
   });
   const rows = vis.robots.map((v, i) => VisRobotMapper.toRow(v, i, cenario ? arena : null, taskOf(v)?.name ?? null));
+  const netRows = vis.robots.map((v, i) => VisRobotMapper.toNetRow(v, i, netStats.snapshot, vis.now));
 
   // ---- robô em foco (drawer + ferramenta Waypoint) — mesma regra da Simulação ----------
   const stickyAddress = useStickyFocus(selection.selectedIds, routeDraft.draft?.address ?? null, tool === 'waypoint');
@@ -158,6 +162,9 @@ export function Visualizer() {
       onClose={closeDrawer}
       now={vis.now}
       connected={connected}
+      net={focus ? (netStats.snapshot.robots.get(VisRobotMapper.key(focus.robot.address)) ?? null) : null}
+      netWindowMs={netStats.windowMs}
+      expectedHz={netStats.expectedHz}
       task={focus ? taskOf(focus) : null}
       pendingTasks={vis.tasks.filter((t) => t.status === TaskStatus.Pending)}
       routeDraft={visibleDraft?.points ?? []}
@@ -225,6 +232,17 @@ export function Visualizer() {
 
       <Menu title="Log da API">
         <GatewayLog entries={vis.logEntries} />
+      </Menu>
+
+      <Menu title="Rede">
+        <NetStatsPanel
+          snapshot={netStats.snapshot}
+          rows={netRows}
+          connected={connected}
+          onWindowChange={netStats.setWindowMs}
+          onExpectedHzChange={netStats.setExpectedHz}
+          onReset={netStats.reset}
+        />
       </Menu>
     </MenuColumns>
   );

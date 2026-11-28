@@ -8,24 +8,18 @@ import { RobotModeField } from '../RobotModeField/RobotModeField';
 import { RobotTaskSection } from '../RobotTaskSection/RobotTaskSection';
 import { RouteDraftSection } from '../RouteDraftSection/RouteDraftSection';
 import { StatusLine, StatusSep } from '../StatusLine/StatusLine';
-import type { StatusTone } from '../StatusLine/StatusLine';
 import { DEFAULT_WAYPOINT_THRESHOLD_MM, RAD_TO_DEG } from '../../Consts/SimulationConsts';
 import { PositionSource } from '../../enums/PositionSource.enum';
 import { RobotControlMode } from '../../enums/RobotControlMode.enum';
-import { RobotStatus } from '../../enums/RobotStatus.enum';
+import { NetStatsMapper } from '../../mapper/NetStats.Mapper';
 import { RobotMapper } from '../../mapper/Robot.Mapper';
 import { SimRobotMapper } from '../../mapper/SimRobot.Mapper';
 import { VisRobotMapper } from '../../mapper/VisRobot.Mapper';
 import type { RgbColorModel } from '../../model/SimRobot.Model';
 import type { Vec2Model } from '../../model/SimWorld.Model';
 import type { TaskModel } from '../../model/Task.Model';
+import type { RobotNetSnapshotModel } from '../../model/VisNetStats.Model';
 import type { VisRobotModel } from '../../model/VisRobot.Model';
-
-const STATUS_TONE: Record<RobotStatus, StatusTone> = {
-  [RobotStatus.Active]: 'on',
-  [RobotStatus.Inactive]: 'warn',
-  [RobotStatus.Lost]: 'off',
-};
 
 /** Toda ação do drawer vira uma chamada da API: resolve com a mensagem de erro, ou null. */
 type ApiResult = Promise<string | null>;
@@ -35,7 +29,8 @@ type ApiResult = Promise<string | null>;
 // seções de comando do drawer da Simulação (RobotModeField, ManualDrive,
 // RouteDraftSection, RobotTaskSection, LedControl), sem o que é do mundo
 // simulado (derrubar/religar, swarmit). Cada ação vira uma rota da API (ver
-// Integration/ApiLink.ts) e o erro dela aparece aqui.
+// Integration/ApiLink.ts) e o erro dela aparece aqui. A seção Rede mostra os
+// números do robô na janela do cartão Rede (ver VisNetStats).
 // ---------------------------------------------------------------------------
 
 interface VisRobotDrawerProps {
@@ -45,6 +40,10 @@ interface VisRobotDrawerProps {
   /** Relógio da tela (ms), pro "telemetria há X s". */
   now: number;
   connected: boolean;
+  /** Números de rede do robô na janela do cartão Rede (null = nada dele ainda). */
+  net: RobotNetSnapshotModel | null;
+  netWindowMs: number;
+  expectedHz: number;
   /** Tarefa atual do robô (robot.taskId), se a lista da API tiver. */
   task: TaskModel | null;
   pendingTasks: readonly TaskModel[];
@@ -74,6 +73,9 @@ function VisRobotPanel({
   robot: v,
   now,
   connected,
+  net,
+  netWindowMs,
+  expectedHz,
   task,
   pendingTasks,
   routeDraft,
@@ -106,7 +108,7 @@ function VisRobotPanel({
 
   return (
     <DrawerBody>
-      <StatusLine tone={STATUS_TONE[robot.status]}>
+      <StatusLine tone={SimRobotMapper.statusTone(robot.status)}>
         API: {SimRobotMapper.statusLabel(robot.status)}
         <StatusSep />
         {age !== null ? `telemetria há ${age} s` : 'sem telemetria desde que a tela abriu'}
@@ -135,6 +137,16 @@ function VisRobotPanel({
           { label: 'tarefa', value: task ? task.name : robot.taskId ? `${robot.taskId.slice(0, 8)}…` : '—' },
         ]}
       />
+
+      <DrawerSection title="Rede" />
+      {net ? (
+        <>
+          <KeyValueList items={NetStatsMapper.items(net, expectedHz)} />
+          <DrawerHint>Janela de {NetStatsMapper.duration(netWindowMs)}, a mesma do cartão Rede.</DrawerHint>
+        </>
+      ) : (
+        <DrawerHint>Nenhum anúncio nem comando deste robô desde que a tela abriu.</DrawerHint>
+      )}
 
       <DrawerSection title="Comandos (API)" />
       {!connected && <DrawerHint>Sem conexão com a API — os comandos não chegam no robô.</DrawerHint>}
