@@ -15,15 +15,16 @@
  * `[1 B payload_type] + campos`.
  */
 
+import { BATTERY_EMPTY_MV, BATTERY_FULL_MV } from '../../Consts/BatteryConsts';
 import { PayloadType } from '../../enums/PayloadType.enum';
 import type { FieldSpec } from './Protocol.Codec';
 import { decodeFields, encodeFields } from './Protocol.Codec';
 import { addressToBytes } from './Mari/Mari.Protocol';
 
-/** Bateria % → mV (u16): rampa 0% = 3000 mV … 100% = 4200 mV — o backend divide por 1000 pra exibir volts. */
+/** Bateria % → mV (u16): rampa 0% = 450 mV … 100% = 2960 mV (faixa do robô real, `Consts/BatteryConsts`) — o backend divide por 1000 pra exibir volts. */
 export function batteryToMillivolts(percent: number): number {
   const p = Math.min(100, Math.max(0, percent));
-  return Math.round(3000 + (p / 100) * 1200);
+  return Math.round(BATTERY_EMPTY_MV + (p / 100) * (BATTERY_FULL_MV - BATTERY_EMPTY_MV));
 }
 
 function packet(type: number, body: Uint8Array): Uint8Array {

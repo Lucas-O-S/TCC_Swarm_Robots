@@ -1,3 +1,4 @@
+import { LOW_BATTERY_MV } from '../Consts/BatteryConsts';
 import { DEFAULT_WAYPOINT_THRESHOLD_MM } from '../Consts/SimulationConsts';
 import { DotBotControlMode } from '../enums/DotBotControlMode.enum';
 import { RobotControlMode } from '../enums/RobotControlMode.enum';
@@ -22,8 +23,6 @@ import type { DotBotAdvertisement } from './Protocols/DotBot.Payload';
 
 /** RUN_TIME do OrchestratorService (5000 ms). */
 export const ORCHESTRATOR_RUN_S = 5;
-/** LOW_BATTERY_VOLTS = 3.0 — aqui comparado direto em mV, como chega no advertisement. */
-const LOW_BATTERY_MV = 3000;
 /** Tolerância pra comparar o waypoint do advertisement (u32 arredondado) com o da task. */
 const WAYPOINT_MATCH_MM = 1;
 
@@ -133,6 +132,7 @@ export class LocalOrchestrator {
       return;
     }
 
+    // LOW_BATTERY_VOLTS do backend (20% da faixa), aqui em mV como chega no advertisement.
     if (adv.battery <= LOW_BATTERY_MV) {
       this.releaseTo(robot, task, TaskStatus.Pending);
       this.host.log(`[ORQ] ${address} com bateria baixa → task "${task.name}" voltou pra fila`);

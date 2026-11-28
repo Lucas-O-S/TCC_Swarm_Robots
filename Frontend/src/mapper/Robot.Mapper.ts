@@ -19,6 +19,7 @@ import type {
   RobotWaypointsInput,
 } from '../model/Robot.Model';
 import type { RobotControlMode } from '../enums/RobotControlMode.enum';
+import { BATTERY_EMPTY_MV, BATTERY_FULL_MV } from '../Consts/BatteryConsts';
 import { compact } from './compact';
 
 export const RobotMapper = {
@@ -110,13 +111,14 @@ export const RobotMapper = {
    * Volts -> percentual pra `BatteryBar`. O backend só expõe a tensão
    * (`RobotModel.battery`); a UI precisa de 0–100%.
    *
-   * SUPOSIÇÃO: LiPo 1S (3.0V vazia / 4.2V cheia — mesma faixa do `@Default`
-   * do model no backend). Ajustar se o hardware usar outra química/faixa.
+   * Faixa medida no robô real (`Consts/BatteryConsts`): <= 0,45 V = 0%,
+   * >= 2,96 V = 100%, linear no meio.
    */
   batteryToPercent(volts: number): number {
-    const MIN_V = 3.0;
-    const MAX_V = 4.2;
-    const pct = ((volts - MIN_V) / (MAX_V - MIN_V)) * 100;
+    const mv = volts * 1000;
+    if (mv <= BATTERY_EMPTY_MV) return 0;
+    if (mv >= BATTERY_FULL_MV) return 100;
+    const pct = ((mv - BATTERY_EMPTY_MV) / (BATTERY_FULL_MV - BATTERY_EMPTY_MV)) * 100;
     return Math.max(0, Math.min(100, Math.round(pct)));
   },
 };
