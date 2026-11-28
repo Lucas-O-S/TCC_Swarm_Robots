@@ -21,6 +21,8 @@ import { lh2Config } from "src/config/lh2.config";
 import { Lh2Homography } from "src/Protocols/Swarmit/Lh2Homography";
 import { Lh2Corner } from "src/Enums/Lh2Corner.enum";
 import { LH2_CAPTURE_DEFAULTS, Lh2CaptureSession } from "./Lh2CaptureSession";
+import { Lh2Layout } from "src/Protocols/Swarmit/Lh2Layout";
+import { basename } from "path";
 
 // Espaço entre as matrizes de um mesmo envio (uma por estação). O swarmit usa
 // 0,3 s: o enlace não é confiável e uma rajada pode estourar a fila do gateway.
@@ -202,7 +204,7 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
     // Reserva o robô: a borda dá STOP se ele estiver rodando e não calibra nem
     // dá START nele até solve/cancel. Uma captura por vez. station null = a
     // sessão usa a estação que o robô enxergar na primeira leitura.
-    beginLh2Capture(address: string, distanceMm: number, tag: string | null, station: number | null = null): Lh2CaptureSession {
+    beginLh2Capture(address: string, layout: Lh2Layout, tag: string | null, station: number | null = null): Lh2CaptureSession {
         if (this.capture)
             throw new Error(`já existe captura em andamento para ${this.capture.address} - resolva ou cancele antes`);
 
@@ -210,12 +212,12 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
         if (!node)
             throw new Error(`a malha SwarmIT nunca reportou o robô '${Protocol.normalizeAddress(address)}'`);
 
-        this.capture = new Lh2CaptureSession(node.address, distanceMm, tag, () => {
+        this.capture = new Lh2CaptureSession(node.address, layout, tag, () => {
             this.sendSwarmit(node.address, SwarmitProtocol.buildLh2Capture());
         }, LH2_CAPTURE_DEFAULTS, station);
 
         const canal = station === null ? "canal: o primeiro que o robô enxergar" : `canal ${station + 1}`;
-        console.log(`[LH2] captura iniciada em ${node.address} (quadrado de ${distanceMm} mm, ${canal})`);
+        console.log(`[LH2] captura iniciada em ${node.address} (${MariGatewayAdapter.describeLayout(layout)}, ${canal})`);
         return this.capture;
     }
 
@@ -248,11 +250,13 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
         if (!session) throw new Error("nenhuma captura em andamento");
 
         const corners = session.corners();
-        const matrix = Lh2Homography.toWire(Lh2Homography.fromCorners(corners, session.distanceMm));
+        const matrix = Lh2Homography.toWire(Lh2Homography.fromCorners(corners, session.layout));
         // corners() só devolve com os 4 cantos, então a estação já foi escolhida.
         const draft = Lh2Calibration.forStation(session.calibratedStation!, matrix, "captura");
         const createdAt = new Date();
-        const path = draft.saveToml(lh2Config.calibrationDir, { distanceMm: session.distanceMm, tag: session.tag ?? undefined, createdAt });
+        const path = draft.saveToml(lh2Config.calibrationDir, {
+            distanceMm: session.distanceMm, tag: session.tag ?? undefined, createdAt, ...session.layout.metaFields(),
+        });
         // Relido do disco: o que fica carregado (com o [metadata]) é exatamente
         // o que a borda vai ler no próximo boot.
         const calibration = Lh2Calibration.fromFile(path);
@@ -271,6 +275,44 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
             `para continuar valendo depois de reiniciar a borda, ponha esse caminho no LH2_CALIBRATION_FILE`
         );
         return { calibration, cornersFile, marked };
+    }
+
+    // Recalcula a calibração carregada para outro layout (a mesma captura,
+    // outro referencial - ver Lh2Homography.reframe), grava um TOML novo,
+    // carrega e marca a frota toda, como o solve. Só com [metadata] (é dele
+    // que sai o layout antigo) e fora de captura.
+    reframeLh2Calibration(to: Lh2Layout, tag: string | null): { calibration: Lh2Calibration; from: string; marked: string[] } {
+        if (this.capture)
+            throw new Error(`captura em andamento para ${this.capture.address} - resolva ou cancele antes`);
+
+        const current = this.calibration;
+        if (!current)
+            throw new Error("nenhuma calibração carregada (LH2_CALIBRATION_FILE vazio)");
+
+        const from = current.layout;
+        if (!from)
+            throw new Error(`${current.source} não tem [metadata] (calibration.out?): sem o lado não dá para saber o referencial antigo`);
+
+        const stations = new Set(current.stations);
+        const matrices = current.matrices.map((matrix, index) =>
+            stations.has(index) ? Lh2Homography.reframeWire(matrix, from, to) : matrix
+        );
+
+        const finalTag = tag ?? current.meta?.tag;
+        const path = Lh2Calibration.fromMatrices(matrices, "recálculo").saveToml(lh2Config.calibrationDir, {
+            distanceMm: to.distanceMm, tag: finalTag, ...to.metaFields(), reframedFrom: basename(current.source),
+        });
+        const calibration = Lh2Calibration.fromFile(path);
+
+        this.calibration = calibration;
+        this.fleet.configure({ lh2StationCount: calibration.count, calibrateOnJoin: true });
+        const marked = this.fleet.forceCalibrate();
+
+        console.log(
+            `[LH2] calibração recalculada (${MariGatewayAdapter.describeLayout(to)}) a partir de ${current.source}, ` +
+            `salva em ${path} e carregada - ponha esse caminho no LH2_CALIBRATION_FILE para valer depois de reiniciar`
+        );
+        return { calibration, from: current.source, marked };
     }
 
     cancelLh2Capture(): boolean {
@@ -434,10 +476,20 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
     // Canais + o [metadata] do TOML, para o log do boot.
     private static describe(calibration: Lh2Calibration): string {
         const meta = calibration.meta;
-        if (!meta) return MariGatewayAdapter.channels(calibration);
+        const layout = calibration.layout;
+        if (!meta || !layout) return MariGatewayAdapter.channels(calibration);
 
         const tag = meta.tag ? `, "${meta.tag}"` : "";
         const data = meta.createdAt ? `, de ${meta.createdAt.toISOString()}` : "";
-        return `${MariGatewayAdapter.channels(calibration)}, lado ${meta.distanceMm} mm${tag}${data}`;
+        return `${MariGatewayAdapter.channels(calibration)}, ${MariGatewayAdapter.describeLayout(layout)}${tag}${data}`;
+    }
+
+    // "quadrado de 800 mm em (1200, 1200), área 1200 × 1200 a partir de (1000, 1000)".
+    private static describeLayout(layout: Lh2Layout): string {
+        const quadrado = `quadrado de ${layout.distanceMm} mm em (${layout.squareX}, ${layout.squareY})`;
+        const area = layout.area;
+        return area
+            ? `${quadrado}, área ${area.width} × ${area.height} a partir de (${area.x}, ${area.y})`
+            : `${quadrado}, layout do PyDotBot (arena de 5 × o lado)`;
     }
 }

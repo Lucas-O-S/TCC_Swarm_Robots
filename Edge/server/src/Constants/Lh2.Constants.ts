@@ -39,6 +39,14 @@ export const LH2_CALIBRATION_DISTANCE_DEFAULT = 500;
 // é 5 × o lado, então com 500 mm os cantos ficam em 1000..1500 mm.
 export const LH2_ARENA_FACTOR = 5;
 
+// Folga em volta da área real, em mm (decisão de 2026-11-28): o (0,0) da LH2
+// fica essa distância antes do canto da área, para cima e para a esquerda.
+// Coordenada negativa o firmware descarta (u32), então é ela que deixa um
+// robô que saiu da área continuar com posição. Fixa, e não proporcional ao
+// quadrado, para o canto da área não mudar quando a calibração for refeita
+// com outro quadrado.
+export const LH2_AREA_MARGIN_MM = 1000;
+
 // Captura: espera por tentativa e reenvios (CAPTURE_TIMEOUT_DEFAULT = 5 s,
 // CAPTURE_RETRIES_DEFAULT = 3 no PyDotBot). O pedido não tem ack no enlace.
 export const LH2_CAPTURE_TIMEOUT_MS = 5000;

@@ -1,6 +1,7 @@
-import { LH2_ARENA_FACTOR, LH2_HOMOGRAPHY_TOLERANCE, LH2_MATRIX_LEN, LH2_PERIODS } from "src/Constants/Lh2.Constants";
-import { LH2_CORNER_ORDER, LH2_CORNER_REFERENCE, Lh2Corner } from "src/Enums/Lh2Corner.enum";
+import { LH2_HOMOGRAPHY_TOLERANCE, LH2_MATRIX_LEN, LH2_PERIODS } from "src/Constants/Lh2.Constants";
+import { LH2_CORNER_ORDER, Lh2Corner } from "src/Enums/Lh2Corner.enum";
 import { Lh2Sample } from "./Swarmit.Protocol";
+import type { Lh2Layout } from "./Lh2Layout";
 
 // Matemática da calibração LH2, igual à do PyDotBot 0.30.0
 // (dotbot/calibration/lighthouse2.py), sem OpenCV: com exatamente 4 cantos a
@@ -32,11 +33,9 @@ export class Lh2Homography {
         return [x, y];
     }
 
-    // Posição real (mm) de cada canto para um quadrado de lado distanceMm.
-    static referencePoint(corner: Lh2Corner, distanceMm: number): Point {
-        const [fx, fy] = LH2_CORNER_REFERENCE[corner];
-        const scale = distanceMm * LH2_ARENA_FACTOR;
-        return [fx * scale, fy * scale];
+    // Posição (mm) que cada canto deve ter no referencial (ver Lh2Layout).
+    static referencePoint(corner: Lh2Corner, layout: Lh2Layout): Point {
+        return layout.corner(corner);
     }
 
     // Homografia que leva cada src[i] em dst[i] (4 pares, DLT com h33 = 1).
@@ -62,12 +61,48 @@ export class Lh2Homography {
         return [(h[0] * x + h[1] * y + h[2]) / w, (h[3] * x + h[4] * y + h[5]) / w];
     }
 
+    // Inverso do toWire: 9 × int32 LE / 1000.
+    static fromWire(wire: Buffer): Homography {
+        if (wire.length !== LH2_MATRIX_LEN)
+            throw new Error(`matriz com ${wire.length} B, esperava ${LH2_MATRIX_LEN} B`);
+        return Array.from({ length: 9 }, (_, i) => wire.readInt32LE(i * 4) / 1000);
+    }
+
+    // Mesma captura num referencial novo, sem voltar ao chão. De um layout
+    // para outro os cantos só mudam por escala (lado novo / lado antigo) e
+    // translação - nada gira -, então H' = A · H, com
+    // A = [[s, 0, tx], [0, s, ty], [0, 0, 1]]. A terceira linha de H não muda
+    // (h33 continua 1) e, com escala 1 e deslocamento em mm inteiros, os
+    // coeficientes novos continuam múltiplos de 0,001: o toWire não perde nada.
+    static reframe(h: Homography, from: Lh2Layout, to: Lh2Layout): Homography {
+        const s = to.distanceMm / from.distanceMm;
+        const tx = to.squareX - s * from.squareX;
+        const ty = to.squareY - s * from.squareY;
+
+        return [
+            s * h[0] + tx * h[6], s * h[1] + tx * h[7], s * h[2] + tx * h[8],
+            s * h[3] + ty * h[6], s * h[4] + ty * h[7], s * h[5] + ty * h[8],
+            h[6], h[7], h[8],
+        ];
+    }
+
     // Formato do fio: 9 × int32 LE, valor × 1000 truncado para zero (o
     // int(n * 1e3) do homography_as_bytes).
     static toWire(h: Homography): Buffer {
+        return Lh2Homography.pack(h, Math.trunc);
+    }
+
+    // reframe direto no formato do fio. Arredonda em vez de truncar: os
+    // coeficientes novos já são múltiplos de 0,001 e só o ponto flutuante os
+    // tira do lugar (1460,62 vira 1460,6199999...), e o trunc perderia 0,001.
+    static reframeWire(wire: Buffer, from: Lh2Layout, to: Lh2Layout): Buffer {
+        return Lh2Homography.pack(Lh2Homography.reframe(Lh2Homography.fromWire(wire), from, to), Math.round);
+    }
+
+    private static pack(h: Homography, toInt: (n: number) => number): Buffer {
         const out = Buffer.alloc(LH2_MATRIX_LEN);
         h.forEach((value, i) => {
-            const scaled = Math.trunc(value * 1000);
+            const scaled = toInt(value * 1000);
             // O PyDotBot cai para 36 zeros quando estoura; aqui falha alto -
             // a matriz zerada "calibraria" o robô com lixo.
             if (!Number.isFinite(scaled) || scaled > 0x7FFFFFFF || scaled < -0x80000000)
@@ -80,9 +115,9 @@ export class Lh2Homography {
     // Calibração da estação de referência a partir dos 4 cantos
     // (_compute_reference_homography). Confere que os cantos projetados caem
     // nos de referência antes de devolver.
-    static fromCorners(samples: Record<Lh2Corner, Lh2Sample>, distanceMm: number): Homography {
+    static fromCorners(samples: Record<Lh2Corner, Lh2Sample>, layout: Lh2Layout): Homography {
         const src = LH2_CORNER_ORDER.map((corner) => Lh2Homography.cameraPoint(samples[corner]));
-        const dst = LH2_CORNER_ORDER.map((corner) => Lh2Homography.referencePoint(corner, distanceMm));
+        const dst = LH2_CORNER_ORDER.map((corner) => Lh2Homography.referencePoint(corner, layout));
 
         const h = Lh2Homography.solve(src, dst);
 

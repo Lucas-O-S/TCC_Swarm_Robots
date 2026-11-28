@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { extname, join } from "path";
 import { LH2_MATRIX_LEN, LH2_MAX_STATIONS } from "src/Constants/Lh2.Constants";
+import { Lh2Area, Lh2Layout } from "./Lh2Layout";
 
 // schema_version que o PyDotBot 0.30.0 grava. Outro valor = outro formato
 // (a 1.25.0 do firmware usa schema 3, com outro modelo de LH2).
@@ -12,6 +13,15 @@ export interface Lh2CalibrationMeta {
     distanceMm: number;
     tag?: string;
     createdAt?: Date;
+    // Só quando a calibração foi feita (ou recalculada) dentro de uma área
+    // real (Lh2Layout.inArea): canto TopLeft do quadrado e a área, em mm no
+    // referencial. Sem eles vale o layout do PyDotBot (5 × o lado). Chaves a
+    // mais no [metadata] não atrapalham o PyDotBot: ele só lê data_hex.
+    squareX?: number;
+    squareY?: number;
+    area?: Lh2Area;
+    // Arquivo de onde esta saiu por recálculo (mesma captura, outro layout).
+    reframedFrom?: string;
 }
 
 // Calibração LH2 lida do arquivo do PyDotBot, já fatiada em uma matriz por
@@ -33,6 +43,15 @@ export class Lh2Calibration {
         // em TOML sem calibration_distance_mm.
         public readonly meta: Lh2CalibrationMeta | null = null,
     ) {}
+
+    // Onde ficam o quadrado e a área (null sem [metadata]: calibration.out).
+    get layout(): Lh2Layout | null {
+        const meta = this.meta;
+        if (!meta) return null;
+        return meta.area && meta.squareX !== undefined && meta.squareY !== undefined
+            ? Lh2Layout.of(meta.distanceMm, meta.squareX, meta.squareY, meta.area)
+            : Lh2Layout.legacy(meta.distanceMm);
+    }
 
     // Slots enviados (= lh2HomographyCount que o robô reporta), não estações calibradas.
     get count(): number {
@@ -78,6 +97,7 @@ export class Lh2Calibration {
             `calibration_distance_mm = ${Math.trunc(meta.distanceMm)}\n` +
             `num_lh_stations = ${this.count}\n` +
             (slug ? `tag = "${slug}"\n` : "") +
+            Lh2Calibration.layoutToml(meta) +
             "\n" +
             "[calibration]\n" +
             "# 1-byte homography count + N x 36-byte int32 LE matrices,\n" +
@@ -98,6 +118,24 @@ export class Lh2Calibration {
         mkdirSync(dir, { recursive: true });
         writeFileSync(path, this.toToml({ ...meta, createdAt: now }), "utf8");
         return path;
+    }
+
+    // Linhas do layout na área (vazio no layout do PyDotBot, para o arquivo
+    // continuar igual ao dele).
+    private static layoutToml(meta: Lh2CalibrationMeta): string {
+        const lines: string[] = [];
+        if (meta.area && meta.squareX !== undefined && meta.squareY !== undefined) {
+            lines.push(
+                `square_x_mm = ${Math.trunc(meta.squareX)}`,
+                `square_y_mm = ${Math.trunc(meta.squareY)}`,
+                `area_x_mm = ${Math.trunc(meta.area.x)}`,
+                `area_y_mm = ${Math.trunc(meta.area.y)}`,
+                `area_width_mm = ${Math.trunc(meta.area.width)}`,
+                `area_height_mm = ${Math.trunc(meta.area.height)}`,
+            );
+        }
+        if (meta.reframedFrom) lines.push(`reframed_from = "${meta.reframedFrom.replace(/["\\]/g, "")}"`);
+        return lines.map((line) => line + "\n").join("");
     }
 
     // _slug_tag do PyDotBot: letras ASCII, dígitos, ponto, hífen e sublinhado;
@@ -192,6 +230,22 @@ export class Lh2Calibration {
         const created = /^\s*created_at\s*=\s*"([^"]*)"/m.exec(text);
         const createdAt = created ? new Date(created[1]) : null;
         if (createdAt && !Number.isNaN(createdAt.getTime())) meta.createdAt = createdAt;
+
+        // Layout na área: só vale com as seis chaves (meio layout é pior que nenhum).
+        const int = (key: string): number | null => {
+            const match = new RegExp(`^\\s*${key}\\s*=\\s*(-?\\d+)`, "m").exec(text);
+            return match ? Number(match[1]) : null;
+        };
+        const [squareX, squareY, x, y, width, height] =
+            ["square_x_mm", "square_y_mm", "area_x_mm", "area_y_mm", "area_width_mm", "area_height_mm"].map(int);
+        if (squareX !== null && squareY !== null && x !== null && y !== null && width !== null && height !== null) {
+            meta.squareX = squareX;
+            meta.squareY = squareY;
+            meta.area = { x, y, width, height };
+        }
+
+        const from = /^\s*reframed_from\s*=\s*"([^"]*)"/m.exec(text);
+        if (from && from[1]) meta.reframedFrom = from[1];
 
         return meta;
     }

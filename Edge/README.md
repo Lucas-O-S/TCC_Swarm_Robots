@@ -100,11 +100,27 @@ zerados), que é como o firmware procura a homografia.
 
 | Rota | Corpo | O que faz |
 | --- | --- | --- |
-| `POST /v1/lh2/calibration/session` | `{ address, distanceMm?, tag?, channel? }` | reserva o robô (STOP se estiver rodando; sem calibração nem START até terminar). `distanceMm` = lado do quadrado, default 500; a arena útil é 5 × o lado |
+| `POST /v1/lh2/calibration/session` | `{ address, distanceMm?, tag?, channel?, areaWidthMm?, areaHeightMm?, squareXMm?, squareYMm? }` | reserva o robô (STOP se estiver rodando; sem calibração nem START até terminar). `distanceMm` = lado do quadrado, default 500. Com os 4 campos da área (juntos), a calibração sai no referencial da área real (ver abaixo); sem eles, layout do PyDotBot (arena de 5 × o lado). A resposta mostra `references` (para onde cada canto vai) e `area` |
 | `GET /v1/lh2/calibration/session` | - | cantos capturados, `missing`, `pending`, `station`/`channel` calibrados, `otherStations` (índices vistos e ignorados) |
 | `POST /v1/lh2/calibration/session/capture` | `{ corner }` | `top-left`, `top-right`, `bottom-left` ou `bottom-right`, com o fotodiodo do robô na marca. Espera a leitura (até ~20 s); `504` se não vier, `409` fora do Bootloader |
 | `POST /v1/lh2/calibration/session/solve` | - | calcula a homografia, grava o TOML (formato do PyDotBot 0.30.0, em `LH2_CALIBRATION_DIR`) e, ao lado, `<nome>.corners.json` com as leituras cruas dos 4 cantos (para recalcular sem voltar ao chão enquanto a base não mudar de lugar); carrega e marca a frota toda para receber. Devolve `file`, `cornersFile` e `metadata`. `400` se faltar canto ou as capturas forem inconsistentes |
 | `DELETE /v1/lh2/calibration/session` | - | cancela e solta o robô |
+| `POST /v1/lh2/calibration/reframe` | `{ areaWidthMm, areaHeightMm, squareXMm, squareYMm, distanceMm?, tag? }` | recalcula a calibração **carregada** para a área real, sem voltar ao chão (vale enquanto a base não sair do lugar): grava um TOML novo (`reframed_from` no `[metadata]`), carrega e marca a frota. `distanceMm` só se o lado foi digitado errado. `409` sem calibração carregada, sem `[metadata]` ou com captura em andamento; `400` com campo faltando ou quadrado fora da área |
+
+**Referencial da área real.** O PyDotBot põe o quadrado no meio de uma arena
+de 5 × o lado: o (0,0) é um ponto virtual a 2 lados do canto top-left (com
+lado 800 o canto vira (1600, 1600)). Informando a área, o (0,0) passa a ficar
+**1000 mm** (`LH2_AREA_MARGIN_MM`) antes do canto superior-esquerdo da área,
+para cima e para a esquerda, e o quadrado onde ele foi colado:
+`squareXMm`/`squareYMm` = distância da borda esquerda/de cima da área até o
+canto top-left do quadrado, medida no chão. Ex.: área 1200 × 1200, quadrado
+de 800 a 200 mm das bordas → área de (1000, 1000) a (2200, 2200), quadrado de
+(1200, 1200) a (2000, 2000). A margem existe porque coordenada negativa o
+firmware descarta: robô até 1 m fora da área continua com posição. É fixa
+para o canto da área não mudar se a calibração for refeita com outro
+quadrado. O layout vai no `[metadata]` (`square_x_mm`, `square_y_mm`,
+`area_*_mm` - o PyDotBot ignora, só lê `data_hex`) e aparece no `metadata` do
+GET.
 
 O TOML gerado só continua carregado depois de reiniciar a borda se o caminho
 dele for para o `LH2_CALIBRATION_FILE`.

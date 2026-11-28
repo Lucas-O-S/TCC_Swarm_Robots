@@ -1,6 +1,7 @@
 import { Lh2Sample, Lh2State } from "src/Protocols/Swarmit/Swarmit.Protocol";
 import { Lh2Corner } from "src/Enums/Lh2Corner.enum";
 import { Lh2CaptureView } from "src/adapter/Mari/Lh2CaptureSession";
+import { Lh2Area } from "src/Protocols/Swarmit/Lh2Layout";
 
 /** Um robô da malha SwarmIT, do ponto de vista da calibração LH2. */
 export interface Lh2RobotView {
@@ -23,6 +24,13 @@ export interface Lh2CalibrationMetaView {
     tag: string | null;
     // ISO 8601 (UTC); null se o TOML não trouxer.
     createdAt: string | null;
+    // Canto top-left do quadrado no referencial (mm). No layout do PyDotBot = 2 × o lado.
+    squareX: number;
+    squareY: number;
+    // Área real no referencial (mm); null = layout do PyDotBot (sem área informada).
+    area: Lh2Area | null;
+    // TOML de onde esta saiu por recálculo; null se veio de uma captura.
+    reframedFrom: string | null;
 }
 
 /** Resposta do GET /v1/lh2/calibration. */
@@ -53,6 +61,19 @@ export interface Lh2CornerResult {
     corner: Lh2Corner;
     sample: Lh2Sample;
     session: Lh2CaptureView;
+}
+
+/** Resposta do POST /v1/lh2/calibration/reframe. */
+export interface Lh2ReframeResult {
+    // TOML novo, já carregado.
+    file: string;
+    // Calibração que foi recalculada.
+    from: string;
+    metadata: Lh2CalibrationMetaView | null;
+    stationCount: number;
+    channels: number[];
+    marked: string[];
+    notInBootloader: string[];
 }
 
 /** Resposta do POST /v1/lh2/calibration/session/solve. */

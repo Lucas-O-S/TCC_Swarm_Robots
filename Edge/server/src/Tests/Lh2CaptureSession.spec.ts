@@ -1,12 +1,13 @@
 import { Lh2CaptureBusyError, Lh2CaptureSession, Lh2CaptureTimeoutError } from "../adapter/Mari/Lh2CaptureSession";
 import { Lh2Corner } from "../Enums/Lh2Corner.enum";
+import { Lh2Layout } from "../Protocols/Swarmit/Lh2Layout";
 
 const A = "BDF2B04BC00D2725";
 const OPTIONS = { timeoutMs: 1000, retries: 2 };
 
 const session = (station: number | null = null) => {
     const trigger = jest.fn();
-    return { trigger, s: new Lh2CaptureSession(A.toLowerCase(), 500, "arena", trigger, OPTIONS, station) };
+    return { trigger, s: new Lh2CaptureSession(A.toLowerCase(), Lh2Layout.legacy(500), "arena", trigger, OPTIONS, station) };
 };
 
 describe("Lh2CaptureSession", () => {

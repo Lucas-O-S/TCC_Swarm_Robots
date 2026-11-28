@@ -5,6 +5,7 @@ import { LH2_CORNER_ORDER, Lh2Corner } from "src/Enums/Lh2Corner.enum";
 import { Lh2Sample } from "src/Protocols/Swarmit/Swarmit.Protocol";
 import { Protocol } from "src/Protocols/Protocol";
 import { Lh2Calibration } from "src/Protocols/Swarmit/Lh2Calibration";
+import { Lh2Area, Lh2Layout } from "src/Protocols/Swarmit/Lh2Layout";
 
 // Captura LH2 de um robô, canto a canto - o `lh2-calibration collect` do
 // PyDotBot 0.30.0 (dotbot/calibration/ota.py), dentro da borda. Sem Nest nem
@@ -33,6 +34,9 @@ export const LH2_CAPTURE_DEFAULTS: Lh2CaptureOptions = {
 export interface Lh2CaptureView {
     address: string;
     distanceMm: number;
+    // Para onde cada canto vai (mm no referencial) e a área real (null = layout do PyDotBot).
+    references: Record<Lh2Corner, [number, number]>;
+    area: Lh2Area | null;
     tag: string | null;
     captured: Partial<Record<Lh2Corner, Lh2Sample>>;
     missing: Lh2Corner[];
@@ -45,8 +49,6 @@ export interface Lh2CaptureView {
     otherStations: number[];
 }
 
-// Já tem um canto esperando resposta: um pedido por vez, senão a resposta de
-// um canto cai no outro.
 // Leituras cruas dos 4 cantos, gravadas ao lado do TOML no solve. Com elas a
 // matriz pode ser recalculada (outro lado, outra origem) sem voltar ao chão -
 // enquanto a base station não sair do lugar.
@@ -56,12 +58,18 @@ export interface Lh2CornersRecord {
     calibrationFile: string;
     address: string;
     distanceMm: number;
+    // Layout usado no solve (canto TopLeft do quadrado e área; area null = PyDotBot).
+    squareX: number;
+    squareY: number;
+    area: Lh2Area | null;
     tag: string | null;
     station: number;
     channel: number;
     corners: Record<Lh2Corner, Lh2Sample>;
 }
 
+// Já tem um canto esperando resposta: um pedido por vez, senão a resposta de
+// um canto cai no outro.
 export class Lh2CaptureBusyError extends Error {}
 
 // Nenhuma amostra da estação de referência depois de todos os reenvios.
@@ -88,13 +96,18 @@ export class Lh2CaptureSession {
     // station null = escolhe pela primeira leitura.
     constructor(
         address: string,
-        readonly distanceMm: number,
+        // Onde o quadrado fica no referencial (ver Lh2Layout) - decide os pontos de referência do solve.
+        readonly layout: Lh2Layout,
         readonly tag: string | null,
         private readonly trigger: () => void,
         private readonly options: Lh2CaptureOptions = LH2_CAPTURE_DEFAULTS,
         private station: number | null = null,
     ) {
         this.address = Protocol.normalizeAddress(address);
+    }
+
+    get distanceMm(): number {
+        return this.layout.distanceMm;
     }
 
     get calibratedStation(): number | null {
@@ -166,6 +179,9 @@ export class Lh2CaptureSession {
             calibrationFile: basename(tomlPath),
             address: this.address,
             distanceMm: this.distanceMm,
+            squareX: this.layout.squareX,
+            squareY: this.layout.squareY,
+            area: this.layout.area,
             // Mesma forma que vai no tag do TOML (slug), para os dois arquivos baterem.
             tag: this.tag ? Lh2Calibration.slug(this.tag) || null : null,
             station: this.station!,
@@ -182,6 +198,8 @@ export class Lh2CaptureSession {
         return {
             address: this.address,
             distanceMm: this.distanceMm,
+            references: Object.fromEntries(LH2_CORNER_ORDER.map((c) => [c, this.layout.corner(c)])) as Record<Lh2Corner, [number, number]>,
+            area: this.layout.area,
             tag: this.tag,
             captured: Object.fromEntries(this.samples),
             missing: this.missing(),

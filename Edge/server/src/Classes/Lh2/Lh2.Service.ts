@@ -5,7 +5,10 @@ import { MariGatewayAdapter } from "src/adapter/Mari/MariGateway.Adapter";
 import { SwarmitNode } from "src/adapter/Mari/SwarmitFleet";
 import { SwarmitDeviceStatus } from "src/Enums/SwarmitDeviceStatus.enum";
 import { Protocol } from "src/Protocols/Protocol";
-import { Lh2CalibrationMetaView, Lh2CalibrationView, Lh2CornerResult, Lh2PushResult, Lh2RobotView, Lh2SolveResult } from "./Lh2.Types";
+import { Lh2CalibrationMetaView, Lh2CalibrationView, Lh2CornerResult, Lh2PushResult, Lh2ReframeResult, Lh2RobotView, Lh2SolveResult } from "./Lh2.Types";
+import { Lh2Layout } from "src/Protocols/Swarmit/Lh2Layout";
+import { Lh2LayoutDto } from "./DTO/lh2.layout.dto";
+import { Lh2ReframeDto } from "./DTO/lh2.reframe.dto";
 import { Lh2Calibration } from "src/Protocols/Swarmit/Lh2Calibration";
 import { Lh2CaptureBusyError, Lh2CaptureTimeoutError, Lh2CaptureView } from "src/adapter/Mari/Lh2CaptureSession";
 import { Lh2Corner } from "src/Enums/Lh2Corner.enum";
@@ -72,7 +75,37 @@ export class Lh2Service {
             throw new NotFoundException(`A malha SwarmIT nunca reportou o robô '${Protocol.normalizeAddress(dto.address)}'`);
 
         const station = dto.channel === undefined ? null : dto.channel - 1;
-        return mari.beginLh2Capture(dto.address, dto.distanceMm ?? LH2_CALIBRATION_DISTANCE_DEFAULT, dto.tag ?? null, station).view();
+        
+        const layout = Lh2Service.layoutOf(dto, dto.distanceMm ?? LH2_CALIBRATION_DISTANCE_DEFAULT, false);
+        
+        return mari.beginLh2Capture(dto.address, layout, dto.tag ?? null, station).view();
+    }
+
+    // Mesma captura num referencial novo (a área real), sem voltar ao chão.
+    reframe(dto: Lh2ReframeDto): Lh2ReframeResult {
+        const mari = this.requireMari();
+
+        if (mari.lh2CaptureSession())
+            throw new ConflictException(`Captura em andamento para ${mari.lh2CaptureSession()!.address} - resolva ou cancele antes`);
+
+        const current = mari.lh2Calibration();
+        if (!current)
+            throw new ConflictException("Nenhuma calibração carregada (LH2_CALIBRATION_FILE vazio)");
+        if (!current.meta)
+            throw new ConflictException(`${current.source} não tem [metadata] (calibration.out?): não dá para saber o referencial antigo`);
+
+        const layout = Lh2Service.layoutOf(dto, dto.distanceMm ?? current.meta.distanceMm, true);
+        const { calibration, from, marked } = mari.reframeLh2Calibration(layout, dto.tag ?? null);
+
+        return {
+            file: calibration.source,
+            from,
+            metadata: Lh2Service.metadata(calibration),
+            stationCount: calibration.count,
+            channels: Lh2Service.channels(calibration.stations),
+            marked,
+            notInBootloader: this.notInBootloader(mari, marked),
+        };
     }
 
     getCapture(): Lh2CaptureView {
@@ -151,8 +184,39 @@ export class Lh2Service {
 
     private static metadata(calibration: Lh2Calibration): Lh2CalibrationMetaView | null {
         const meta = calibration.meta;
-        if (!meta) return null;
-        return { distanceMm: meta.distanceMm, tag: meta.tag ?? null, createdAt: meta.createdAt?.toISOString() ?? null };
+        const layout = calibration.layout;
+        if (!meta || !layout) return null;
+        return {
+            distanceMm: meta.distanceMm,
+            tag: meta.tag ?? null,
+            createdAt: meta.createdAt?.toISOString() ?? null,
+            squareX: layout.squareX,
+            squareY: layout.squareY,
+            area: layout.area,
+            reframedFrom: meta.reframedFrom ?? null,
+        };
+    }
+
+    // Layout pedido: os quatro campos da área juntos (área real) ou nenhum
+    // (layout do PyDotBot). requireArea = o recálculo, que só existe para
+    // levar a calibração para uma área. Quadrado fora da área = 400.
+    private static layoutOf(dto: Lh2LayoutDto, distanceMm: number, requireArea: boolean): Lh2Layout {
+        const fields = [dto.areaWidthMm, dto.areaHeightMm, dto.squareXMm, dto.squareYMm];
+        const given = fields.filter((value) => value !== undefined).length;
+
+        if (given === 0 && !requireArea)
+            return Lh2Layout.legacy(distanceMm);
+
+        if (given !== fields.length)
+            throw new BadRequestException("Informe juntos areaWidthMm, areaHeightMm, squareXMm e squareYMm");
+
+        try {
+            return Lh2Layout.inArea(distanceMm, {
+                areaWidthMm: dto.areaWidthMm!, areaHeightMm: dto.areaHeightMm!, squareXMm: dto.squareXMm!, squareYMm: dto.squareYMm!,
+            });
+        } catch (error) {
+            throw new BadRequestException((error as Error).message);
+        }
     }
 
     private mari(): MariGatewayAdapter | null {
