@@ -1,13 +1,16 @@
 import { Lh2Corner } from "src/Enums/Lh2Corner.enum";
 
-// Lado, tag e a área real (Lh2LayoutDto): os quatro campos da área juntos ou nenhum.
+// Tamanho do retângulo (distanceMm para quadrado OU widthMm + heightMm), tag
+// e a área real (Lh2LayoutDto): os quatro campos da área juntos ou nenhum.
 const LAYOUT_PROPERTIES = {
     distanceMm: { type: 'integer', example: 800 },
+    widthMm: { type: 'integer', example: 1000 },
+    heightMm: { type: 'integer', example: 800 },
     tag: { type: 'string', example: 'arena-taak' },
     areaWidthMm: { type: 'integer', example: 1200 },
     areaHeightMm: { type: 'integer', example: 1200 },
-    squareXMm: { type: 'integer', minimum: 0, example: 200 },
-    squareYMm: { type: 'integer', minimum: 0, example: 200 },
+    rectXMm: { type: 'integer', minimum: 0, example: 100 },
+    rectYMm: { type: 'integer', minimum: 0, example: 200 },
 };
 
 /** Schemas manuais pro @ApiBody do Swagger (estilo ApiGameHit). */
@@ -24,11 +27,11 @@ export const Lh2CaptureStartSchema = {
     },
 };
 
-export const Lh2ReframeSchema = {
+// Correção: só o que estava errado.
+export const Lh2CorrectSchema = {
     required: true,
     schema: {
         type: 'object',
-        required: ['areaWidthMm', 'areaHeightMm', 'squareXMm', 'squareYMm'],
         properties: LAYOUT_PROPERTIES,
     },
 };

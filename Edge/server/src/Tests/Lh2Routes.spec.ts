@@ -18,7 +18,7 @@ import { SwarmitDeviceInfo, SwarmitStatus } from "../Protocols/Swarmit/Swarmit.P
 import { Lh2Flags, SwarmitDeviceStatus, SwarmitDeviceType } from "../Enums/SwarmitDeviceStatus.enum";
 import { LH2_MAX_WAYPOINTS } from "../Constants/Lh2.Constants";
 import { Lh2Homography } from "../Protocols/Swarmit/Lh2Homography";
-import { Lh2ReframeDto } from "../Classes/Lh2/DTO/lh2.reframe.dto";
+import { Lh2CorrectDto } from "../Classes/Lh2/DTO/lh2.correct.dto";
 
 const A = "BDF2B04BC00D2725";
 const B = "0000000000000002";
@@ -170,7 +170,7 @@ describe("/v1/lh2/calibration/session - captura pela borda", () => {
     it("fluxo completo: reserva, 4 cantos, resolve, grava e manda para a frota", async () => {
         const { adapter, fleet, sent, service } = mariSetup(false);
 
-        expect(service.startCapture({ address: A.toLowerCase(), tag: "arena taak" })).toMatchObject({ address: A, distanceMm: 500 });
+        expect(service.startCapture({ address: A.toLowerCase(), tag: "arena taak" })).toMatchObject({ address: A, widthMm: 500, heightMm: 500 });
         expect(fleet.get(A)?.held).toBe(true);
 
         for (const corner of Object.values(Lh2Corner)) {
@@ -197,7 +197,7 @@ describe("/v1/lh2/calibration/session - captura pela borda", () => {
 
         // Lado, tag e data do [metadata], no solve e no GET.
         // Sem área informada: layout do PyDotBot (canto TL do quadrado em 2 × o lado).
-        const metadata = { distanceMm: 500, tag: "arena-taak", createdAt: expect.any(String), squareX: 1000, squareY: 1000, area: null, reframedFrom: null };
+        const metadata = { distanceMm: 500, widthMm: 500, heightMm: 500, tag: "arena-taak", createdAt: expect.any(String), rectX: 1000, rectY: 1000, area: null, correctedFrom: null };
         expect(result.metadata).toEqual(metadata);
         expect(service.getCalibration().metadata).toEqual(metadata);
 
@@ -206,7 +206,7 @@ describe("/v1/lh2/calibration/session - captura pela borda", () => {
         const record = JSON.parse(readFileSync(result.cornersFile, "utf8"));
         expect(record).toMatchObject({
             schemaVersion: 1, calibrationFile: basename(result.file), address: A,
-            distanceMm: 500, tag: "arena-taak", station: 0, channel: 1, createdAt: result.metadata!.createdAt,
+            widthMm: 500, heightMm: 500, rectX: 1000, rectY: 1000, area: null, tag: "arena-taak", station: 0, channel: 1, createdAt: result.metadata!.createdAt,
         });
         for (const corner of Object.values(Lh2Corner))
             expect(record.corners[corner]).toEqual({ lhIndex: 0, count1: COUNTS[corner][0], count2: COUNTS[corner][1] });
@@ -300,22 +300,27 @@ describe("/v1/lh2/calibration/session - captura pela borda", () => {
     });
 
     // Área de 1,2 m com o quadrado de 800 colado a 200 mm das bordas de cima e da esquerda.
-    const AREA = { areaWidthMm: 1200, areaHeightMm: 1200, squareXMm: 200, squareYMm: 200 };
+    const AREA = { areaWidthMm: 1200, areaHeightMm: 1200, rectXMm: 200, rectYMm: 200 };
 
     it("DTOs: campos da área", () => {
         expect(validateSync(plainToInstance(Lh2CaptureStartDto, { address: A, distanceMm: 800, ...AREA }))).toHaveLength(0);
-        expect(validateSync(plainToInstance(Lh2CaptureStartDto, { address: A, ...AREA, squareXMm: -1 }))).toHaveLength(1);
-        expect(validateSync(plainToInstance(Lh2ReframeDto, { ...AREA, areaWidthMm: 1.5 }))).toHaveLength(1);
+        expect(validateSync(plainToInstance(Lh2CaptureStartDto, { address: A, ...AREA, rectXMm: -1 }))).toHaveLength(1);
+        expect(validateSync(plainToInstance(Lh2CorrectDto, { ...AREA, areaWidthMm: 1.5 }))).toHaveLength(1);
+        expect(validateSync(plainToInstance(Lh2CaptureStartDto, { address: A, widthMm: 1000, heightMm: 800 }))).toHaveLength(0);
+        expect(validateSync(plainToInstance(Lh2CaptureStartDto, { address: A, widthMm: 1000, heightMm: 50 }))).toHaveLength(1);
     });
 
     it("sessão na área: referências em margem + posição do quadrado; campos soltos ou quadrado fora = 400", () => {
         const { service } = mariSetup(false);
 
         expect(() => service.startCapture({ address: A, distanceMm: 800, areaWidthMm: 1200 })).toThrow(/juntos/);
-        expect(() => service.startCapture({ address: A, distanceMm: 800, ...AREA, squareXMm: 500 })).toThrow(BadRequestException);
+        expect(() => service.startCapture({ address: A, distanceMm: 800, ...AREA, rectXMm: 500 })).toThrow(BadRequestException);
+        expect(() => service.startCapture({ address: A, widthMm: 1000 })).toThrow(/widthMm e heightMm/);
+        expect(() => service.startCapture({ address: A, distanceMm: 800, widthMm: 1000, heightMm: 800 })).toThrow(/não os dois/);
 
         expect(service.startCapture({ address: A, distanceMm: 800, ...AREA })).toMatchObject({
-            distanceMm: 800,
+            widthMm: 800,
+            heightMm: 800,
             area: { x: 1000, y: 1000, width: 1200, height: 1200 },
             references: {
                 [Lh2Corner.TopLeft]: [1200, 1200], [Lh2Corner.TopRight]: [2000, 1200],
@@ -335,10 +340,10 @@ describe("/v1/lh2/calibration/session - captura pela borda", () => {
         }
         const result = service.solveCapture();
 
-        expect(result.metadata).toMatchObject({ distanceMm: 800, squareX: 1200, squareY: 1200, area: { x: 1000, y: 1000, width: 1200, height: 1200 } });
+        expect(result.metadata).toMatchObject({ distanceMm: 800, widthMm: 800, heightMm: 800, rectX: 1200, rectY: 1200, area: { x: 1000, y: 1000, width: 1200, height: 1200 } });
         const saved = Lh2Calibration.fromFile(result.file);
-        expect(saved.meta).toMatchObject({ squareX: 1200, squareY: 1200, area: { x: 1000, y: 1000, width: 1200, height: 1200 } });
-        expect(JSON.parse(readFileSync(result.cornersFile, "utf8"))).toMatchObject({ squareX: 1200, squareY: 1200, area: { x: 1000, y: 1000 } });
+        expect(saved.meta).toMatchObject({ rectX: 1200, rectY: 1200, area: { x: 1000, y: 1000, width: 1200, height: 1200 } });
+        expect(JSON.parse(readFileSync(result.cornersFile, "utf8"))).toMatchObject({ widthMm: 800, heightMm: 800, rectX: 1200, rectY: 1200, area: { x: 1000, y: 1000 } });
 
         // A matriz gravada (com o truncamento do fio) leva o canto TL para ~(1200, 1200).
         const h = Lh2Homography.fromWire(saved.matrices[0]);
@@ -346,15 +351,39 @@ describe("/v1/lh2/calibration/session - captura pela borda", () => {
         expect(Math.abs(x - 1200)).toBeLessThan(1);
         expect(Math.abs(y - 1200)).toBeLessThan(1);
     });
+
+    it("solve com retângulo: largura e altura no TOML e no GET", async () => {
+        const { adapter, service } = mariSetup(false);
+        service.startCapture({ address: A, widthMm: 1000, heightMm: 800, areaWidthMm: 1200, areaHeightMm: 1000, rectXMm: 100, rectYMm: 100 });
+
+        for (const corner of Object.values(Lh2Corner)) {
+            const pending = service.captureCorner(corner);
+            reply(adapter, COUNTS[corner]);
+            await pending;
+        }
+        const result = service.solveCapture();
+
+        expect(result.metadata).toMatchObject({ distanceMm: 1000, widthMm: 1000, heightMm: 800, rectX: 1100, rectY: 1100 });
+        const text = readFileSync(result.file, "utf8");
+        expect(text).toMatch(/^calibration_distance_mm = 1000$/m);
+        expect(text).toMatch(/^calibration_width_mm = 1000$/m);
+        expect(text).toMatch(/^calibration_height_mm = 800$/m);
+
+        const h = Lh2Homography.fromWire(Lh2Calibration.fromFile(result.file).matrices[0]);
+        const br = COUNTS[Lh2Corner.BottomRight];
+        const [x, y] = Lh2Homography.apply(h, Lh2Homography.cameraPoint({ lhIndex: 0, count1: br[0], count2: br[1] }));
+        expect(Math.abs(x - 2100)).toBeLessThan(1);
+        expect(Math.abs(y - 1900)).toBeLessThan(1);
+    });
 });
 
-describe("POST /v1/lh2/calibration/reframe", () => {
+describe("POST /v1/lh2/calibration/correct", () => {
 
     let dir: string;
     const originalDir = lh2Config.calibrationDir;
 
     beforeEach(() => {
-        dir = mkdtempSync(join(tmpdir(), "lh2-reframe-"));
+        dir = mkdtempSync(join(tmpdir(), "lh2-correct-"));
         lh2Config.calibrationDir = dir;
     });
 
@@ -365,41 +394,53 @@ describe("POST /v1/lh2/calibration/reframe", () => {
 
     // Matriz da calibração real de 27/11 (lado 800, canal 13, layout do PyDotBot).
     const REAL = Lh2Homography.toWire([1639.62, 3983.394, 1968.438, -745.293, 7402.737, 1605.531, -0.179, 1.867, 1]);
-    const AREA = { areaWidthMm: 1200, areaHeightMm: 1200, squareXMm: 200, squareYMm: 200 };
+    const AREA = { areaWidthMm: 1200, areaHeightMm: 1200, rectXMm: 200, rectYMm: 200 };
 
-    // Mari com a calibração real carregada de um TOML (com [metadata]).
-    const loaded = () => {
+    // Mari com uma calibração carregada de um TOML (com [metadata]).
+    const loaded = (distanceMm = 800) => {
         const setup = mariSetup(false);
-        const path = Lh2Calibration.forStation(12, REAL, "teste").saveToml(dir, { distanceMm: 800, tag: "arena-taak" });
+        const path = Lh2Calibration.forStation(12, REAL, "teste").saveToml(dir, { distanceMm, tag: "arena-taak" });
         (setup.adapter as any).calibration = Lh2Calibration.fromFile(path);
         return { ...setup, path };
     };
 
-    it("leva a calibração para a área: mesmo ponto físico, número novo (canto TL 1600 → 1200)", () => {
-        const { adapter, fleet, service, path } = loaded();
+    // Ponto da câmera que a matriz leva até (u, v): resolve H·p = (u, v).
+    const cameraAt = (h: number[], [u, v]: [number, number]): [number, number] => {
+        const a = h[0] - u * h[6], b = h[1] - u * h[7], c = u * h[8] - h[2];
+        const d = h[3] - v * h[6], e = h[4] - v * h[7], f = v * h[8] - h[5];
+        const det = a * e - b * d;
+        return [(c * e - b * f) / det, (a * f - c * d) / det];
+    };
 
-        const result = service.reframe({ ...AREA });
+    it("lado digitado errado: digitou 500, era 800 - o mesmo ponto físico passa a ler o número certo", () => {
+        const { adapter, service, path } = loaded(500);
+
+        const result = service.correct({ distanceMm: 800 });
+
+        expect(result).toMatchObject({ from: path, stationCount: 13, channels: [13], metadata: { distanceMm: 800, widthMm: 800, heightMm: 800, area: null, correctedFrom: basename(path) } });
+        expect(adapter.lh2Calibration()!.source).toBe(result.file);
+
+        // O canto top-left lia (1000, 1000) com lado 500; com 800 lê (1600, 1600).
+        const camera = cameraAt(Lh2Homography.fromWire(REAL), [1000, 1000]);
+        const [x, y] = Lh2Homography.apply(Lh2Homography.fromWire(Lh2Calibration.fromFile(result.file).matrices[12]), camera);
+        expect(x).toBeCloseTo(1600, 1);
+        expect(y).toBeCloseTo(1600, 1);
+    });
+
+    it("posição na área digitada errado: só o que veio muda, o tamanho continua", () => {
+        const { fleet, service, path } = loaded(800);
+
+        const result = service.correct({ ...AREA });
 
         expect(result).toMatchObject({
-            from: path, stationCount: 13, channels: [13], notInBootloader: [B],
-            metadata: { distanceMm: 800, tag: "arena-taak", squareX: 1200, squareY: 1200, area: { x: 1000, y: 1000, width: 1200, height: 1200 }, reframedFrom: basename(path) },
+            from: path, notInBootloader: [B],
+            metadata: { widthMm: 800, heightMm: 800, rectX: 1200, rectY: 1200, area: { x: 1000, y: 1000, width: 1200, height: 1200 }, correctedFrom: basename(path) },
         });
         expect(result.marked).toEqual(expect.arrayContaining([A, B]));
-        expect(adapter.lh2Calibration()!.source).toBe(result.file);
-        expect(existsSync(result.file)).toBe(true);
 
-        // Um ponto da câmera que antes dava o canto TL (1600, 1600) agora dá (1200, 1200).
-        const before = Lh2Homography.fromWire(REAL);
-        const after = Lh2Homography.fromWire(Lh2Calibration.fromFile(result.file).matrices[12]);
-        const inverse = (h: number[], [u, v]: [number, number]): [number, number] => {
-            // Resolve H·p = (u, v) para p (2 incógnitas, 2 equações lineares).
-            const a = h[0] - u * h[6], b = h[1] - u * h[7], c = u * h[8] - h[2];
-            const d = h[3] - v * h[6], e = h[4] - v * h[7], f = v * h[8] - h[5];
-            const det = a * e - b * d;
-            return [(c * e - b * f) / det, (a * f - c * d) / det];
-        };
-        const camera = inverse(before, [1600, 1600]);
-        const [x, y] = Lh2Homography.apply(after, camera);
+        // Canto TL: (1600, 1600) no layout do PyDotBot → (1200, 1200) na área.
+        const camera = cameraAt(Lh2Homography.fromWire(REAL), [1600, 1600]);
+        const [x, y] = Lh2Homography.apply(Lh2Homography.fromWire(Lh2Calibration.fromFile(result.file).matrices[12]), camera);
         expect(x).toBeCloseTo(1200, 6);
         expect(y).toBeCloseTo(1200, 6);
 
@@ -407,18 +448,24 @@ describe("POST /v1/lh2/calibration/reframe", () => {
         expect(Lh2Calibration.fromFile(result.file).stations).toEqual([12]);
         fleet.onStatus("0000000000000003", status(SwarmitDeviceStatus.Bootloader));
         expect(fleet.get("0000000000000003")?.forceCalibration).toBe(true);
+
+        // Corrigir de novo só a altura (retângulo): a área e a posição ficam.
+        const again = service.correct({ widthMm: 800, heightMm: 600 });
+        expect(again.metadata).toMatchObject({ widthMm: 800, heightMm: 600, rectX: 1200, rectY: 1200, area: { width: 1200, height: 1200 } });
     });
 
-    it("sem calibração carregada, sem [metadata] ou sem os campos da área = erro", () => {
-        expect(() => mariService(false).reframe({ ...AREA })).toThrow(ConflictException);
-        expect(() => mariService(true).reframe({ ...AREA })).toThrow(/metadata/);
-        expect(() => loaded().service.reframe({ areaWidthMm: 1200 })).toThrow(/juntos/);
-        expect(() => loaded().service.reframe({})).toThrow(/juntos/);
+    it("sem calibração, sem [metadata], nada para corrigir ou campos soltos = erro", () => {
+        expect(() => mariService(false).correct({ ...AREA })).toThrow(ConflictException);
+        expect(() => mariService(true).correct({ ...AREA })).toThrow(/metadata/);
+        expect(() => loaded().service.correct({})).toThrow(/Nada para corrigir/);
+        expect(() => loaded().service.correct({ distanceMm: 800 })).toThrow(/Nada para corrigir/);
+        expect(() => loaded().service.correct({ areaWidthMm: 1200 })).toThrow(/juntos/);
+        expect(() => loaded().service.correct({ ...AREA, rectXMm: 500 })).toThrow(BadRequestException);
     });
 
     it("captura em andamento = 409", () => {
         const { service } = loaded();
         service.startCapture({ address: A });
-        expect(() => service.reframe({ ...AREA })).toThrow(ConflictException);
+        expect(() => service.correct({ ...AREA })).toThrow(ConflictException);
     });
 });

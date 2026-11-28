@@ -6,8 +6,8 @@ import { Lh2PushDto } from "./DTO/lh2.push.dto";
 import { Lh2PushSchema } from "./Schema/Lh2Push.Schema";
 import { Lh2CaptureStartDto } from "./DTO/lh2.capture.start.dto";
 import { Lh2CaptureCornerDto } from "./DTO/lh2.capture.corner.dto";
-import { Lh2CaptureCornerSchema, Lh2CaptureStartSchema, Lh2ReframeSchema } from "./Schema/Lh2Capture.Schema";
-import { Lh2ReframeDto } from "./DTO/lh2.reframe.dto";
+import { Lh2CaptureCornerSchema, Lh2CaptureStartSchema, Lh2CorrectSchema } from "./Schema/Lh2Capture.Schema";
+import { Lh2CorrectDto } from "./DTO/lh2.correct.dto";
 
 /**
  * Calibração LH2 (só no modo mari). A borda já calibra sozinha quem aparece
@@ -44,15 +44,16 @@ export class Lh2Controller {
     }
 
     /**
-     * Recalcula a calibração carregada para a área real informada (outro
-     * referencial, mesma captura) sem voltar ao chão - vale enquanto a base
-     * station não sair do lugar. Grava um TOML novo, carrega e manda para a frota.
+     * Corrige medida digitada errado (lado, largura, altura, posição na área)
+     * na calibração carregada, sem voltar ao chão - vale enquanto a base
+     * station não sair do lugar. Só vai o que estava errado. Grava um TOML
+     * novo, carrega e manda para a frota.
      */
-    @Post('reframe')
+    @Post('correct')
     @HttpCode(200)
-    @ApiBody(Lh2ReframeSchema)
-    reframe(@Body() dto: Lh2ReframeDto) {
-        return this.lh2.reframe(dto);
+    @ApiBody(Lh2CorrectSchema)
+    correct(@Body() dto: Lh2CorrectDto) {
+        return this.lh2.correct(dto);
     }
 
     /** Reserva o robô para a captura (STOP se estiver rodando) e abre a sessão. */

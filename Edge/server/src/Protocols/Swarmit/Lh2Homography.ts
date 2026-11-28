@@ -68,28 +68,24 @@ export class Lh2Homography {
         return Array.from({ length: 9 }, (_, i) => wire.readInt32LE(i * 4) / 1000);
     }
 
-    // Mesma captura num referencial novo, sem voltar ao chão. De um layout
-    // para outro os cantos só mudam por escala (lado novo / lado antigo) e
-    // translação - nada gira -, então H' = A · H, com
-    // A = [[s, 0, tx], [0, s, ty], [0, 0, 1]]. A terceira linha de H não muda
-    // (h33 continua 1) e, com escala 1 e deslocamento em mm inteiros, os
-    // coeficientes novos continuam múltiplos de 0,001: o toWire não perde nada.
+    // Mesma captura com as medidas corrigidas (lado/largura/altura digitados
+    // errado, ou a posição na área), sem voltar ao chão. De um layout para o
+    // outro os cantos só mudam por escala em cada eixo e translação - nada
+    // gira -, então H' = A · H, com A = [[sx, 0, tx], [0, sy, ty], [0, 0, 1]].
+    // A terceira linha de H não muda (h33 continua 1) e, com escala 1 e
+    // deslocamento em mm inteiros, os coeficientes novos continuam múltiplos
+    // de 0,001: o fio não perde nada.
     static reframe(h: Homography, from: Lh2Layout, to: Lh2Layout): Homography {
-        const s = to.distanceMm / from.distanceMm;
-        const tx = to.squareX - s * from.squareX;
-        const ty = to.squareY - s * from.squareY;
+        const sx = to.widthMm / from.widthMm;
+        const sy = to.heightMm / from.heightMm;
+        const tx = to.rectX - sx * from.rectX;
+        const ty = to.rectY - sy * from.rectY;
 
         return [
-            s * h[0] + tx * h[6], s * h[1] + tx * h[7], s * h[2] + tx * h[8],
-            s * h[3] + ty * h[6], s * h[4] + ty * h[7], s * h[5] + ty * h[8],
+            sx * h[0] + tx * h[6], sx * h[1] + tx * h[7], sx * h[2] + tx * h[8],
+            sy * h[3] + ty * h[6], sy * h[4] + ty * h[7], sy * h[5] + ty * h[8],
             h[6], h[7], h[8],
         ];
-    }
-
-    // Formato do fio: 9 × int32 LE, valor × 1000 truncado para zero (o
-    // int(n * 1e3) do homography_as_bytes).
-    static toWire(h: Homography): Buffer {
-        return Lh2Homography.pack(h, Math.trunc);
     }
 
     // reframe direto no formato do fio. Arredonda em vez de truncar: os
@@ -98,6 +94,13 @@ export class Lh2Homography {
     static reframeWire(wire: Buffer, from: Lh2Layout, to: Lh2Layout): Buffer {
         return Lh2Homography.pack(Lh2Homography.reframe(Lh2Homography.fromWire(wire), from, to), Math.round);
     }
+
+    // Formato do fio: 9 × int32 LE, valor × 1000 truncado para zero (o
+    // int(n * 1e3) do homography_as_bytes).
+    static toWire(h: Homography): Buffer {
+        return Lh2Homography.pack(h, Math.trunc);
+    }
+
 
     private static pack(h: Homography, toInt: (n: number) => number): Buffer {
         const out = Buffer.alloc(LH2_MATRIX_LEN);

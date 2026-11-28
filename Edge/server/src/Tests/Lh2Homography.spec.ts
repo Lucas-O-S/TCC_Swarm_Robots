@@ -71,7 +71,7 @@ describe("Lh2Homography", () => {
     });
 
     it("na área real: os cantos caem em margem + posição do quadrado", () => {
-        const layout = Lh2Layout.inArea(800, { areaWidthMm: 1200, areaHeightMm: 1200, squareXMm: 200, squareYMm: 100 });
+        const layout = Lh2Layout.inArea(800, 800, { areaWidthMm: 1200, areaHeightMm: 1200, rectXMm: 200, rectYMm: 100 });
         const c = corners(CASES[0].counts);
         const h = Lh2Homography.fromCorners(c, layout);
 
@@ -88,32 +88,48 @@ describe("Lh2Homography", () => {
         }
     });
 
-    it("recusa quadrado que passa da área", () => {
-        expect(() => Lh2Layout.inArea(800, { areaWidthMm: 1200, areaHeightMm: 1200, squareXMm: 500, squareYMm: 0 })).toThrow(/passa da área/);
-        expect(() => Lh2Layout.inArea(800, { areaWidthMm: 1200, areaHeightMm: 1200, squareXMm: -1, squareYMm: 0 })).toThrow(/negativa/);
+    it("retângulo: largura e altura diferentes, cantos em (x, y) .. (x + largura, y + altura)", () => {
+        const layout = Lh2Layout.inArea(1000, 800, { areaWidthMm: 1200, areaHeightMm: 1000, rectXMm: 100, rectYMm: 100 });
+        expect([Lh2Corner.TopLeft, Lh2Corner.TopRight, Lh2Corner.BottomLeft, Lh2Corner.BottomRight].map((c) => layout.corner(c)))
+            .toEqual([[1100, 1100], [2100, 1100], [1100, 1900], [2100, 1900]]);
+
+        // No layout do PyDotBot o retângulo fica de 40% a 60% de 5 × o tamanho em cada eixo.
+        expect(Lh2Layout.legacy(1000, 800).corner(Lh2Corner.BottomRight)).toEqual([3000, 2400]);
+
+        const c = corners(CASES[0].counts);
+        const [x, y] = Lh2Homography.apply(Lh2Homography.fromCorners(c, layout), Lh2Homography.cameraPoint(c[Lh2Corner.BottomRight]));
+        expect(x).toBeCloseTo(2100, 6);
+        expect(y).toBeCloseTo(1900, 6);
     });
 
-    it("reframe = recalcular no layout novo: mesmo resultado de resolver de novo", () => {
-        const c = corners(CASES[0].counts);
-        const legacy = Lh2Layout.legacy(500);
-        const area = Lh2Layout.inArea(500, { areaWidthMm: 1200, areaHeightMm: 1200, squareXMm: 300, squareYMm: 300 });
+    it("recusa retângulo que passa da área", () => {
+        expect(() => Lh2Layout.inArea(800, 800, { areaWidthMm: 1200, areaHeightMm: 1200, rectXMm: 500, rectYMm: 0 })).toThrow(/passa da área/);
+        expect(() => Lh2Layout.inArea(1000, 800, { areaWidthMm: 1200, areaHeightMm: 1000, rectXMm: 0, rectYMm: 300 })).toThrow(/passa da área/);
+        expect(() => Lh2Layout.inArea(800, 800, { areaWidthMm: 1200, areaHeightMm: 1200, rectXMm: -1, rectYMm: 0 })).toThrow(/negativa/);
+    });
 
-        const reframed = Lh2Homography.reframe(Lh2Homography.fromCorners(c, legacy), legacy, area);
-        const solved = Lh2Homography.fromCorners(c, area);
+    it("correção de medida = resolver de novo com a medida certa (lado, largura e altura, posição)", () => {
+        const c = corners(CASES[0].counts);
+        // Digitou um quadrado de 500 no layout do PyDotBot; era um retângulo de 800 × 600 numa área.
+        const typed = Lh2Layout.legacy(500);
+        const right = Lh2Layout.inArea(800, 600, { areaWidthMm: 1200, areaHeightMm: 1000, rectXMm: 300, rectYMm: 200 });
+
+        const corrected = Lh2Homography.reframe(Lh2Homography.fromCorners(c, typed), typed, right);
+        const solved = Lh2Homography.fromCorners(c, right);
 
         // Qualquer ponto (não só os cantos) vai para o mesmo lugar.
         for (const counts of [[31000, 69000], [40000, 75000], [50000, 85000]] as [number, number][]) {
             const p = Lh2Homography.cameraPoint({ lhIndex: 0, count1: counts[0], count2: counts[1] });
-            const [ax, ay] = Lh2Homography.apply(reframed, p);
+            const [ax, ay] = Lh2Homography.apply(corrected, p);
             const [bx, by] = Lh2Homography.apply(solved, p);
             expect(ax).toBeCloseTo(bx, 6);
             expect(ay).toBeCloseTo(by, 6);
         }
     });
 
-    it("reframe no fio é exato para deslocamento em mm inteiros", () => {
+    it("correção no fio é exata para deslocamento em mm inteiros", () => {
         const legacy = Lh2Layout.legacy(800);
-        const area = Lh2Layout.inArea(800, { areaWidthMm: 1200, areaHeightMm: 1200, squareXMm: 200, squareYMm: 200 });
+        const area = Lh2Layout.inArea(800, 800, { areaWidthMm: 1200, areaHeightMm: 1200, rectXMm: 200, rectYMm: 200 });
         // Matriz da calibração real de 27/11 (lado 800, canal 13).
         const wire = Lh2Homography.toWire([1639.62, 3983.394, 1968.438, -745.293, 7402.737, 1605.531, -0.179, 1.867, 1]);
         const out = Lh2Homography.reframeWire(wire, legacy, area);

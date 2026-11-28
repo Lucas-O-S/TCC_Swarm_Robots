@@ -18,19 +18,23 @@ export interface Lh2RobotView {
     forcePending: boolean;
 }
 
-/** [metadata] do TOML carregado: lado do quadrado (dele sai a arena), tag e data. */
+/** [metadata] do TOML carregado: tamanho e posição do retângulo de calibração, área, tag e data. */
 export interface Lh2CalibrationMetaView {
+    // calibration_distance_mm do TOML (o do PyDotBot): o lado no quadrado, a largura no retângulo.
     distanceMm: number;
+    // Retângulo de calibração (quadrado = iguais).
+    widthMm: number;
+    heightMm: number;
     tag: string | null;
     // ISO 8601 (UTC); null se o TOML não trouxer.
     createdAt: string | null;
-    // Canto top-left do quadrado no referencial (mm). No layout do PyDotBot = 2 × o lado.
-    squareX: number;
-    squareY: number;
+    // Canto top-left do retângulo no referencial (mm). No layout do PyDotBot = 2 × largura/altura.
+    rectX: number;
+    rectY: number;
     // Área real no referencial (mm); null = layout do PyDotBot (sem área informada).
     area: Lh2Area | null;
-    // TOML de onde esta saiu por recálculo; null se veio de uma captura.
-    reframedFrom: string | null;
+    // TOML de onde esta saiu por correção de medida; null se veio de uma captura.
+    correctedFrom: string | null;
 }
 
 /** Resposta do GET /v1/lh2/calibration. */
@@ -63,11 +67,11 @@ export interface Lh2CornerResult {
     session: Lh2CaptureView;
 }
 
-/** Resposta do POST /v1/lh2/calibration/reframe. */
-export interface Lh2ReframeResult {
+/** Resposta do POST /v1/lh2/calibration/correct. */
+export interface Lh2CorrectResult {
     // TOML novo, já carregado.
     file: string;
-    // Calibração que foi recalculada.
+    // Calibração que foi corrigida.
     from: string;
     metadata: Lh2CalibrationMetaView | null;
     stationCount: number;

@@ -255,7 +255,7 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
         const draft = Lh2Calibration.forStation(session.calibratedStation!, matrix, "captura");
         const createdAt = new Date();
         const path = draft.saveToml(lh2Config.calibrationDir, {
-            distanceMm: session.distanceMm, tag: session.tag ?? undefined, createdAt, ...session.layout.metaFields(),
+            ...session.layout.metaFields(), tag: session.tag ?? undefined, createdAt,
         });
         // Relido do disco: o que fica carregado (com o [metadata]) é exatamente
         // o que a borda vai ler no próximo boot.
@@ -277,11 +277,13 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
         return { calibration, cornersFile, marked };
     }
 
-    // Recalcula a calibração carregada para outro layout (a mesma captura,
-    // outro referencial - ver Lh2Homography.reframe), grava um TOML novo,
-    // carrega e marca a frota toda, como o solve. Só com [metadata] (é dele
-    // que sai o layout antigo) e fora de captura.
-    reframeLh2Calibration(to: Lh2Layout, tag: string | null): { calibration: Lh2Calibration; from: string; marked: string[] } {
+    // Corrige medidas digitadas errado (lado, largura, altura, posição na
+    // área) da calibração carregada: mesma captura, cantos com os números
+    // certos (ver Lh2Homography.reframe). Grava um TOML novo, carrega e marca
+    // a frota toda, como o solve. Só com [metadata] (é dele que sai o layout
+    // antigo) e fora de captura. Não conserta captura malfeita nem base que
+    // saiu do lugar.
+    correctLh2Calibration(to: Lh2Layout, tag: string | null): { calibration: Lh2Calibration; from: string; marked: string[] } {
         if (this.capture)
             throw new Error(`captura em andamento para ${this.capture.address} - resolva ou cancele antes`);
 
@@ -291,16 +293,15 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
 
         const from = current.layout;
         if (!from)
-            throw new Error(`${current.source} não tem [metadata] (calibration.out?): sem o lado não dá para saber o referencial antigo`);
+            throw new Error(`${current.source} não tem [metadata] (calibration.out?): sem as medidas não dá para corrigir`);
 
         const stations = new Set(current.stations);
         const matrices = current.matrices.map((matrix, index) =>
             stations.has(index) ? Lh2Homography.reframeWire(matrix, from, to) : matrix
         );
 
-        const finalTag = tag ?? current.meta?.tag;
-        const path = Lh2Calibration.fromMatrices(matrices, "recálculo").saveToml(lh2Config.calibrationDir, {
-            distanceMm: to.distanceMm, tag: finalTag, ...to.metaFields(), reframedFrom: basename(current.source),
+        const path = Lh2Calibration.fromMatrices(matrices, "correção").saveToml(lh2Config.calibrationDir, {
+            ...to.metaFields(), tag: tag ?? current.meta?.tag, correctedFrom: basename(current.source),
         });
         const calibration = Lh2Calibration.fromFile(path);
 
@@ -309,7 +310,7 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
         const marked = this.fleet.forceCalibrate();
 
         console.log(
-            `[LH2] calibração recalculada (${MariGatewayAdapter.describeLayout(to)}) a partir de ${current.source}, ` +
+            `[LH2] calibração corrigida (${MariGatewayAdapter.describeLayout(to)}) a partir de ${current.source}, ` +
             `salva em ${path} e carregada - ponha esse caminho no LH2_CALIBRATION_FILE para valer depois de reiniciar`
         );
         return { calibration, from: current.source, marked };
@@ -484,12 +485,13 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
         return `${MariGatewayAdapter.channels(calibration)}, ${MariGatewayAdapter.describeLayout(layout)}${tag}${data}`;
     }
 
-    // "quadrado de 800 mm em (1200, 1200), área 1200 × 1200 a partir de (1000, 1000)".
+    // "retângulo de 1000 × 800 mm em (1100, 1200), área 1200 × 1200 a partir de (1000, 1000)".
     private static describeLayout(layout: Lh2Layout): string {
-        const quadrado = `quadrado de ${layout.distanceMm} mm em (${layout.squareX}, ${layout.squareY})`;
+        const forma = layout.isSquare ? `quadrado de ${layout.widthMm} mm` : `retângulo de ${layout.widthMm} × ${layout.heightMm} mm`;
+        const onde = `${forma} em (${layout.rectX}, ${layout.rectY})`;
         const area = layout.area;
         return area
-            ? `${quadrado}, área ${area.width} × ${area.height} a partir de (${area.x}, ${area.y})`
-            : `${quadrado}, layout do PyDotBot (arena de 5 × o lado)`;
+            ? `${onde}, área ${area.width} × ${area.height} a partir de (${area.x}, ${area.y})`
+            : `${onde}, layout do PyDotBot (arena de 5 × o tamanho)`;
     }
 }

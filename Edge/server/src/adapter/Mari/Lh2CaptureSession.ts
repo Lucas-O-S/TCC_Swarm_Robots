@@ -33,7 +33,9 @@ export const LH2_CAPTURE_DEFAULTS: Lh2CaptureOptions = {
 
 export interface Lh2CaptureView {
     address: string;
-    distanceMm: number;
+    // Retângulo de calibração (quadrado = largura igual à altura).
+    widthMm: number;
+    heightMm: number;
     // Para onde cada canto vai (mm no referencial) e a área real (null = layout do PyDotBot).
     references: Record<Lh2Corner, [number, number]>;
     area: Lh2Area | null;
@@ -57,10 +59,11 @@ export interface Lh2CornersRecord {
     createdAt: string;
     calibrationFile: string;
     address: string;
-    distanceMm: number;
-    // Layout usado no solve (canto TopLeft do quadrado e área; area null = PyDotBot).
-    squareX: number;
-    squareY: number;
+    // Layout usado no solve: retângulo, canto top-left dele e área (area null = PyDotBot).
+    widthMm: number;
+    heightMm: number;
+    rectX: number;
+    rectY: number;
     area: Lh2Area | null;
     tag: string | null;
     station: number;
@@ -96,7 +99,7 @@ export class Lh2CaptureSession {
     // station null = escolhe pela primeira leitura.
     constructor(
         address: string,
-        // Onde o quadrado fica no referencial (ver Lh2Layout) - decide os pontos de referência do solve.
+        // Onde o retângulo fica no referencial (ver Lh2Layout) - decide os pontos de referência do solve.
         readonly layout: Lh2Layout,
         readonly tag: string | null,
         private readonly trigger: () => void,
@@ -104,10 +107,6 @@ export class Lh2CaptureSession {
         private station: number | null = null,
     ) {
         this.address = Protocol.normalizeAddress(address);
-    }
-
-    get distanceMm(): number {
-        return this.layout.distanceMm;
     }
 
     get calibratedStation(): number | null {
@@ -178,9 +177,10 @@ export class Lh2CaptureSession {
             createdAt: createdAt.toISOString(),
             calibrationFile: basename(tomlPath),
             address: this.address,
-            distanceMm: this.distanceMm,
-            squareX: this.layout.squareX,
-            squareY: this.layout.squareY,
+            widthMm: this.layout.widthMm,
+            heightMm: this.layout.heightMm,
+            rectX: this.layout.rectX,
+            rectY: this.layout.rectY,
             area: this.layout.area,
             // Mesma forma que vai no tag do TOML (slug), para os dois arquivos baterem.
             tag: this.tag ? Lh2Calibration.slug(this.tag) || null : null,
@@ -197,7 +197,8 @@ export class Lh2CaptureSession {
     view(): Lh2CaptureView {
         return {
             address: this.address,
-            distanceMm: this.distanceMm,
+            widthMm: this.layout.widthMm,
+            heightMm: this.layout.heightMm,
             references: Object.fromEntries(LH2_CORNER_ORDER.map((c) => [c, this.layout.corner(c)])) as Record<Lh2Corner, [number, number]>,
             area: this.layout.area,
             tag: this.tag,

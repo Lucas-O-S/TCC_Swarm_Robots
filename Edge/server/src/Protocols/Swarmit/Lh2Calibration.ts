@@ -13,15 +13,19 @@ export interface Lh2CalibrationMeta {
     distanceMm: number;
     tag?: string;
     createdAt?: Date;
-    // Só quando a calibração foi feita (ou recalculada) dentro de uma área
-    // real (Lh2Layout.inArea): canto TopLeft do quadrado e a área, em mm no
-    // referencial. Sem eles vale o layout do PyDotBot (5 × o lado). Chaves a
-    // mais no [metadata] não atrapalham o PyDotBot: ele só lê data_hex.
-    squareX?: number;
-    squareY?: number;
+    // Retângulo de calibração (largura ≠ altura): o tamanho de verdade. No
+    // quadrado ficam de fora e vale o distanceMm (o lado).
+    widthMm?: number;
+    heightMm?: number;
+    // Só quando a calibração foi feita dentro de uma área real
+    // (Lh2Layout.inArea): canto top-left do retângulo e a área, em mm no
+    // referencial. Sem eles vale o layout do PyDotBot (5 × o tamanho). Chaves
+    // a mais no [metadata] não atrapalham o PyDotBot: ele só lê data_hex.
+    rectX?: number;
+    rectY?: number;
     area?: Lh2Area;
-    // Arquivo de onde esta saiu por recálculo (mesma captura, outro layout).
-    reframedFrom?: string;
+    // Arquivo de onde esta saiu por correção de medida digitada errada.
+    correctedFrom?: string;
 }
 
 // Calibração LH2 lida do arquivo do PyDotBot, já fatiada em uma matriz por
@@ -48,9 +52,11 @@ export class Lh2Calibration {
     get layout(): Lh2Layout | null {
         const meta = this.meta;
         if (!meta) return null;
-        return meta.area && meta.squareX !== undefined && meta.squareY !== undefined
-            ? Lh2Layout.of(meta.distanceMm, meta.squareX, meta.squareY, meta.area)
-            : Lh2Layout.legacy(meta.distanceMm);
+        const width = meta.widthMm ?? meta.distanceMm;
+        const height = meta.heightMm ?? meta.distanceMm;
+        return meta.area && meta.rectX !== undefined && meta.rectY !== undefined
+            ? Lh2Layout.of(width, height, meta.rectX, meta.rectY, meta.area)
+            : Lh2Layout.legacy(width, height);
     }
 
     // Slots enviados (= lh2HomographyCount que o robô reporta), não estações calibradas.
@@ -120,21 +126,24 @@ export class Lh2Calibration {
         return path;
     }
 
-    // Linhas do layout na área (vazio no layout do PyDotBot, para o arquivo
-    // continuar igual ao dele).
+    // Linhas do retângulo e da área (vazio para quadrado no layout do
+    // PyDotBot, para o arquivo continuar igual ao dele).
     private static layoutToml(meta: Lh2CalibrationMeta): string {
         const lines: string[] = [];
-        if (meta.area && meta.squareX !== undefined && meta.squareY !== undefined) {
+        if (meta.widthMm !== undefined && meta.heightMm !== undefined) {
+            lines.push(`calibration_width_mm = ${Math.trunc(meta.widthMm)}`, `calibration_height_mm = ${Math.trunc(meta.heightMm)}`);
+        }
+        if (meta.area && meta.rectX !== undefined && meta.rectY !== undefined) {
             lines.push(
-                `square_x_mm = ${Math.trunc(meta.squareX)}`,
-                `square_y_mm = ${Math.trunc(meta.squareY)}`,
+                `rect_x_mm = ${Math.trunc(meta.rectX)}`,
+                `rect_y_mm = ${Math.trunc(meta.rectY)}`,
                 `area_x_mm = ${Math.trunc(meta.area.x)}`,
                 `area_y_mm = ${Math.trunc(meta.area.y)}`,
                 `area_width_mm = ${Math.trunc(meta.area.width)}`,
                 `area_height_mm = ${Math.trunc(meta.area.height)}`,
             );
         }
-        if (meta.reframedFrom) lines.push(`reframed_from = "${meta.reframedFrom.replace(/["\\]/g, "")}"`);
+        if (meta.correctedFrom) lines.push(`corrected_from = "${meta.correctedFrom.replace(/["\\]/g, "")}"`);
         return lines.map((line) => line + "\n").join("");
     }
 
@@ -231,21 +240,29 @@ export class Lh2Calibration {
         const createdAt = created ? new Date(created[1]) : null;
         if (createdAt && !Number.isNaN(createdAt.getTime())) meta.createdAt = createdAt;
 
-        // Layout na área: só vale com as seis chaves (meio layout é pior que nenhum).
         const int = (key: string): number | null => {
             const match = new RegExp(`^\\s*${key}\\s*=\\s*(-?\\d+)`, "m").exec(text);
             return match ? Number(match[1]) : null;
         };
-        const [squareX, squareY, x, y, width, height] =
-            ["square_x_mm", "square_y_mm", "area_x_mm", "area_y_mm", "area_width_mm", "area_height_mm"].map(int);
-        if (squareX !== null && squareY !== null && x !== null && y !== null && width !== null && height !== null) {
-            meta.squareX = squareX;
-            meta.squareY = squareY;
+
+        // Retângulo: só com as duas chaves.
+        const [rectWidth, rectHeight] = ["calibration_width_mm", "calibration_height_mm"].map(int);
+        if (rectWidth !== null && rectHeight !== null) {
+            meta.widthMm = rectWidth;
+            meta.heightMm = rectHeight;
+        }
+
+        // Layout na área: só vale com as seis chaves (meio layout é pior que nenhum).
+        const [rectX, rectY, x, y, width, height] =
+            ["rect_x_mm", "rect_y_mm", "area_x_mm", "area_y_mm", "area_width_mm", "area_height_mm"].map(int);
+        if (rectX !== null && rectY !== null && x !== null && y !== null && width !== null && height !== null) {
+            meta.rectX = rectX;
+            meta.rectY = rectY;
             meta.area = { x, y, width, height };
         }
 
-        const from = /^\s*reframed_from\s*=\s*"([^"]*)"/m.exec(text);
-        if (from && from[1]) meta.reframedFrom = from[1];
+        const from = /^\s*corrected_from\s*=\s*"([^"]*)"/m.exec(text);
+        if (from && from[1]) meta.correctedFrom = from[1];
 
         return meta;
     }

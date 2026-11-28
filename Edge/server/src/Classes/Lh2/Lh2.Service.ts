@@ -5,10 +5,10 @@ import { MariGatewayAdapter } from "src/adapter/Mari/MariGateway.Adapter";
 import { SwarmitNode } from "src/adapter/Mari/SwarmitFleet";
 import { SwarmitDeviceStatus } from "src/Enums/SwarmitDeviceStatus.enum";
 import { Protocol } from "src/Protocols/Protocol";
-import { Lh2CalibrationMetaView, Lh2CalibrationView, Lh2CornerResult, Lh2PushResult, Lh2ReframeResult, Lh2RobotView, Lh2SolveResult } from "./Lh2.Types";
+import { Lh2CalibrationMetaView, Lh2CalibrationView, Lh2CornerResult, Lh2CorrectResult, Lh2PushResult, Lh2RobotView, Lh2SolveResult } from "./Lh2.Types";
 import { Lh2Layout } from "src/Protocols/Swarmit/Lh2Layout";
 import { Lh2LayoutDto } from "./DTO/lh2.layout.dto";
-import { Lh2ReframeDto } from "./DTO/lh2.reframe.dto";
+import { Lh2CorrectDto } from "./DTO/lh2.correct.dto";
 import { Lh2Calibration } from "src/Protocols/Swarmit/Lh2Calibration";
 import { Lh2CaptureBusyError, Lh2CaptureTimeoutError, Lh2CaptureView } from "src/adapter/Mari/Lh2CaptureSession";
 import { Lh2Corner } from "src/Enums/Lh2Corner.enum";
@@ -76,13 +76,14 @@ export class Lh2Service {
 
         const station = dto.channel === undefined ? null : dto.channel - 1;
         
-        const layout = Lh2Service.layoutOf(dto, dto.distanceMm ?? LH2_CALIBRATION_DISTANCE_DEFAULT, false);
+        const layout = Lh2Service.layoutOf(dto, null);
         
         return mari.beginLh2Capture(dto.address, layout, dto.tag ?? null, station).view();
     }
 
-    // Mesma captura num referencial novo (a área real), sem voltar ao chão.
-    reframe(dto: Lh2ReframeDto): Lh2ReframeResult {
+    // Medida digitada errado na calibração carregada: refaz com a certa, sem
+    // voltar ao chão. O que não veio no corpo continua como está.
+    correct(dto: Lh2CorrectDto): Lh2CorrectResult {
         const mari = this.requireMari();
 
         if (mari.lh2CaptureSession())
@@ -91,11 +92,15 @@ export class Lh2Service {
         const current = mari.lh2Calibration();
         if (!current)
             throw new ConflictException("Nenhuma calibração carregada (LH2_CALIBRATION_FILE vazio)");
-        if (!current.meta)
-            throw new ConflictException(`${current.source} não tem [metadata] (calibration.out?): não dá para saber o referencial antigo`);
+        const before = current.layout;
+        if (!before)
+            throw new ConflictException(`${current.source} não tem [metadata] (calibration.out?): sem as medidas não dá para corrigir`);
 
-        const layout = Lh2Service.layoutOf(dto, dto.distanceMm ?? current.meta.distanceMm, true);
-        const { calibration, from, marked } = mari.reframeLh2Calibration(layout, dto.tag ?? null);
+        const layout = Lh2Service.layoutOf(dto, before);
+        if (layout.equals(before) && dto.tag === undefined)
+            throw new BadRequestException("Nada para corrigir: as medidas informadas são as da calibração carregada");
+
+        const { calibration, from, marked } = mari.correctLh2Calibration(layout, dto.tag ?? null);
 
         return {
             file: calibration.source,
@@ -188,32 +193,46 @@ export class Lh2Service {
         if (!meta || !layout) return null;
         return {
             distanceMm: meta.distanceMm,
+            widthMm: layout.widthMm,
+            heightMm: layout.heightMm,
             tag: meta.tag ?? null,
             createdAt: meta.createdAt?.toISOString() ?? null,
-            squareX: layout.squareX,
-            squareY: layout.squareY,
+            rectX: layout.rectX,
+            rectY: layout.rectY,
             area: layout.area,
-            reframedFrom: meta.reframedFrom ?? null,
+            correctedFrom: meta.correctedFrom ?? null,
         };
     }
 
-    // Layout pedido: os quatro campos da área juntos (área real) ou nenhum
-    // (layout do PyDotBot). requireArea = o recálculo, que só existe para
-    // levar a calibração para uma área. Quadrado fora da área = 400.
-    private static layoutOf(dto: Lh2LayoutDto, distanceMm: number, requireArea: boolean): Lh2Layout {
-        const fields = [dto.areaWidthMm, dto.areaHeightMm, dto.squareXMm, dto.squareYMm];
+    // Layout pedido. Tamanho: distanceMm (quadrado) ou widthMm + heightMm
+    // (retângulo); área: os quatro campos juntos ou nenhum. Na correção, o
+    // que não veio sai de `base` (a calibração carregada); na captura, sem
+    // tamanho vale o lado padrão e sem área, o layout do PyDotBot. Campos
+    // soltos ou retângulo fora da área = 400.
+    private static layoutOf(dto: Lh2LayoutDto, base: Lh2Layout | null): Lh2Layout {
+        const rect = dto.widthMm !== undefined || dto.heightMm !== undefined;
+
+        if (rect && (dto.widthMm === undefined || dto.heightMm === undefined))
+            throw new BadRequestException("Informe juntos widthMm e heightMm");
+
+        if (rect && dto.distanceMm !== undefined)
+            throw new BadRequestException("Use distanceMm (quadrado) ou widthMm + heightMm (retângulo), não os dois");
+
+        const width = dto.widthMm ?? dto.distanceMm ?? base?.widthMm ?? LH2_CALIBRATION_DISTANCE_DEFAULT;
+        const height = dto.heightMm ?? dto.distanceMm ?? base?.heightMm ?? LH2_CALIBRATION_DISTANCE_DEFAULT;
+
+        const fields = [dto.areaWidthMm, dto.areaHeightMm, dto.rectXMm, dto.rectYMm];
         const given = fields.filter((value) => value !== undefined).length;
 
-        if (given === 0 && !requireArea)
-            return Lh2Layout.legacy(distanceMm);
+        if (given !== 0 && given !== fields.length)
+            throw new BadRequestException("Informe juntos areaWidthMm, areaHeightMm, rectXMm e rectYMm");
 
-        if (given !== fields.length)
-            throw new BadRequestException("Informe juntos areaWidthMm, areaHeightMm, squareXMm e squareYMm");
+        const placement = given === fields.length
+            ? { areaWidthMm: dto.areaWidthMm!, areaHeightMm: dto.areaHeightMm!, rectXMm: dto.rectXMm!, rectYMm: dto.rectYMm! }
+            : base?.placement() ?? null;
 
         try {
-            return Lh2Layout.inArea(distanceMm, {
-                areaWidthMm: dto.areaWidthMm!, areaHeightMm: dto.areaHeightMm!, squareXMm: dto.squareXMm!, squareYMm: dto.squareYMm!,
-            });
+            return placement ? Lh2Layout.inArea(width, height, placement) : Lh2Layout.legacy(width, height);
         } catch (error) {
             throw new BadRequestException((error as Error).message);
         }
