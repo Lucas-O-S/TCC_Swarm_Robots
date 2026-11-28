@@ -220,16 +220,21 @@ export class SwarmitProtocol {
         return info.imageName || info.imageDigest.slice(0, 16) || "-";
     }
 
-    // Carga restante, 0-100. O DotBot v3 roda supercapacitor: a energia
-    // armazenada vai com V^2 e o robô apaga em 0,6 V, então a fração útil é
-    // entre os quadrados, não entre as tensões (swarmit: battery_pct).
+    // Carga restante, 0-100. Faixa medida no robô real: <= 450 mV conta como
+    // 0% e >= 2960 mV (máximo que a carga alcança) como 100%. O DotBot v3
+    // roda supercapacitor: a energia armazenada vai com V^2, então no meio a
+    // fração útil é entre os quadrados, não entre as tensões (swarmit: battery_pct).
     static batteryPct(device: SwarmitDeviceType, batteryMv: number): number {
         
         const supercap = device === SwarmitDeviceType.DotBotV3;
         
-        const maxMv = 3000;
+        const maxMv = 2960;
         
-        const emptyMv = supercap ? 600 : 0;
+        const emptyMv = 450;
+
+        if (batteryMv <= emptyMv) return 0;
+
+        if (batteryMv >= maxMv) return 100;
         
         const num = supercap ? batteryMv ** 2 - emptyMv ** 2 : batteryMv - emptyMv;
         
