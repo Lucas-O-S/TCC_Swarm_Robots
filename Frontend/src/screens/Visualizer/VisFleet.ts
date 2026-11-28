@@ -13,7 +13,7 @@ import { PoseTween } from './PoseTween';
 import type { TweenPose } from './PoseTween';
 
 /** O backend grava o address em hex maiúsculo; a chave interna ignora a caixa pra casar REST e socket. */
-const keyOf = (address: string) => address.toLowerCase();
+const keyOf = VisRobotMapper.key;
 
 function newEntry(robot: RobotModel): VisRobotModel {
   return { robot, telemetry: null, receivedAt: null, theta: 0, rgb: null, route: null };

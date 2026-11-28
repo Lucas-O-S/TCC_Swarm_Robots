@@ -1,0 +1,179 @@
+/* Gráfico de linha pequeno (uma série). A cor da linha é o laranja do tema
+   escurecido (#c96a00): o --color-orange dá só 1,95:1 contra o fundo do
+   cartão e marca de dado precisa de 3:1. */
+
+.chart {
+  --line: #c96a00;
+  --ring: var(--color-surface-alt);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.title {
+  min-width: 0;
+}
+
+.current {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.frame {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.yTop,
+.yBottom {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.yTop {
+  margin-bottom: 2px;
+}
+
+.yBottom {
+  margin-top: 2px;
+}
+
+.plot {
+  position: relative;
+  height: 56px;
+  cursor: crosshair;
+  outline: none;
+  border-radius: 2px;
+}
+
+.plot:focus-visible {
+  box-shadow: 0 0 0 2px var(--color-orange);
+}
+
+.svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.grid {
+  stroke: var(--color-border);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.area {
+  fill: var(--line);
+  opacity: 0.1;
+}
+
+.line {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  background: var(--line);
+  box-shadow: 0 0 0 2px var(--ring);
+  pointer-events: none;
+}
+
+.crosshair {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  margin-left: -0.5px;
+  background: var(--color-text-muted);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.tooltip {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--color-dark);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.tooltip strong {
+  font-size: 12px;
+}
+
+.tooltip span {
+  opacity: 0.8;
+}
+
+/* Acima do gráfico, no lado oposto ao ponto (não cobre a linha perto do mouse nem sai do cartão). */
+.tooltipLeft {
+  left: 0;
+}
+
+.tooltipRight {
+  right: 0;
+}
+
+.empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.xAxis {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-muted);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

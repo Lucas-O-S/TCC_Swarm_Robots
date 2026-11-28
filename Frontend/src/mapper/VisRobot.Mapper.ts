@@ -5,6 +5,7 @@ import { controlModeLabel } from '../Integration/LocalOrchestrator';
 import type { RobotTelemetryModel } from '../model/RobotTelemetry.Model';
 import type { SimMapRobotModel } from '../model/SimRobot.Model';
 import type { Vec2Model } from '../model/SimWorld.Model';
+import type { NetSnapshotModel, VisNetRowModel } from '../model/VisNetStats.Model';
 import type { VisRobotModel, VisRobotRowModel } from '../model/VisRobot.Model';
 import { clamp } from '../screens/Simulation/Service/SimPhysics';
 import { RobotMapper } from './Robot.Mapper';
@@ -35,6 +36,11 @@ function knownRoute(v: VisRobotModel, taskPoints: Vec2Model[] | null): Vec2Model
   return v.robot.taskId ? (taskPoints ?? []) : (v.route?.points ?? []);
 }
 
+/** Chave interna do robô: o backend grava o address em hex maiúsculo; a chave ignora a caixa pra casar REST e socket. */
+function key(address: string): string {
+  return address.toLowerCase();
+}
+
 function isOutside(p: Vec2Model, arena: ArenaSize): boolean {
   return p.x < 0 || p.y < 0 || p.x > arena.width || p.y > arena.height;
 }
@@ -44,6 +50,7 @@ function isOutside(p: Vec2Model, arena: ArenaSize): boolean {
 // reaproveitar o SimulationMap) e a linha da lista do menu. A telemetria já
 // vem no referencial do mapa (o do firmware): nada a converter.
 export const VisRobotMapper = {
+  key,
   position,
   thetaFromDirection,
 
@@ -104,6 +111,22 @@ export const VisRobotMapper = {
       outside: pos !== null && arena !== null && isOutside(pos, arena),
       waypointIdx: t?.waypointIdx ?? null,
       taskName,
+    };
+  },
+
+  /**
+   * Robô → linha do cartão Rede. O silêncio conta do último anúncio que
+   * chegou nesta tela ou, sem nenhum, do `lastSync` da API.
+   */
+  toNetRow(v: VisRobotModel, index: number, snapshot: NetSnapshotModel, now: number): VisNetRowModel {
+    const last = v.receivedAt ?? v.robot.lastSync.getTime();
+    return {
+      address: v.robot.address,
+      label: SimRobotMapper.label(index),
+      color: SimRobotMapper.color(index),
+      status: v.robot.status,
+      silenceS: Number.isFinite(last) ? Math.max(0, Math.round((now - last) / 1000)) : null,
+      net: snapshot.robots.get(key(v.robot.address)) ?? null,
     };
   },
 };

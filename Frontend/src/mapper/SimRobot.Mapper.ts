@@ -1,3 +1,4 @@
+import type { StatusTone } from '../components/StatusLine/StatusLine';
 import { RAD_TO_DEG, DEG_TO_RAD } from '../Consts/SimulationConsts';
 import { DotBotControlMode } from '../enums/DotBotControlMode.enum';
 import type { RobotControlMode } from '../enums/RobotControlMode.enum';
@@ -53,6 +54,17 @@ function statusLabel(status: RobotStatus): string {
   return STATUS_LABEL[status];
 }
 
+const STATUS_TONE: Record<RobotStatus, StatusTone> = {
+  [RobotStatus.Active]: 'on',
+  [RobotStatus.Inactive]: 'warn',
+  [RobotStatus.Lost]: 'off',
+};
+
+/** Cor da bolinha do <StatusLine> pro status (verde/amarelo/vermelho). */
+function statusTone(status: RobotStatus): StatusTone {
+  return STATUS_TONE[status];
+}
+
 /** "2 Active · 0 Inactive · 1 Lost" — contagem por status (null = ainda não cadastrado, fica de fora). */
 function statusSummary(statuses: readonly (RobotStatus | null)[]): string {
   const count = (s: RobotStatus) => statuses.filter((x) => x === s).length;
@@ -78,6 +90,7 @@ export const SimRobotMapper = {
   shortAddress,
   modeLabel,
   statusLabel,
+  statusTone,
   statusSummary,
   rgbToHex,
   hexToRgb,
