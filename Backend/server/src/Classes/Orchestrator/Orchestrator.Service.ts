@@ -19,8 +19,18 @@ export class OrchestratorService implements OnModuleInit {
 
     private RUN_TIME = 5000;
     
-    /** Limiar de bateria baixa, em Volts. O protocolo manda mV; convertemos ao comparar. */
-    private LOW_BATTERY_VOLTS = 3.0;
+    /** Faixa medida no robô real: <= 0,45 V conta como 0%, >= 2,96 V como 100%. */
+    private readonly BATTERY_EMPTY_VOLTS = 0.45;
+    private readonly BATTERY_FULL_VOLTS = 2.96;
+    private readonly LOW_BATTERY_PCT = 20;
+
+    /**
+     * Limiar de bateria baixa, em Volts: 20% da faixa (0,952 V), arredondado
+     * no mV. O protocolo manda mV; convertemos ao comparar.
+     */
+    private LOW_BATTERY_VOLTS = Math.round(
+        (this.BATTERY_EMPTY_VOLTS + (this.LOW_BATTERY_PCT / 100) * (this.BATTERY_FULL_VOLTS - this.BATTERY_EMPTY_VOLTS)) * 1000,
+    ) / 1000;
 
     /**
      * Advertisement igual ao último conferido (mesmo waypoint_idx e mesma

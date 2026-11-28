@@ -8,8 +8,8 @@ import { EdgeClient } from 'src/Classes/Edge/Edge.Client';
 import { SwarmService } from 'src/Classes/Swarm/Swarm.Service';
 import { clearDatabase } from './db';
 
-/** Bateria considerada boa nos testes (o limite do orquestrador é 3,0 V). */
-export const BATERIA_OK = 3.9;
+/** Bateria considerada boa nos testes (o limite do orquestrador é 0,952 V = 20% de 0,45–2,96 V). */
+export const BATERIA_OK = 2.5;
 
 /**
  * App de teste: o AppModule inteiro, com a mesma configuração do main.ts

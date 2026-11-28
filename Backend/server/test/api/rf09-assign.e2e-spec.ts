@@ -36,7 +36,7 @@ const regras: Regra[] = [
             return pendente();
         },
     },
-    { id: 'CT-09-05', regra: 'R5', status: 409, erro: /bateria baixa/, preparar: async (ctx) => { ctx.batteryVolts.mockReturnValue(2.9); await createRobot(); return pendente(); } },
+    { id: 'CT-09-05', regra: 'R5', status: 409, erro: /bateria baixa/, preparar: async (ctx) => { ctx.batteryVolts.mockReturnValue(0.9); await createRobot(); return pendente(); } },
     { id: 'CT-09-06', regra: 'R6', status: 409, erro: /não pode receber task/, preparar: async (ctx) => { ctx.taskBlockReason.mockReturnValue('sem posição válida'); await createRobot(); return pendente(); } },
     { id: 'CT-09-07', regra: 'R7', status: 404, erro: /Nenhuma task com uuid/, preparar: async () => { await createRobot(); return UUID_INEXISTENTE; } },
     { id: 'CT-09-08', regra: 'R8', status: 400, erro: /não tem waypoints/, preparar: async () => { await createRobot(); return (await createTask(0)).uuid; } },

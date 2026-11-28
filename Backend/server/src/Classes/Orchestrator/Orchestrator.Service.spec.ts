@@ -47,7 +47,7 @@ describe('OrchestratorService', () => {
 
     beforeEach(async () => {
         jest.clearAllMocks();
-        swarmService.batteryVolts.mockReturnValue(3.9);
+        swarmService.batteryVolts.mockReturnValue(2.5);
         swarmService.taskBlockReason.mockReturnValue(null);
         robotService.sendCommand.mockResolvedValue({});
 
@@ -70,7 +70,7 @@ describe('OrchestratorService', () => {
             { regra: 'R2 robô não existe', robo: null, task: task(5), erro: NotFoundException },
             { regra: 'R3 robô em Manual', robo: robo({ mode: RobotControlMode.Manual }), task: task(5), erro: BadRequestException },
             { regra: 'R4 robô ocupado', robo: robo({ taskId: 'outra' }), task: task(5), erro: ConflictException },
-            { regra: 'R5 bateria baixa', robo: robo(), task: task(5), bateria: 3.0, erro: ConflictException },
+            { regra: 'R5 bateria baixa', robo: robo(), task: task(5), bateria: 0.9, erro: ConflictException },
             { regra: 'R6 sem calibração', robo: robo(), task: task(5), bloqueio: 'sem posição', erro: ConflictException },
             { regra: 'R7 task não existe', robo: robo(), task: null, erro: NotFoundException },
             { regra: 'R8 task sem pontos', robo: robo(), task: task(0), erro: BadRequestException },
