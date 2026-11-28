@@ -1,5 +1,6 @@
 import { PositionSource } from "src/Enums/PositionSource.enum";
 import { RobotStatus } from "src/Enums/RobotStatus.enum";
+import { GatewayMode } from "src/Enums/GatewayMode.enum";
 
 /**
  * Formato do que a borda manda (JSON), do jeito que chega aqui - datas vêm
@@ -76,6 +77,43 @@ export interface EdgeRobotSnapshot {
     state: EdgeRobotState;
 }
 
+
+/**
+ * Identidade do gateway, mandada pela borda no handshake do /edge (junto com
+ * o token) e no GET /v1/gateway. Espelha GatewayIdentity da borda
+ * (Edge/server/src/config/gateway.config.ts).
+ */
+export interface EdgeGatewayIdentity {
+    edgeId: string;
+    mode: GatewayMode;
+    /** 4 hex maiúsculos, ex.: "1200". */
+    networkId: string;
+}
+
+/** Retângulo em mm (x,y = canto superior-esquerdo). */
+export interface EdgeArea {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
+/**
+ * Evento `arena:snapshot` e GET /v1/arena da borda: a área em que os robôs do
+ * gateway reportam a posição. Espelha ArenaView da borda
+ * (Edge/server/src/Classes/Arena/Arena.Types.ts).
+ */
+export interface EdgeArenaView {
+    gateway: EdgeGatewayIdentity;
+    /** null = área desconhecida (sem calibração / ARENA_* vazio). */
+    source: "lh2" | "config" | null;
+    layout: "area" | "pydotbot" | "config" | null;
+    area: EdgeArea | null;
+    calibration: EdgeArea | null;
+    channels: number[] | null;
+    version: string | null;
+    file: string | null;
+}
 
 //dados do lh2 enviados pela edge
 export interface Lh2Data {

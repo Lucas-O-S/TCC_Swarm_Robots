@@ -414,6 +414,7 @@ cd ~/tcc/back/deploy && sudo docker compose up -d --build
   ```bash
   sudo docker compose exec -T db psql -U adm -d mari_database < ../Backend/server/database/sql/<arquivo>.sql
   ```
+- Migrações que já existem (rodar uma vez em banco criado antes delas; podem rodar de novo sem efeito): `migrate_address_uppercase.sql`, `migrate_gateways.sql` (tabela `gateways` e as colunas de área no `scenario`).
 - Backup: `sudo docker compose exec -T db pg_dump -U adm mari_database > ~/backup.sql`
 - Trocar a senha do banco depois da primeira subida (mudar só o `.env` faz o back parar de conectar):
   ```bash

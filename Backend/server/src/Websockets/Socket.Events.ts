@@ -1,6 +1,7 @@
 import { PositionSource } from "src/Enums/PositionSource.enum";
 import { RobotStatus } from "src/Enums/RobotStatus.enum";
 import { RobotModel } from "src/Model/Robot.Model";
+import { ScenarioModel } from "src/Model/Scenario.Model";
 
 /**
  * Formato dos eventos que a API emite pro FRONT (nomes em `SocketEvents`).
@@ -45,6 +46,11 @@ export interface RobotUpdatesEvent {
 export interface RobotStatusEvent {
     address: string;
     status: RobotStatus;
+}
+
+/** `scenario:updated` - o cenário mudou (área nova da borda); mesmo formato do GET /scenarios/:uuid. */
+export interface ScenarioUpdatedEvent {
+    scenario: ScenarioModel;
 }
 
 /** `robot:new` - robô cadastrado no primeiro anúncio. */

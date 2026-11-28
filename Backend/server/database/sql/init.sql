@@ -107,6 +107,25 @@ CREATE TABLE position (
     FOREIGN KEY (robot_id) REFERENCES robots(uuid)
 );
 
+-- Gateway = uma borda (EDGE_ID) + o transporte dela (GATEWAY_MODE) + a rede
+-- Mari (MARI_NETWORK_ID). Criado sozinho quando a borda conecta no /edge com
+-- essa identidade no handshake. O modo entra na chave porque a mesma borda em
+-- mqtt (simulador) tem o mesmo EDGE_ID e a mesma rede.
+CREATE TABLE IF NOT EXISTS gateways (
+    uuid UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    edge_id VARCHAR(255) NOT NULL,
+    mode VARCHAR(16) NOT NULL CHECK (mode IN ('mari', 'mqtt', 'simulator')),
+    -- 4 hex maiúsculos, ex.: '1200'.
+    network_id VARCHAR(4) NOT NULL CHECK (network_id = UPPER(network_id)),
+    name VARCHAR(255) NOT NULL,
+    connected BOOLEAN NOT NULL DEFAULT FALSE,
+    last_seen TIMESTAMP NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
+    CONSTRAINT gateways_identity UNIQUE (edge_id, mode, network_id)
+);
+
 CREATE TABLE scenario (
     
     uuid UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -115,10 +134,35 @@ CREATE TABLE scenario (
     
     size_x INT NOT NULL,
     size_y INT NOT NULL,
-    
+
+    -- Mapa de um gateway: um cenário por gateway, criado e atualizado pela
+    -- borda (arena:snapshot). O usuário edita nome, descrição e obstáculos.
+    gateway_id UUID NULL,
+    -- Área em mm no referencial em que os robôs reportam a posição (Y pra
+    -- baixo, origem no canto superior-esquerdo); size_x/size_y = largura/altura.
+    -- lh2 = calibração LH2 da borda; config = ARENA_* da borda (sem LH2).
+    area_source VARCHAR(8) NULL CHECK (area_source IN ('lh2', 'config')),
+    -- area = área real da calibração; pydotbot = 5 × o retângulo a partir de
+    -- (0, 0); config = ARENA_* a partir de (0, 0).
+    area_layout VARCHAR(10) NULL CHECK (area_layout IN ('area', 'pydotbot', 'config')),
+    area_x INT NULL,
+    area_y INT NULL,
+    -- Retângulo das 4 marcas de calibração no chão, canais, created_at e TOML
+    -- da calibração (só lh2).
+    calibration_x INT NULL,
+    calibration_y INT NULL,
+    calibration_width INT NULL,
+    calibration_height INT NULL,
+    calibration_channels INT[] NULL,
+    calibration_version VARCHAR(32) NULL,
+    calibration_file VARCHAR(1024) NULL,
+
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP NULL
+    deleted_at TIMESTAMP NULL,
+
+    CONSTRAINT scenario_gateway UNIQUE (gateway_id),
+    FOREIGN KEY (gateway_id) REFERENCES gateways(uuid)
 );
 
 CREATE TABLE obstacle (
@@ -138,5 +182,3 @@ CREATE TABLE obstacle (
 
     FOREIGN KEY (scenario_id) REFERENCES scenario(uuid)
 );
-
-

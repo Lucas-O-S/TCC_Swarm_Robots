@@ -120,6 +120,18 @@ NEGÓCIO do nosso sistema ficou em `Backend/server`.
   `GET /v1/robots` para não perder robô que anunciou com ela fora.
 - O MQTT `/mari/{NETID}/to_edge|to_cloud` ficou só entre a borda e o
   RobotSwarmSimulator.
+- Gateway e área (2026-11-28): a borda manda a identidade
+  `{ edgeId, mode, networkId }` no handshake do `/edge` (ou `GET /v1/gateway`
+  no modo EDGE_URL) e a área em `arena:snapshot` (ou `GET /v1/arena`). O
+  `GatewayService` (`src/Classes/Gateways`) cria o gateway sozinho (tabela
+  `gateways`, chave edgeId + mode + networkId), marca connected/lastSeen e
+  cria/atualiza o CENÁRIO do gateway com a área (um cenário por gateway,
+  `scenario.gateway_id` único; colunas `area_*`/`calibration_*`; size_x/size_y
+  = largura/altura em mm). Só a borda cria cenário (não há POST /scenarios);
+  o usuário edita nome, descrição e obstáculos. O front lê `GET /gateways`,
+  `GET /gateways/:uuid/scenario` e recebe `scenario:updated`. Borda antiga sem
+  mode/networkId conecta normal, só não ganha gateway. Bancos antigos:
+  `database/sql/migrate_gateways.sql`.
 
 **O que mudou na API**:
 - `RobotService.dispatch` → `EdgeClient.sendCommand` (era codec +

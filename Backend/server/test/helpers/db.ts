@@ -8,7 +8,7 @@ import { TaskStatus } from 'src/Enums/TaskStatus.Enum';
 /** Endereço do robô usado nos casos de teste. */
 export const ROBO = 'AA00000000000001';
 
-const TABELAS = ['users', 'robots', 'tasks', 'task_waypoints', 'position', 'scenario', 'obstacle'];
+const TABELAS = ['users', 'robots', 'tasks', 'task_waypoints', 'position', 'scenario', 'obstacle', 'gateways'];
 
 export async function clearDatabase(sequelize: Sequelize): Promise<void> {
     await sequelize.query(`TRUNCATE TABLE ${TABELAS.join(', ')} RESTART IDENTITY CASCADE`);

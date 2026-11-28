@@ -11,5 +11,7 @@ export enum EdgeSocketEvents {
     RobotSnapshot = "robot:snapshot",
     /** Este vai no sentido contrário: API → borda, com ack (EdgeCommandAck). */
     RobotCommand = "robot:command",
+    /** Área do gateway (EdgeArenaView): a cada (re)conexão e quando a calibração muda. */
+    ArenaSnapshot = "arena:snapshot",
 
 }

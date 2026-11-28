@@ -1,9 +1,13 @@
 import { WebSocketGateway, WebSocketServer } from "@nestjs/websockets";
+import { OnEvent } from "@nestjs/event-emitter";
+import { EventsCommands } from "src/Enums/Events.Enum";
 import { Server } from "socket.io";
 import { SocketEvents } from "src/Enums/SocketEvents.enum";
 import { RobotStatus } from "src/Enums/RobotStatus.enum";
 import { RobotModel } from "src/Model/Robot.Model";
 import { RobotNewEvent, RobotStatusEvent, RobotUpdateEvent, RobotUpdatesEvent } from "./Socket.Events";
+// `import type`: vai na assinatura de um método decorado (@OnEvent).
+import type { ScenarioUpdatedEvent } from "./Socket.Events";
 
 /**
  * Janela do lote do `robot:updates` (~30 envios/s, independente de quantos
@@ -68,6 +72,15 @@ export class RobotWebsockets {
     emitNew(robot: RobotModel): void {
         const event: RobotNewEvent = { robot };
         this.server.emit(SocketEvents.RobotNew, event);
+    }
+
+    /**
+     * Cenário mudou (hoje: área nova que a borda mandou; o GatewayService grava
+     * e avisa pelo barramento interno): o front redesenha o mapa sem refetch.
+     */
+    @OnEvent(EventsCommands.scenarioUpdated)
+    emitScenarioUpdated(event: ScenarioUpdatedEvent): void {
+        this.server.emit(SocketEvents.ScenarioUpdated, event);
     }
 
 }

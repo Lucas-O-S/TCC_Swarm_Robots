@@ -1,12 +1,10 @@
-/** Schema manual pro @ApiBody do Swagger (estilo ApiGameHit). */
+/** Schema manual pro @ApiBody do Swagger (estilo ApiGameHit). Só o PUT: tamanho e área vêm da borda. */
 export const ScenarioSchema = {
     schema: {
         type: 'object',
         properties: {
             name: { type: 'string', example: 'Arena de teste' },
             description: { type: 'string', example: 'Arena com uma caixa no meio' },
-            sizeX: { type: 'number', example: 3000 },
-            sizeY: { type: 'number', example: 2000 },
             obstacles: {
                 type: 'array',
                 items: {
@@ -24,6 +22,5 @@ export const ScenarioSchema = {
                 example: [{ name: 'Caixa 1', sizeX: 200, sizeY: 200, startPointX: 500, startPointY: 500 }],
             },
         },
-        required: ['name', 'sizeX', 'sizeY'],
     },
 };

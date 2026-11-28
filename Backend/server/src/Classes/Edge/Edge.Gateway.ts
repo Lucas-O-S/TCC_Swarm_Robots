@@ -2,10 +2,14 @@ import { OnGatewayDisconnect, OnGatewayInit, WebSocketGateway } from "@nestjs/we
 import { timingSafeEqual } from "crypto";
 import { Namespace, Socket } from "socket.io";
 import { edgeConfig } from "src/config/edge.config";
+import { GatewayMode } from "src/Enums/GatewayMode.enum";
+import { EdgeGatewayIdentity } from "./Edge.Types";
 
 /**
  * Porta de entrada da borda na API: a borda conecta aqui como cliente
- * socket.io, no namespace /edge, com `auth: { token, edgeId }` no handshake.
+ * socket.io, no namespace /edge, com `auth: { token, edgeId, mode, networkId }`
+ * no handshake (mode + networkId = identidade do gateway; borda antiga sem
+ * eles ainda conecta, só não ganha gateway no back).
  *
  * Regras (no middleware, antes de aceitar a conexão):
  *  - token tem que bater com o EDGE_TOKEN (vazio = sem checagem, dev);
@@ -53,8 +57,16 @@ export class EdgeGateway implements OnGatewayInit, OnGatewayDisconnect {
             // Reserva aqui, não no "connection": duas bordas no mesmo instante
             // passariam as duas pelo middleware antes de qualquer uma conectar.
             socket.data.edgeId = edgeId;
+            
             socket.data.ip = ip;
+
+            socket.data.identity = EdgeGateway.identityOf(socket.handshake.auth, edgeId);
+            
+            if (!socket.data.identity)
+                console.warn(`[EDGE] ${edgeId} não mandou mode/networkId válidos (borda antiga?) - sem gateway no back`);
+
             this.edge = socket;
+
             console.log(`[EDGE] borda conectada: edgeId=${edgeId}, ip=${ip}`);
 
             // Antes do next(): a borda manda o robot:snapshot assim que recebe
@@ -68,6 +80,18 @@ export class EdgeGateway implements OnGatewayInit, OnGatewayDisconnect {
         if (socket !== this.edge) return;
         this.edge = null;
         console.warn(`[EDGE] borda desconectada: edgeId=${socket.data.edgeId}, ip=${socket.data.ip}`);
+    }
+
+    /** Identidade do gateway no handshake; null se mode/networkId faltam ou são inválidos. */
+    static identityOf(auth: any, edgeId: string): EdgeGatewayIdentity | null {
+        
+        const mode = auth?.mode;
+        
+        const networkId = typeof auth?.networkId === "string" ? auth.networkId.toUpperCase() : null;
+        
+        if (!Object.values(GatewayMode).includes(mode) || !networkId || !/^[0-9A-F]{4}$/.test(networkId)) return null;
+        
+        return { edgeId, mode, networkId };
     }
 
     /** Borda conectada agora (null = nenhuma). */

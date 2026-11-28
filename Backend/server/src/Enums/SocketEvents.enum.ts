@@ -11,4 +11,6 @@ export enum SocketEvents {
     RobotUpdates = "robot:updates",
     RobotStatus = "robot:status",
     RobotNew = "robot:new",
+    /** Cenário mudou - área nova vinda da borda (ScenarioUpdatedEvent). */
+    ScenarioUpdated = "scenario:updated",
 }

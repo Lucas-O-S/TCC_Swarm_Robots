@@ -43,6 +43,11 @@ export class ScenarioRepository extends BaseRepository<ScenarioModel> {
         });
     }
 
+    /** Cenário (mapa) de um gateway, com os obstáculos. */
+    async getByGateway(gatewayId: string): Promise<ScenarioModel | null> {
+        return await this.model.findOne({ where: { gatewayId }, include: [ObstacleModel] });
+    }
+
     async get(uuid: string): Promise<ScenarioModel | null> {
         return await this.model.findByPk(uuid, { include: [ObstacleModel] });
     }

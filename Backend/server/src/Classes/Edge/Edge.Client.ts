@@ -5,7 +5,7 @@ import { edgeConfig } from "src/config/edge.config";
 import { Command } from "src/Enums/Command.enum";
 import { EdgeSocketEvents } from "src/Enums/EdgeSocketEvents.enum";
 import { EdgeGateway } from "./Edge.Gateway";
-import { EdgeCommandAck, EdgeCommandRequest, EdgeRobotSnapshot, EdgeRobotSnapshotEvent, EdgeRobotState, EdgeRobotStatesEvent, EdgeRobotStatusEvent } from "./Edge.Types";
+import { EdgeArenaView, EdgeCommandAck, EdgeCommandRequest, EdgeGatewayIdentity, EdgeRobotSnapshot, EdgeRobotSnapshotEvent, EdgeRobotState, EdgeRobotStatesEvent, EdgeRobotStatusEvent } from "./Edge.Types";
 
 /**
  * Único ponto da API que conversa com a borda. Substitui o antigo
@@ -13,6 +13,8 @@ import { EdgeCommandAck, EdgeCommandRequest, EdgeRobotSnapshot, EdgeRobotSnapsho
  *  - comandos: `robot:command` com ack pela borda conectada no /edge; sem
  *    ela e com EDGE_URL definido, HTTP POST {EDGE_URL}/v1/robots/:address/commands/:comando
  *  - telemetria: socket.io  robot:states (lote) / robot:status
+ *  - gateway: identidade (handshake do /edge ou GET /v1/gateway) e área
+ *    (arena:snapshot ou GET /v1/arena), para o GatewayService
  * Dois jeitos de receber a telemetria, os dois alimentam os mesmos listeners:
  *  - borda conecta na API (namespace /edge, EdgeGateway) e manda
  *    robot:snapshot ao conectar;
@@ -27,6 +29,15 @@ export class EdgeClient implements OnModuleInit, OnModuleDestroy {
     private readonly stateListeners: ((state: EdgeRobotState) => void)[] = [];
 
     private readonly statusListeners: ((event: EdgeRobotStatusEvent) => void)[] = [];
+
+    private readonly gatewayUpListeners: ((identity: EdgeGatewayIdentity) => void)[] = [];
+
+    private readonly gatewayDownListeners: ((identity: EdgeGatewayIdentity) => void)[] = [];
+
+    private readonly arenaListeners: ((identity: EdgeGatewayIdentity, arena: EdgeArenaView) => void)[] = [];
+
+    // Gateway da borda alcançada pelo EDGE_URL (modo antigo), lido no GET /v1/gateway.
+    private urlIdentity: EdgeGatewayIdentity | null = null;
 
     // Evita repetir o aviso de "borda fora" a cada tentativa de reconexão.
     private warnedOffline = false;
@@ -50,10 +61,15 @@ export class EdgeClient implements OnModuleInit, OnModuleDestroy {
             this.resync().catch((error) =>
                 console.error("[EDGE] erro ao sincronizar com a borda:", error.message ?? error),
             );
+            this.resyncGateway().catch((error) =>
+                console.warn("[EDGE] borda sem gateway/arena (versão antiga?):", error.message ?? error),
+            );
         });
 
         this.socket.on("disconnect", (reason) => {
             console.warn(`[EDGE] desconectado da borda (${reason})`);
+            if (this.urlIdentity) this.publishGatewayDown(this.urlIdentity);
+            this.urlIdentity = null;
         });
 
         this.socket.on("connect_error", (error) => {
@@ -64,10 +80,21 @@ export class EdgeClient implements OnModuleInit, OnModuleDestroy {
 
         this.socket.on(EdgeSocketEvents.RobotStates, (event: EdgeRobotStatesEvent) => this.onStates(event));
         this.socket.on(EdgeSocketEvents.RobotStatus, (event: EdgeRobotStatusEvent) => this.publishStatus(event));
+        this.socket.on(EdgeSocketEvents.ArenaSnapshot, (arena: EdgeArenaView) => {
+            if (this.urlIdentity) this.publishArena(this.urlIdentity, arena);
+        });
     }
 
     /** Borda que acabou de entrar no /edge: mesmos eventos + o snapshot inicial. */
     private attach(socket: EdgeSocket): void {
+        // Identidade do handshake (EdgeGateway); null = borda antiga, sem gateway.
+        const identity: EdgeGatewayIdentity | null = socket.data.identity ?? null;
+        if (identity) {
+            this.publishGatewayUp(identity);
+            socket.on(EdgeSocketEvents.ArenaSnapshot, (arena: EdgeArenaView) => this.publishArena(identity, arena));
+            socket.on("disconnect", () => this.publishGatewayDown(identity));
+        }
+
         socket.on(EdgeSocketEvents.RobotSnapshot, (event: EdgeRobotSnapshotEvent) => {
             if (!Array.isArray(event?.robots)) return;
             this.applySnapshot(event.robots);
@@ -84,6 +111,14 @@ export class EdgeClient implements OnModuleInit, OnModuleDestroy {
 
     private async resync(): Promise<void> {
         this.applySnapshot(await this.getRobots());
+    }
+
+    // Modo antigo (EDGE_URL): sem handshake, a identidade e a área vêm pelo REST.
+    private async resyncGateway(): Promise<void> {
+        const identity = await this.request<EdgeGatewayIdentity>("GET", "/v1/gateway");
+        this.urlIdentity = identity;
+        this.publishGatewayUp(identity);
+        this.publishArena(identity, await this.request<EdgeArenaView>("GET", "/v1/arena"));
     }
 
     private applySnapshot(snapshots: EdgeRobotSnapshot[]): void {
@@ -106,6 +141,21 @@ export class EdgeClient implements OnModuleInit, OnModuleDestroy {
     /** Assina as mudanças de status calculadas pela borda (SwarmService). */
     onStatus(callback: (event: EdgeRobotStatusEvent) => void): void {
         this.statusListeners.push(callback);
+    }
+
+    /** Gateway conectou (borda no /edge com identidade, ou EDGE_URL respondendo). */
+    onGatewayUp(callback: (identity: EdgeGatewayIdentity) => void): void {
+        this.gatewayUpListeners.push(callback);
+    }
+
+    /** Gateway caiu. */
+    onGatewayDown(callback: (identity: EdgeGatewayIdentity) => void): void {
+        this.gatewayDownListeners.push(callback);
+    }
+
+    /** Área que a borda mandou para o gateway (arena:snapshot ou GET /v1/arena). */
+    onArena(callback: (identity: EdgeGatewayIdentity, arena: EdgeArenaView) => void): void {
+        this.arenaListeners.push(callback);
     }
 
     /**
@@ -146,6 +196,18 @@ export class EdgeClient implements OnModuleInit, OnModuleDestroy {
 
     private publishStatus(event: EdgeRobotStatusEvent): void {
         for (const listener of this.statusListeners) listener(event);
+    }
+
+    private publishGatewayUp(identity: EdgeGatewayIdentity): void {
+        for (const listener of this.gatewayUpListeners) listener(identity);
+    }
+
+    private publishGatewayDown(identity: EdgeGatewayIdentity): void {
+        for (const listener of this.gatewayDownListeners) listener(identity);
+    }
+
+    private publishArena(identity: EdgeGatewayIdentity, arena: EdgeArenaView): void {
+        for (const listener of this.arenaListeners) listener(identity, arena);
     }
 
     private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
