@@ -63,7 +63,12 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
         // sem ninguém perceber.
         if (lh2Config.calibrationFile) {
             this.calibration = Lh2Calibration.fromFile(lh2Config.calibrationFile);
-            console.log(`[LH2] calibração carregada: ${MariGatewayAdapter.channels(this.calibration)} de ${this.calibration.source}`);
+            console.log(`[LH2] calibração carregada: ${MariGatewayAdapter.describe(this.calibration)} de ${this.calibration.source}`);
+        } else {
+            // Sem arquivo indicado, a borda não escolhe um sozinha: o mais
+            // recente da pasta pode ser um teste. Os robôs seguem com a
+            // calibração que já têm na flash.
+            console.log("[LH2] nenhuma calibração carregada (LH2_CALIBRATION_FILE vazio) - os robôs seguem com a que têm na flash");
         }
 
         this.connect();
@@ -71,6 +76,9 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
         this.fleet.configure({
             autoStart: mariConfig.autoStart,
             lh2StationCount: this.calibration?.count ?? null,
+            // Com arquivo carregado, cada robô recebe essa calibração uma vez
+            // nesta execução: todos no mesmo referencial (ver SwarmitFleetPolicy).
+            calibrateOnJoin: this.calibration !== null,
         });
 
         // Roda sempre no modo mari: o device-info (imagem + calibração LH2) é
@@ -235,7 +243,7 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
     // Calcula a homografia, grava o TOML (mesmo formato do PyDotBot), adota
     // como calibração carregada e marca a frota toda para receber - arena
     // recalibrada vale para todos os robôs. Solta o robô reservado.
-    solveLh2Capture(): { calibration: Lh2Calibration; marked: string[] } {
+    solveLh2Capture(): { calibration: Lh2Calibration; cornersFile: string; marked: string[] } {
         const session = this.capture;
         if (!session) throw new Error("nenhuma captura em andamento");
 
@@ -243,11 +251,16 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
         const matrix = Lh2Homography.toWire(Lh2Homography.fromCorners(corners, session.distanceMm));
         // corners() só devolve com os 4 cantos, então a estação já foi escolhida.
         const draft = Lh2Calibration.forStation(session.calibratedStation!, matrix, "captura");
-        const path = draft.saveToml(lh2Config.calibrationDir, { distanceMm: session.distanceMm, tag: session.tag ?? undefined });
-        const calibration = Lh2Calibration.fromPayload(draft.payload, path);
+        const createdAt = new Date();
+        const path = draft.saveToml(lh2Config.calibrationDir, { distanceMm: session.distanceMm, tag: session.tag ?? undefined, createdAt });
+        // Relido do disco: o que fica carregado (com o [metadata]) é exatamente
+        // o que a borda vai ler no próximo boot.
+        const calibration = Lh2Calibration.fromFile(path);
+        // Mesma data do TOML (que guarda só até o segundo), para os dois baterem.
+        const cornersFile = session.saveCorners(path, calibration.meta?.createdAt ?? createdAt);
 
         this.calibration = calibration;
-        this.fleet.configure({ lh2StationCount: calibration.count });
+        this.fleet.configure({ lh2StationCount: calibration.count, calibrateOnJoin: true });
         const marked = this.fleet.forceCalibrate();
 
         this.fleet.release(session.address);
@@ -257,7 +270,7 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
             `[LH2] calibração salva em ${path} e carregada - ` +
             `para continuar valendo depois de reiniciar a borda, ponha esse caminho no LH2_CALIBRATION_FILE`
         );
-        return { calibration, marked };
+        return { calibration, cornersFile, marked };
     }
 
     cancelLh2Capture(): boolean {
@@ -416,5 +429,15 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
     private static channels(calibration: Lh2Calibration): string {
         const canais = calibration.stations.map((i) => i + 1);
         return `${canais.length > 1 ? "canais" : "canal"} ${canais.join(", ")}`;
+    }
+
+    // Canais + o [metadata] do TOML, para o log do boot.
+    private static describe(calibration: Lh2Calibration): string {
+        const meta = calibration.meta;
+        if (!meta) return MariGatewayAdapter.channels(calibration);
+
+        const tag = meta.tag ? `, "${meta.tag}"` : "";
+        const data = meta.createdAt ? `, de ${meta.createdAt.toISOString()}` : "";
+        return `${MariGatewayAdapter.channels(calibration)}, lado ${meta.distanceMm} mm${tag}${data}`;
     }
 }

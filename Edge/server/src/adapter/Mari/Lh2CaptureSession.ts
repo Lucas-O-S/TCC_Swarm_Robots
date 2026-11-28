@@ -1,7 +1,10 @@
+import { writeFileSync } from "fs";
+import { basename } from "path";
 import { LH2_CAPTURE_RETRIES, LH2_CAPTURE_TIMEOUT_MS } from "src/Constants/Lh2.Constants";
 import { LH2_CORNER_ORDER, Lh2Corner } from "src/Enums/Lh2Corner.enum";
 import { Lh2Sample } from "src/Protocols/Swarmit/Swarmit.Protocol";
 import { Protocol } from "src/Protocols/Protocol";
+import { Lh2Calibration } from "src/Protocols/Swarmit/Lh2Calibration";
 
 // Captura LH2 de um robô, canto a canto - o `lh2-calibration collect` do
 // PyDotBot 0.30.0 (dotbot/calibration/ota.py), dentro da borda. Sem Nest nem
@@ -44,6 +47,21 @@ export interface Lh2CaptureView {
 
 // Já tem um canto esperando resposta: um pedido por vez, senão a resposta de
 // um canto cai no outro.
+// Leituras cruas dos 4 cantos, gravadas ao lado do TOML no solve. Com elas a
+// matriz pode ser recalculada (outro lado, outra origem) sem voltar ao chão -
+// enquanto a base station não sair do lugar.
+export interface Lh2CornersRecord {
+    schemaVersion: 1;
+    createdAt: string;
+    calibrationFile: string;
+    address: string;
+    distanceMm: number;
+    tag: string | null;
+    station: number;
+    channel: number;
+    corners: Record<Lh2Corner, Lh2Sample>;
+}
+
 export class Lh2CaptureBusyError extends Error {}
 
 // Nenhuma amostra da estação de referência depois de todos os reenvios.
@@ -135,6 +153,29 @@ export class Lh2CaptureSession {
             throw new Error(`faltam os cantos: ${missing.join(", ")}`);
 
         return Object.fromEntries(LH2_CORNER_ORDER.map((c) => [c, this.samples.get(c)!])) as Record<Lh2Corner, Lh2Sample>;
+    }
+
+    // Grava as leituras dos cantos em <toml sem extensão>.corners.json e
+    // devolve o caminho. Só com os 4 cantos (corners() recusa antes).
+    saveCorners(tomlPath: string, createdAt: Date = new Date()): string {
+        // Antes de tudo: sem os 4 cantos, recusa (e com eles a estação já foi escolhida).
+        const corners = this.corners();
+        const record: Lh2CornersRecord = {
+            schemaVersion: 1,
+            createdAt: createdAt.toISOString(),
+            calibrationFile: basename(tomlPath),
+            address: this.address,
+            distanceMm: this.distanceMm,
+            // Mesma forma que vai no tag do TOML (slug), para os dois arquivos baterem.
+            tag: this.tag ? Lh2Calibration.slug(this.tag) || null : null,
+            station: this.station!,
+            channel: this.station! + 1,
+            corners,
+        };
+
+        const path = tomlPath.replace(/\.toml$/, "") + ".corners.json";
+        writeFileSync(path, JSON.stringify(record, null, 2) + "\n", "utf8");
+        return path;
     }
 
     view(): Lh2CaptureView {

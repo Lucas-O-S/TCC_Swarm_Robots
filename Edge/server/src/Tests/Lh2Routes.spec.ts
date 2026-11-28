@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, GatewayTimeoutException, NotFoundException } from "@nestjs/common";
-import { existsSync, mkdtempSync, rmSync } from "fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
-import { join } from "path";
+import { basename, join } from "path";
 import { lh2Config } from "../config/lh2.config";
 import { Lh2Corner } from "../Enums/Lh2Corner.enum";
 import { Lh2CaptureStartDto } from "../Classes/Lh2/DTO/lh2.capture.start.dto";
@@ -64,7 +64,7 @@ const simulatorService = () => new Lh2Service({ send: () => {}, onFrameReceived:
 describe("GET /v1/lh2/calibration", () => {
 
     it("fora do modo mari: não se aplica", () => {
-        expect(simulatorService().getCalibration()).toEqual({ supported: false, file: null, stationCount: null, channels: null, robots: [] });
+        expect(simulatorService().getCalibration()).toEqual({ supported: false, file: null, stationCount: null, channels: null, metadata: null, robots: [] });
     });
 
     it("mostra o arquivo e cada robô comparado com ele", () => {
@@ -192,6 +192,26 @@ describe("/v1/lh2/calibration/session - captura pela borda", () => {
         const saved = Lh2Calibration.fromFile(result.file);
         expect(saved.payload.equals(adapter.lh2Calibration()!.payload)).toBe(true);
         expect(service.getCalibration().file).toBe(result.file);
+
+        // Lado, tag e data do [metadata], no solve e no GET.
+        const metadata = { distanceMm: 500, tag: "arena-taak", createdAt: expect.any(String) };
+        expect(result.metadata).toEqual(metadata);
+        expect(service.getCalibration().metadata).toEqual(metadata);
+
+        // Leituras cruas dos cantos ao lado do TOML.
+        expect(result.cornersFile).toBe(result.file.replace(/\.toml$/, ".corners.json"));
+        const record = JSON.parse(readFileSync(result.cornersFile, "utf8"));
+        expect(record).toMatchObject({
+            schemaVersion: 1, calibrationFile: basename(result.file), address: A,
+            distanceMm: 500, tag: "arena-taak", station: 0, channel: 1, createdAt: result.metadata!.createdAt,
+        });
+        for (const corner of Object.values(Lh2Corner))
+            expect(record.corners[corner]).toEqual({ lhIndex: 0, count1: COUNTS[corner][0], count2: COUNTS[corner][1] });
+
+        // Robô que aparecer depois do solve também recebe a calibração nova.
+        const C = "0000000000000003";
+        fleet.onStatus(C, status(SwarmitDeviceStatus.Bootloader));
+        expect(fleet.get(C)?.forceCalibration).toBe(true);
 
         // Sessão encerrada e robô solto.
         expect(fleet.get(A)?.held).toBe(false);

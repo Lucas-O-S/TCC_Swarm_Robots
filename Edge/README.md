@@ -80,8 +80,16 @@ quadro atual e daí em diante seguir os eventos.
 
 Fora do modo `mari` o GET responde `supported: false` e as demais rotas, `409`.
 
-- `GET /v1/lh2/calibration` → arquivo carregado e a calibração reportada por robô.
+- `GET /v1/lh2/calibration` → arquivo carregado, `metadata` (`{ distanceMm, tag, createdAt }` lidos do `[metadata]` do TOML; `null` sem arquivo ou com `calibration.out`) e a calibração reportada por robô.
 - `POST /v1/lh2/calibration/push` `{ address? }` → `202`; reenvia a calibração carregada (sem `address`, a frota toda).
+
+No boot, com `LH2_CALIBRATION_FILE` preenchido, a borda carrega esse arquivo e
+cada robô que aparecer recebe essa calibração **uma vez nesta execução**, mesmo
+já reportando calibrado - o device-info só traz contagem e flags, então dois
+robôs com matrizes diferentes na flash pareceriam iguais. Quem já estava
+rodando recebe quando passar pelo Bootloader (`forcePending` no GET). Com o
+campo vazio nada é carregado nem enviado (a borda não escolhe o arquivo mais
+recente sozinha) e os robôs seguem com a calibração que têm na flash.
 
 Captura pela própria borda (substitui o `dotbot swarm lh2-calibration collect`):
 base station em qualquer canal, quadrado marcado no chão, robô ligado. A
@@ -95,7 +103,7 @@ zerados), que é como o firmware procura a homografia.
 | `POST /v1/lh2/calibration/session` | `{ address, distanceMm?, tag?, channel? }` | reserva o robô (STOP se estiver rodando; sem calibração nem START até terminar). `distanceMm` = lado do quadrado, default 500; a arena útil é 5 × o lado |
 | `GET /v1/lh2/calibration/session` | - | cantos capturados, `missing`, `pending`, `station`/`channel` calibrados, `otherStations` (índices vistos e ignorados) |
 | `POST /v1/lh2/calibration/session/capture` | `{ corner }` | `top-left`, `top-right`, `bottom-left` ou `bottom-right`, com o fotodiodo do robô na marca. Espera a leitura (até ~20 s); `504` se não vier, `409` fora do Bootloader |
-| `POST /v1/lh2/calibration/session/solve` | - | calcula a homografia, grava o TOML (formato do PyDotBot 0.30.0, em `LH2_CALIBRATION_DIR`), carrega e marca a frota toda para receber. `400` se faltar canto ou as capturas forem inconsistentes |
+| `POST /v1/lh2/calibration/session/solve` | - | calcula a homografia, grava o TOML (formato do PyDotBot 0.30.0, em `LH2_CALIBRATION_DIR`) e, ao lado, `<nome>.corners.json` com as leituras cruas dos 4 cantos (para recalcular sem voltar ao chão enquanto a base não mudar de lugar); carrega e marca a frota toda para receber. Devolve `file`, `cornersFile` e `metadata`. `400` se faltar canto ou as capturas forem inconsistentes |
 | `DELETE /v1/lh2/calibration/session` | - | cancela e solta o robô |
 
 O TOML gerado só continua carregado depois de reiniciar a borda se o caminho

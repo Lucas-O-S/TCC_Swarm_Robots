@@ -5,7 +5,8 @@ import { MariGatewayAdapter } from "src/adapter/Mari/MariGateway.Adapter";
 import { SwarmitNode } from "src/adapter/Mari/SwarmitFleet";
 import { SwarmitDeviceStatus } from "src/Enums/SwarmitDeviceStatus.enum";
 import { Protocol } from "src/Protocols/Protocol";
-import { Lh2CalibrationView, Lh2CornerResult, Lh2PushResult, Lh2RobotView, Lh2SolveResult } from "./Lh2.Types";
+import { Lh2CalibrationMetaView, Lh2CalibrationView, Lh2CornerResult, Lh2PushResult, Lh2RobotView, Lh2SolveResult } from "./Lh2.Types";
+import { Lh2Calibration } from "src/Protocols/Swarmit/Lh2Calibration";
 import { Lh2CaptureBusyError, Lh2CaptureTimeoutError, Lh2CaptureView } from "src/adapter/Mari/Lh2CaptureSession";
 import { Lh2Corner } from "src/Enums/Lh2Corner.enum";
 import { LH2_CALIBRATION_DISTANCE_DEFAULT } from "src/Constants/Lh2.Constants";
@@ -25,7 +26,7 @@ export class Lh2Service {
         const mari = this.mari();
 
         if (!mari) {
-            return { supported: false, file: null, stationCount: null, channels: null, robots: [] };
+            return { supported: false, file: null, stationCount: null, channels: null, metadata: null, robots: [] };
         }
 
         const calibration = mari.lh2Calibration();
@@ -36,6 +37,7 @@ export class Lh2Service {
             file: calibration?.source ?? null,
             stationCount,
             channels: calibration ? Lh2Service.channels(calibration.stations) : null,
+            metadata: calibration ? Lh2Service.metadata(calibration) : null,
             robots: mari.swarmitFleet().map((node) => this.robotView(node, stationCount)),
         };
     }
@@ -100,9 +102,13 @@ export class Lh2Service {
             throw new BadRequestException(`Faltam os cantos: ${session.view().missing.join(", ")}`);
 
         try {
-            const { calibration, marked } = mari.solveLh2Capture();
+            
+            const { calibration, cornersFile, marked } = mari.solveLh2Capture();
+            
             return {
                 file: calibration.source,
+                cornersFile,
+                metadata: Lh2Service.metadata(calibration),
                 stationCount: calibration.count,
                 channels: Lh2Service.channels(calibration.stations),
                 marked,
@@ -141,6 +147,12 @@ export class Lh2Service {
 
     private static channels(stations: number[]): number[] {
         return stations.map((index) => index + 1);
+    }
+
+    private static metadata(calibration: Lh2Calibration): Lh2CalibrationMetaView | null {
+        const meta = calibration.meta;
+        if (!meta) return null;
+        return { distanceMm: meta.distanceMm, tag: meta.tag ?? null, createdAt: meta.createdAt?.toISOString() ?? null };
     }
 
     private mari(): MariGatewayAdapter | null {

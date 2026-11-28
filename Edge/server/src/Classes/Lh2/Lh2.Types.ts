@@ -17,6 +17,14 @@ export interface Lh2RobotView {
     forcePending: boolean;
 }
 
+/** [metadata] do TOML carregado: lado do quadrado (dele sai a arena), tag e data. */
+export interface Lh2CalibrationMetaView {
+    distanceMm: number;
+    tag: string | null;
+    // ISO 8601 (UTC); null se o TOML não trouxer.
+    createdAt: string | null;
+}
+
 /** Resposta do GET /v1/lh2/calibration. */
 export interface Lh2CalibrationView {
     // false = transporte sem SwarmIT (simulador/MQTT): não há o que calibrar.
@@ -27,6 +35,8 @@ export interface Lh2CalibrationView {
     stationCount: number | null;
     // Canais com matriz de verdade (os slots zerados ficam de fora).
     channels: number[] | null;
+    // null = nada carregado, calibration.out legado ou TOML sem lado.
+    metadata: Lh2CalibrationMetaView | null;
     robots: Lh2RobotView[];
 }
 
@@ -49,6 +59,9 @@ export interface Lh2CornerResult {
 export interface Lh2SolveResult {
     // TOML gravado (formato do PyDotBot 0.30.0) e já carregado pela borda.
     file: string;
+    // Leituras cruas dos 4 cantos, ao lado do TOML (<nome>.corners.json).
+    cornersFile: string;
+    metadata: Lh2CalibrationMetaView | null;
     stationCount: number;
     channels: number[];
     // Robôs que vão receber a calibração nova (a frota toda).

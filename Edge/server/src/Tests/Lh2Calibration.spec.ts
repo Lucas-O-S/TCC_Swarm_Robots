@@ -107,4 +107,34 @@ describe("Lh2Calibration.fromFile", () => {
         expect(fromToml.source).toBe(tomlPath);
         expect(fromToml.matrices[0].equals(fromOut.matrices[0])).toBe(true);
     });
+
+    it("traz o [metadata] do TOML; o .out legado não tem", () => {
+        const data = payload(matrix(1));
+        const tomlPath = join(dir, "calibration-meta.toml");
+        const outPath = join(dir, "calibration-meta.out");
+        writeFileSync(tomlPath, toml(data));
+        writeFileSync(outPath, data);
+
+        expect(Lh2Calibration.fromFile(tomlPath).meta).toEqual({ distanceMm: 500, createdAt: new Date("2026-10-17T12:00:00Z") });
+        expect(Lh2Calibration.fromFile(outPath).meta).toBeNull();
+    });
+
+    it("o TOML gravado pela borda volta com lado, tag e data", () => {
+        const createdAt = new Date("2026-11-27T21:29:55Z");
+        const path = Lh2Calibration.fromPayload(payload(matrix(1))).saveToml(dir, { distanceMm: 800, tag: "arena taak", createdAt });
+
+        expect(Lh2Calibration.fromFile(path).meta).toEqual({ distanceMm: 800, tag: "arena-taak", createdAt });
+    });
+});
+
+describe("Lh2Calibration.metaFromToml", () => {
+
+    it("sem calibration_distance_mm não há metadado", () => {
+        expect(Lh2Calibration.metaFromToml('schema_version = 1\n[metadata]\ntag = "x"\n')).toBeNull();
+    });
+
+    it("data inválida fica de fora, o resto vale", () => {
+        const text = 'schema_version = 1\n[metadata]\ncreated_at = "ontem"\ncalibration_distance_mm = 1200\ntag = "sala"\n';
+        expect(Lh2Calibration.metaFromToml(text)).toEqual({ distanceMm: 1200, tag: "sala" });
+    });
 });

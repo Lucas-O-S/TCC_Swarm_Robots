@@ -85,13 +85,19 @@ export interface SwarmitFleetPolicy {
     // Estações da calibração carregada (LH2_CALIBRATION_FILE). null = a borda
     // não calibra ninguém, só repassa o lh2 que o robô reportar.
     lh2StationCount: number | null;
+    // Robô visto pela primeira vez nesta execução recebe a calibração
+    // carregada uma vez, mesmo já reportando calibrado: o device-info só traz
+    // contagem e flags, então dois robôs com matrizes diferentes (de
+    // calibrações antigas na flash) pareceriam iguais. Só vale com
+    // calibração carregada e, como o forceCalibrate, só em Bootloader.
+    calibrateOnJoin: boolean;
 }
 
 export class SwarmitFleet {
 
     private readonly nodes = new Map<string, SwarmitNode>();
 
-    private policy: SwarmitFleetPolicy = { autoStart: false, lh2StationCount: null };
+    private policy: SwarmitFleetPolicy = { autoStart: false, lh2StationCount: null, calibrateOnJoin: false };
 
     constructor(private readonly options: SwarmitFleetOptions = SWARMIT_FLEET_DEFAULTS) {}
 
@@ -125,7 +131,7 @@ export class SwarmitFleet {
             calibrateAttempts: 0,
             lastCalibrateAt: null,
             calibrateMark: null,
-            forceCalibration: false,
+            forceCalibration: this.policy.calibrateOnJoin && this.policy.lh2StationCount !== null,
             calibrationFailedWarned: false,
             held: false,
             lastStopAt: null,

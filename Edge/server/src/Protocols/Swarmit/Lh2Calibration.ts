@@ -6,7 +6,8 @@ import { LH2_MATRIX_LEN, LH2_MAX_STATIONS } from "src/Constants/Lh2.Constants";
 // (a 1.25.0 do firmware usa schema 3, com outro modelo de LH2).
 const TOML_SCHEMA_VERSION = 1;
 
-// Metadados que vão no [metadata] do TOML, como o PyDotBot grava.
+// Metadados que vão no [metadata] do TOML, como o PyDotBot grava. Lidos de
+// volta no fromFile: é deles que sai a arena (5 × o lado) depois de reiniciar.
 export interface Lh2CalibrationMeta {
     distanceMm: number;
     tag?: string;
@@ -28,6 +29,9 @@ export class Lh2Calibration {
     private constructor(
         public readonly matrices: Buffer[],
         public readonly source: string,
+        // [metadata] do TOML; null no calibration.out legado (só bytes) ou
+        // em TOML sem calibration_distance_mm.
+        public readonly meta: Lh2CalibrationMeta | null = null,
     ) {}
 
     // Slots enviados (= lh2HomographyCount que o robô reporta), não estações calibradas.
@@ -106,15 +110,15 @@ export class Lh2Calibration {
 
         const raw = readFileSync(path);
 
-        const payload = extname(path) === ".toml"
-            ? Lh2Calibration.payloadFromToml(raw.toString("utf8"), path)
-            : raw;
+        if (extname(path) !== ".toml")
+            return Lh2Calibration.fromPayload(raw, path);
 
-        return Lh2Calibration.fromPayload(payload, path);
+        const text = raw.toString("utf8");
+        return Lh2Calibration.fromPayload(Lh2Calibration.payloadFromToml(text, path), path, Lh2Calibration.metaFromToml(text));
     }
 
     // 1 B de contagem + N × 36 B (mesmo formato do calibration.out).
-    static fromPayload(payload: Buffer, source: string = "payload"): Lh2Calibration {
+    static fromPayload(payload: Buffer, source: string = "payload", meta: Lh2CalibrationMeta | null = null): Lh2Calibration {
 
         if (payload.length < 1)
             throw new Error(`${source}: calibração vazia`);
@@ -146,7 +150,7 @@ export class Lh2Calibration {
         if (matrices.every(Lh2Calibration.isEmpty))
             throw new Error(`${source}: todas as matrizes zeradas - recalibre`);
 
-        return new Lh2Calibration(matrices, source);
+        return new Lh2Calibration(matrices, source, meta);
     }
 
     private static isEmpty(matrix: Buffer): boolean {
@@ -168,5 +172,27 @@ export class Lh2Calibration {
             throw new Error(`${source}: sem [calibration].data_hex`);
 
         return Buffer.from(hex[1], "hex");
+    }
+
+    // [metadata] do TOML, com a mesma leitura por regex do data_hex. Sem
+    // calibration_distance_mm não há arena para derivar: devolve null. Tag e
+    // data são opcionais (o PyDotBot só grava tag quando ela foi dada).
+    static metaFromToml(text: string): Lh2CalibrationMeta | null {
+
+        const distance = /^\s*calibration_distance_mm\s*=\s*(\d+)/m.exec(text);
+
+        if (!distance)
+            return null;
+
+        const meta: Lh2CalibrationMeta = { distanceMm: Number(distance[1]) };
+
+        const tag = /^\s*tag\s*=\s*"([^"]*)"/m.exec(text);
+        if (tag && tag[1]) meta.tag = tag[1];
+
+        const created = /^\s*created_at\s*=\s*"([^"]*)"/m.exec(text);
+        const createdAt = created ? new Date(created[1]) : null;
+        if (createdAt && !Number.isNaN(createdAt.getTime())) meta.createdAt = createdAt;
+
+        return meta;
     }
 }

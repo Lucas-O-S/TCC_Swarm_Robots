@@ -43,7 +43,7 @@ const info = (over: Partial<SwarmitDeviceInfo> = {}): SwarmitDeviceInfo => ({
 const CALIBRATED = { lh2HomographyCount: 1, lh2Flags: Lh2Flags.valid | Lh2Flags.fromFlash };
 
 // Robô em Bootloader, já com device-info, no instante 0.
-const fleetWith = (policy: { autoStart: boolean; lh2StationCount: number | null }, deviceInfo = info()) => {
+const fleetWith = (policy: { autoStart: boolean; lh2StationCount: number | null; calibrateOnJoin?: boolean }, deviceInfo = info()) => {
     const fleet = new SwarmitFleet();
     fleet.configure(policy);
     fleet.onStatus(A, status(SwarmitDeviceStatus.Bootloader), 0);
@@ -157,6 +157,34 @@ describe("SwarmitFleet - calibração", () => {
 
     it("forceCalibrate de robô desconhecido não marca ninguém", () => {
         expect(fleetWith({ autoStart: false, lh2StationCount: 1 }).forceCalibrate("0000000000000001")).toEqual([]);
+    });
+});
+
+describe("SwarmitFleet - calibrateOnJoin", () => {
+
+    it("robô visto pela primeira vez recebe a calibração mesmo já calibrado, uma vez só", () => {
+        const fleet = fleetWith({ autoStart: true, lh2StationCount: 1, calibrateOnJoin: true }, info(CALIBRATED));
+
+        expect(fleet.plan(0)).toEqual({ requestInfo: [], calibrate: [A], start: [], stop: [] });
+
+        // Reiniciou depois da última matriz: outro boot encerra o reenvio.
+        fleet.onStatus(A, status(SwarmitDeviceStatus.Bootloader, 2), 1000);
+        expect(fleet.plan(2000).requestInfo).toEqual([A]);
+        fleet.onDeviceInfo(A, info({ infoGen: 2, bootCount: 2, uptimeS: 1, ...CALIBRATED }), 2100);
+
+        expect(fleet.get(A)?.forceCalibration).toBe(false);
+        expect(fleet.plan(2100)).toEqual({ requestInfo: [], calibrate: [], start: [A], stop: [] });
+    });
+
+    it("sem calibração carregada não marca ninguém", () => {
+        const fleet = fleetWith({ autoStart: true, lh2StationCount: null, calibrateOnJoin: true });
+        expect(fleet.get(A)?.forceCalibration).toBe(false);
+        expect(fleet.plan(0).start).toEqual([A]);
+    });
+
+    it("desligado, robô já calibrado vai direto para o START (como antes)", () => {
+        const fleet = fleetWith({ autoStart: true, lh2StationCount: 1, calibrateOnJoin: false }, info(CALIBRATED));
+        expect(fleet.plan(0)).toEqual({ requestInfo: [], calibrate: [], start: [A], stop: [] });
     });
 });
 
