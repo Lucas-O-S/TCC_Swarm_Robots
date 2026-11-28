@@ -66,6 +66,11 @@ export class EdgeWebsockets implements OnGatewayInit {
         this.broadcast(EdgeSocketEvents.RobotJoined, event);
     }
 
+    // Área do gateway mudou (calibração nova): vai para todos na hora.
+    emitArena(view: unknown): void {
+        this.broadcast(EdgeSocketEvents.ArenaSnapshot, view);
+    }
+
     // Mesmo evento para os clientes conectados aqui e para o back pelo uplink.
     private broadcast(event: EdgeSocketEvents, payload: unknown): void {
         this.server.emit(event, payload);

@@ -4,6 +4,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { edgeConfig } from './config/edge.config';
+import { gatewayConfig } from './config/gateway.config';
 
 async function bootstrap() {
 
@@ -34,6 +35,6 @@ async function bootstrap() {
     }));
 
     await app.listen(edgeConfig.port, '0.0.0.0');
-    console.log(`[EDGE] borda rodando na porta ${edgeConfig.port} (GATEWAY_MODE=${process.env.GATEWAY_MODE ?? 'simulator'})`);
+    console.log(`[EDGE] borda rodando na porta ${edgeConfig.port} (GATEWAY_MODE=${gatewayConfig.mode})`);
 }
 bootstrap();

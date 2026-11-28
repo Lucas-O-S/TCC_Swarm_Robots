@@ -1,6 +1,7 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { io, Socket } from "socket.io-client";
 import { edgeConfig } from "src/config/edge.config";
+import { gatewayIdentity } from "src/config/gateway.config";
 import { UplinkCommand, UplinkCommandReply } from "./Uplink.Types";
 import { EdgeSocketEvents } from "src/Enums/EdgeSocketEvents.enum";
 
@@ -31,9 +32,12 @@ export class UplinkService implements OnModuleInit, OnModuleDestroy {
         if (!edgeConfig.backendUrl) return;
 
         this.socket = io(edgeConfig.backendUrl, {
-            auth: { 
+            
+            // Identidade do gateway (edgeId + mode + networkId): o back sabe de
+            // qual gateway vêm os robôs desta conexão.
+            auth: {
                 token: edgeConfig.token,
-                edgeId: edgeConfig.edgeId
+                ...gatewayIdentity(),
             },
             transports: ["websocket"],
             reconnection: true,

@@ -14,5 +14,7 @@ export enum EdgeSocketEvents {
     RobotSnapshot = "robot:snapshot",
     /** Comando vindo do back pelo uplink, com ack (UplinkCommand → UplinkCommandReply). */
     RobotCommand = "robot:command",
+    /** Área do gateway (ArenaView): a cada (re)conexão do uplink e quando a calibração muda. */
+    ArenaSnapshot = "arena:snapshot",
 
 }

@@ -7,6 +7,11 @@ import { MARI_HEADER_LEN } from "src/Constants/Mari.Constants";
 
 export class MariProtocol {
 
+    // NETID = network_id em 4 hex MAIÚSCULOS (igual marilib/simulador): tópico
+    // MQTT e identidade do gateway.
+    static networkIdHex(networkId: number): string {
+        return networkId.toString(16).padStart(4, "0").toUpperCase();
+    }
 
     static buildMariHeader (header : MariHeader) : Buffer {
         const buffer = Buffer.alloc(MARI_HEADER_LEN);

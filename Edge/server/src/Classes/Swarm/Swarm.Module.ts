@@ -9,6 +9,6 @@ import { UplinkModule } from "../Uplink/Uplink.Module";
     imports: [GatewayModule, UplinkModule],
     controllers: [SwarmController],
     providers: [SwarmService, EdgeWebsockets],
-    exports: [SwarmService],
+    exports: [SwarmService, EdgeWebsockets],
 })
 export class SwarmModule {}

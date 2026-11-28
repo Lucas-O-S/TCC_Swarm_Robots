@@ -12,10 +12,9 @@ import { HOST_ADDRESS } from "src/Constants/Address.Constants";
 import { FRAME_TYPE_DATA, FRAME_VERSION } from "src/Constants/Frame.Constants";
 import { MARI_TYPE_DATA, MARI_VERSION } from "src/Constants/Mari.Constants";
 
-// NETID = network_id em 4 hex MAIÚSCULOS (igual marilib/simulador).
-const netid = (n: number) => n.toString(16).padStart(4, "0").toUpperCase();
-const toEdgeTopic = (n: number) => `/mari/${netid(n)}/to_edge`;   // comandos  (backend -> sim)
-const toCloudTopic = (n: number) => `/mari/${netid(n)}/to_cloud`; // telemetria (sim -> backend)
+// NETID = network_id em 4 hex MAIÚSCULOS (MariProtocol.networkIdHex).
+const toEdgeTopic = (n: number) => `/mari/${MariProtocol.networkIdHex(n)}/to_edge`;   // comandos  (backend -> sim)
+const toCloudTopic = (n: number) => `/mari/${MariProtocol.networkIdHex(n)}/to_cloud`; // telemetria (sim -> backend)
 
 /**
  * Adapter MQTT: conecta a API ao RobotSwarmSimulator (gateway + frota simulada,

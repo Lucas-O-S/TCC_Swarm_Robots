@@ -52,6 +52,10 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
     // Calibração LH2 carregada do LH2_CALIBRATION_FILE (null = não calibra).
     private calibration: Lh2Calibration | null = null;
 
+    // Quem quer saber quando a calibração carregada muda (solve/correct) - a
+    // arena do gateway sai dela.
+    private readonly calibrationListeners: ((calibration: Lh2Calibration) => void)[] = [];
+
     // setTimeouts das matrizes ainda por sair, para não escrever na serial
     // depois do onModuleDestroy.
     private readonly pendingSends = new Set<NodeJS.Timeout>();
@@ -183,6 +187,10 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
     }
 
     // Calibração carregada do arquivo (null = LH2_CALIBRATION_FILE vazio).
+    onLh2CalibrationChange(listener: (calibration: Lh2Calibration) => void): void {
+        this.calibrationListeners.push(listener);
+    }
+
     lh2Calibration(): Lh2Calibration | null {
         return this.calibration;
     }
@@ -263,9 +271,7 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
         // Mesma data do TOML (que guarda só até o segundo), para os dois baterem.
         const cornersFile = session.saveCorners(path, calibration.meta?.createdAt ?? createdAt);
 
-        this.calibration = calibration;
-        this.fleet.configure({ lh2StationCount: calibration.count, calibrateOnJoin: true });
-        const marked = this.fleet.forceCalibrate();
+        const marked = this.adoptCalibration(calibration);
 
         this.fleet.release(session.address);
         this.capture = null;
@@ -305,9 +311,7 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
         });
         const calibration = Lh2Calibration.fromFile(path);
 
-        this.calibration = calibration;
-        this.fleet.configure({ lh2StationCount: calibration.count, calibrateOnJoin: true });
-        const marked = this.fleet.forceCalibrate();
+        const marked = this.adoptCalibration(calibration);
 
         console.log(
             `[LH2] calibração corrigida (${MariGatewayAdapter.describeLayout(to)}) a partir de ${current.source}, ` +
@@ -472,6 +476,16 @@ export class MariGatewayAdapter implements GatewayAdapter, OnModuleInit, OnModul
     private static channels(calibration: Lh2Calibration): string {
         const canais = calibration.stations.map((i) => i + 1);
         return `${canais.length > 1 ? "canais" : "canal"} ${canais.join(", ")}`;
+    }
+
+    // Calibração nova (solve ou correct) vale para a frota toda: carrega,
+    // marca todos para receber (e quem aparecer depois) e avisa quem ouve.
+    private adoptCalibration(calibration: Lh2Calibration): string[] {
+        this.calibration = calibration;
+        this.fleet.configure({ lh2StationCount: calibration.count, calibrateOnJoin: true });
+        const marked = this.fleet.forceCalibrate();
+        for (const listener of this.calibrationListeners) listener(calibration);
+        return marked;
     }
 
     // Canais + o [metadata] do TOML, para o log do boot.

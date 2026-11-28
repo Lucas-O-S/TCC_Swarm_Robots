@@ -60,6 +60,17 @@ robô do Auto. Nos simuladores a lista vazia também para o robô.
 
 - `GET /v1/robots` → `[{ address, status, state }]`
 - `GET /v1/robots/:address` → `{ address, status, state }` (404 se a borda nunca ouviu o robô)
+- `GET /v1/gateway` → `{ edgeId, mode, networkId }` — quem é este gateway (`EDGE_ID`, `GATEWAY_MODE` = `mari` \| `mqtt` \| `simulator`, `MARI_NETWORK_ID` em 4 hex). O modo entra na identidade porque a mesma borda em mqtt tem o mesmo `EDGE_ID` e rede.
+- `GET /v1/arena` → a área em que os robôs deste gateway reportam a posição, no referencial deles (mm, Y pra baixo; é dela que o mapa nasce, sem conversão):
+
+  | Campo | O que é |
+  | --- | --- |
+  | `gateway` | o mesmo do `GET /v1/gateway` |
+  | `source` | `lh2` (calibração carregada, modo mari), `config` (`ARENA_WIDTH_MM`/`ARENA_HEIGHT_MM`, modos mqtt/simulator) ou `null` (desconhecida: mari sem calibração, ou `ARENA_*` vazio) |
+  | `layout` | `area` (área real informada na calibração, começando em (1000, 1000)), `pydotbot` (calibração sem área: arena de 5 × o retângulo a partir de (0, 0)) ou `config` (a partir de (0, 0)) |
+  | `area` | `{ x, y, width, height }` em mm |
+  | `calibration` | retângulo das 4 marcas de calibração `{ x, y, width, height }` (só `lh2`) |
+  | `channels`, `version`, `file` | canais calibrados, `created_at` e TOML da calibração (só `lh2`) |
 
 ### Eventos (socket.io)
 
@@ -68,6 +79,7 @@ robô do Auto. Nos simuladores a lista vazia também para o robô.
 | `robot:states` | `{ states: [{ address, type, payloadType, data, position, updatedAt }, ...] }` — lote a cada ~20 ms, em ordem de chegada |
 | `robot:status` | `{ address, status, lastSync }` — `status`: 0 Active, 1 Inactive (>5 s sem frame), 2 Lost (>60 s) |
 | `robot:joined` | `{ address }` — primeiro advertisement desde que a borda subiu |
+| `arena:snapshot` | o mesmo do `GET /v1/arena`, quando a calibração muda (solve ou correct) |
 
 - `type`: nome do payload (`DOTBOT_ADVERTISEMENT`, `GPS_POSITION`, ...).
 - `data`: campos decodificados como vieram do robô (`battery` em mV, `pos_x`/`pos_y` em mm, `waypoint_idx`...).
@@ -125,6 +137,29 @@ com outro retângulo. Vai no `[metadata]` (`calibration_width_mm`/
 o PyDotBot ignora, só lê `data_hex`; o `calibration_distance_mm` leva a
 largura) e aparece no `metadata` do GET.
 
+**Conferir a calibração (à mão, 1 minuto).** Com 4 pontos a matriz sempre
+"fecha", então lado digitado errado, cantos capturados fora de ordem ou base
+que mudou de lugar não dão erro. Depois de calibrar, pare o robô em pontos
+conhecidos e compare com o `GET /v1/robots/:address` (`position.x`/`y`).
+Esperado com a área informada (margem de 1000 mm):
+
+| Ponto no chão | x | y |
+| --- | --- | --- |
+| canto superior-esquerdo da área | 1000 | 1000 |
+| canto top-left do retângulo | 1000 + `rectXMm` | 1000 + `rectYMm` |
+| canto bottom-right do retângulo | 1000 + `rectXMm` + largura | 1000 + `rectYMm` + altura |
+| centro do retângulo | 1000 + `rectXMm` + largura / 2 | 1000 + `rectYMm` + altura / 2 |
+
+Diferenças de alguns centímetros são normais (robô posicionado à mão). Tudo
+esticado ou encolhido na mesma proporção = medida digitada errada → `POST
+.../correct`. Eixos trocados, espelho ou deslocamento que muda de um ponto
+para outro = cantos fora de ordem ou base mexida → capturar de novo. A
+tabela não prova a escala: se a medida digitada estiver errada, todos os
+pontos erram na mesma proporção e continuam "batendo" com a conta. A escala se
+confere com trena: o retângulo no chão tem a largura e a altura digitadas (e
+as duas diagonais iguais), ou o robô andado 50 cm medidos muda a leitura em
+500 mm.
+
 O TOML gerado só continua carregado depois de reiniciar a borda se o caminho
 dele for para o `LH2_CALIBRATION_FILE`.
 
@@ -141,7 +176,8 @@ com o back fora do ar.
 | `EDGE_ID` | nome desta borda no back; único entre as bordas ligadas no mesmo back. Vazio = hostname da máquina |
 | `EDGE_TOKEN` | o mesmo token da borda, mandado no handshake |
 
-Handshake: `auth: { token: EDGE_TOKEN, edgeId: EDGE_ID }`, transporte só
+Handshake: `auth: { token: EDGE_TOKEN, edgeId: EDGE_ID, mode: GATEWAY_MODE, networkId: "1200" }`
+(identidade do gateway, a mesma do `GET /v1/gateway`), transporte só
 `websocket`. A reconexão é automática (1 s até 10 s entre tentativas). Se o
 back recusar o handshake (token), a borda tenta de novo a cada 30 s. Se o back
 derrubar a conexão, ela reconecta na hora.
@@ -151,6 +187,7 @@ Eventos borda → back:
 | Evento | Payload |
 | --- | --- |
 | `robot:snapshot` | `{ robots: [{ address, status, state }, ...] }` — o mesmo do `GET /v1/robots`, mandado a cada (re)conexão (o back não consegue chamar o REST da borda) |
+| `arena:snapshot` | o mesmo do `GET /v1/arena`, mandado a cada (re)conexão e quando a calibração muda |
 | `robot:states` / `robot:status` / `robot:joined` | iguais aos da seção "Eventos" acima, na mesma ordem em que saem para os clientes locais |
 
 Com o uplink desconectado, os eventos são descartados (não acumulam para a
@@ -200,6 +237,8 @@ server/src/
     Auth/           token único (EDGE_TOKEN)
     Uplink/         socket.io-client até o back (BACKEND_URL, EDGE_ID, reconexão)
     Bridge/         liga o uplink ao Swarm (snapshot) e ao Commands (robot:command validado)
-  Websockets/       socket.io: robot:states / robot:status / robot:joined (+ cópia pelo uplink)
+    Lh2/            calibração LH2: GET/push, captura (session), correção (correct)
+    Arena/          GET /v1/gateway, GET /v1/arena, arena:snapshot (área a partir da calibração ou ARENA_*)
+  Websockets/       socket.io: robot:states / robot:status / robot:joined / arena:snapshot (+ cópia pelo uplink)
   Tests/            HDLC byte a byte contra o marilib (npm test)
 ```
